@@ -2,14 +2,15 @@
 
 ## 基本信息
 
-| 项目     | 版本         |
-| :------- | :----------- |
-| OS       | Ubuntu 23.10 |
-| GCC      | 14.0.1       |
-| GDB      | 15.0.50      |
-| Binutils | 2.42.50      |
-| Python   | 3.11.6       |
-| Glibc    | 2.38         |
+| 项目      | 版本         |
+| :-------- | :----------- |
+| OS        | Ubuntu 23.10 |
+| GCC       | 14.0.1       |
+| GDB       | 15.0.50      |
+| Binutils  | 2.42.50      |
+| Python    | 3.11.6       |
+| Glibc     | 2.38         |
+| Mingw-w64 | 10.0.0       |
 
 ## 准备工作
 
@@ -52,12 +53,14 @@ export PREFIX=~/x86_64-linux-gnu-native-gcc14
 cd ~/gcc
 mkdir build
 cd build
-../configure --disable-werror --enable-multilib --enable-languages=c,c++ --disable-bootstrap --enable-nls --prefix=$PREFIX
+sh ../configure --disable-werror --enable-multilib --enable-languages=c,c++ --disable-bootstrap --enable-nls --prefix=$PREFIX
 make -j 20
 make install-strip -j 20
 echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
 source ~/.bashrc
 ```
+
+参阅[gcc配置选项](https://gcc.gnu.org/install/configure.html)。
 
 ### 2.编译安装binutils和gdb
 
@@ -66,7 +69,7 @@ cd ~/binutils
 mkdir build
 cd build
 export ORIGIN='$$ORIGIN'
-../configure --prefix=$PREFIX --disable-werror --enable-nls --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64"
+sh ../configure --prefix=$PREFIX --disable-werror --enable-nls --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64"
 make -j 20
 make install-strip -j 20
 ```
@@ -112,3 +115,119 @@ register_libstdcxx_printers(gdb.current_objfile())
 ```
 
 同理，修改`lib32/libstdc++.so.6.0.33-gdb.py`，尽管在默认配置中该文件不会被加载。
+
+## 构建mingw交叉工具链
+
+| build            | host             | target             |
+| :--------------- | :--------------- | :----------------- |
+| x86_64-linux-gnu | x86_64-linux-gnu | x86_64-w64-mingw32 |
+
+### 1.设置环境变量
+
+```shell
+export TARGET=x86_64-w64-mingw32
+export HOST=x86_64-linux-gnu
+export PREFIX=~/$HOST-host-$TARGET-cross-gcc14
+```
+
+### 2.编译安装binutils
+
+```shell
+cd binutils/build
+rm -rf *
+# Linux下不便于调试Windows,故不编译gdb
+sh ../configure --disable-werror --enable-nls --disable-gdb --prefix=$PREFIX --target=$TARGET
+make -j 20
+make install-strip -j 20
+echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### 3.安装mingw-w64头文件
+
+```shell
+cd ~/mingw
+mkdir build
+cd build
+# 这是交叉编译器，故目标平台的头文件需要装在$TARGET目录下
+sh ../configure --prefix=$PREFIX/$TARGET --with-default-msvcrt=ucrt --host=$TARGET --without-crt
+make install
+```
+
+### 4.修改libgcc以支持win32线程模型下的条件变量
+
+```c
+// libgcc/config/i386/gthr-win32.h
+/* Condition variables are supported on Vista and Server 2008 or later.  */
+#if _WIN32_WINNT >= 0x0600
+#define __GTHREAD_HAS_COND 1
+#define __GTHREADS_CXX0X 1
+#endif
+```
+
+修改为：
+
+```c
+// libgcc/config/i386/gthr-win32.h
+/* Condition variables are supported on Vista and Server 2008 or later.  */
+#define __GTHREAD_HAS_COND 1
+#define __GTHREADS_CXX0X 1
+```
+
+### 5.编译安装gcc和libgcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+sh ../configure --disable-werror --enable-multilib --enable-languages=c,c++ --enable-nls --disable-sjlj-exceptions --enable-threads=win32 --prefix=$PREFIX --target=$TARGET
+make all-gcc all-target-libgcc -j 20
+make install-strip-gcc install-strip-target-libgcc -j 20
+```
+
+遇到如下情况：
+
+```log
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 dllcrt2.o: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -lmingwthrd: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -lmingw32: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -lmingwex: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -lmoldname: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -lmsvcrt: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -ladvapi32: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -lshell32: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -luser32: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -lkernel32: 没有那个文件或目录
+```
+
+尝试禁用动态库编译出gcc和libgcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+sh ../configure --disable-werror --enable-multilib --enable-languages=c,c++ --enable-nls --disable-sjlj-exceptions --enable-threads=win32 --prefix=$PREFIX --target=$TARGET --disable-shared
+make all-gcc all-target-libgcc -j 20
+make install-strip-gcc install-strip-target-libgcc -j 20
+```
+
+### 6.编译安装mingw-w64运行时
+
+```shell
+cd ~/mingw/build
+rm -rf *
+sh ../configure --prefix=$PREFIX/$TARGET --with-default-msvcrt=ucrt --host=$TARGET
+make -j 24
+make install-strip -j 24
+# 构建交叉工具链时multilib在$TARGET/lib/32而不是$TARGET/lib32下
+cd $PREFIX/$TARGET/lib
+ln -s ../lib32 32
+```
+
+### 7.编译安装完整gcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+sh ../configure --disable-werror --enable-multilib --enable-languages=c,c++ --enable-nls --disable-sjlj-exceptions --enable-threads=win32 --prefix=$PREFIX --target=$TARGET
+make -j 20
+make install-strip -j 20
+```
