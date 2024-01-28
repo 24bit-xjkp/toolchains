@@ -20,9 +20,12 @@ cd gcc
 contrib/download_prerequisites
 cp -rfL gmp mpfr ..
 ```
-4. 构建本地gcc工具链
-|build|host|target|
-```
+4. 构建gcc本地工具链
+
+| build            | host             | target           |
+| ---------------- | ---------------- | ---------------- |
+| x86_64-linux-gnu | x86_64-linux-gnu | x86_64-linux-gnu |
+```shell
 export PREFIX=~/x86_64-linux-gnu-native-gcc14
 mkdir build
 cd build
