@@ -116,7 +116,16 @@ register_libstdcxx_printers(gdb.current_objfile())
 
 同理，修改`lib32/libstdc++.so.6.0.33-gdb.py`，尽管在默认配置中该文件不会被加载。
 
-## 构建mingw交叉工具链
+### 5.打包工具链
+
+```shell
+cd ~
+export MEMORY=$(cat /proc/meminfo | awk '/MemTotal/ {printf "%dGiB\n", int($2/1024/1024)}')
+tar -cf $PREFIX.tar $PREFIX
+xz -ev9 -T 0 --memlimit=$MEMORY $PREFIX.tar
+```
+
+## 构建mingw[交叉工具链](https://en.wikipedia.org/wiki/Cross_compiler)
 
 | build            | host             | target             |
 | :--------------- | :--------------- | :----------------- |
@@ -231,3 +240,5 @@ sh ../configure --disable-werror --enable-multilib --enable-languages=c,c++ --en
 make -j 20
 make install-strip -j 20
 ```
+
+## 构建mingw[加拿大工具链](https://en.wikipedia.org/wiki/Cross_compiler#Canadian_Cross)
