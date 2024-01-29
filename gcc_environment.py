@@ -6,23 +6,24 @@ import io
 
 lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports")
 
+
 def run_command(command: str) -> None:
     print(command)
-    assert os.system(command) == 0, f"Command \"{command}\" failed."
+    assert os.system(command) == 0, f'Command "{command}" failed.'
 
 
 class environment:
-    major_version: str
-    build: str
-    host: set
-    target: str
-    cross_compiler: bool
-    name_without_version: str
-    name: str
-    home_dir: str
-    prefix: str
-    num_cores: int
-    current_dir: str
+    major_version: str  # < GCC的主版本号
+    build: str  # < build平台
+    host: set  # < host平台
+    target: str  # < target平台
+    cross_compiler: bool  # < 是否是交叉编译器
+    name_without_version: str  # < 不带版本号的工具链名
+    name: str  # < 工具链名
+    home_dir: str  # < $HOME
+    prefix: str  # < 工具链安装位置
+    num_cores: int  # < 编译所用线程数
+    current_dir: str  # < 该文件所在目录
 
     def __init__(self, major_version: str, build: str = "x86_64-linux-gnu", host: str = "", target: str = "") -> None:
         self.major_version = major_version
@@ -35,7 +36,7 @@ class environment:
         self.home_dir = os.environ["HOME"]
         self.prefix = os.path.join(self.home_dir, self.name)
         self.num_cores = psutil.cpu_count() + 4
-        self.current_dir = os.getcwd()
+        self.current_dir = os.path.abspath(os.path.dirname(__file__))
         assert os.path.isfile(os.path.join(self.current_dir, f"{self.name_without_version}.md")), "We must run the script in the project directory and ensure that the project is unbroken."
 
     def update(self) -> None:
@@ -87,7 +88,7 @@ class environment:
         os.chdir(self.home_dir)
         run_command(f"tar -cf {self.name}.tar {self.name}/")
         memory_MB = psutil.virtual_memory().available // 1048576
-        run_command(f"xz -ev9 -T 0 --memlimit={memory_MB}MiB {self.name}.tar")
+        run_command(f"xz -fev9 -T 0 --memlimit={memory_MB}MiB {self.name}.tar")
 
 
 assert __name__ != "__main__", "Import this file instead of running it directly."
