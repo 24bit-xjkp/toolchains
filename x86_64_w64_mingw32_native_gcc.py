@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import gcc_environment as gcc
+import x86_64_linux_gnu_host_x86_64_w64_mingw32_target_gcc
 import os
 
 env = gcc.environment("14", host="x86_64-w64-mingw32")
