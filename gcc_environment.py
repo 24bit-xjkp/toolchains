@@ -6,6 +6,10 @@ import io
 
 lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports")
 
+def run_command(command: str) -> None:
+    print(command)
+    assert os.system(command) == 0, f"Command \"{command}\" failed."
+
 
 class environment:
     major_version: str
@@ -30,7 +34,7 @@ class environment:
         self.name = self.name_without_version + major_version
         self.home_dir = os.environ["HOME"]
         self.prefix = os.path.join(self.home_dir, self.name)
-        self.num_cores = psutil.cpu_count()
+        self.num_cores = psutil.cpu_count() + 4
         self.current_dir = os.getcwd()
         assert os.path.isfile(os.path.join(self.current_dir, f"{self.name_without_version}.md")), "We must run the script in the project directory and ensure that the project is unbroken."
 
@@ -38,25 +42,23 @@ class environment:
         for lib in ("expat", "gcc", "binutils", "linux", "mingw", "pexports", "glibc"):
             path = os.path.join(self.home_dir, lib)
             os.chdir(path)
-            os.system("git pull")
+            run_command("git pull")
 
     def enter_build_dir(self, lib: str) -> None:
         assert lib in lib_list
         build_dir = os.path.join(self.home_dir, lib, "build" if lib != "expat" else "expat/build")
         if os.path.isdir(build_dir):
-            os.chdir(build_dir)
-            os.system("rm -rf *")
-        else:
-            os.mkdir(build_dir)
-            os.chdir(build_dir)
+            shutil.rmtree(build_dir)
+        os.mkdir(build_dir)
+        os.chdir(build_dir)
 
     def make(self, *target: str) -> None:
         targets = " ".join(target)
-        os.system(f"make {targets} -j {self.num_cores}")
+        run_command(f"make {targets} -j {self.num_cores}")
 
     def install(self, *target: str) -> None:
         targets = " ".join(target) if target != [] else "install-strip"
-        os.system(f"make {targets} -j {self.num_cores}")
+        run_command(f"make {targets} -j {self.num_cores}")
 
     def register_in_env(self) -> None:
         bin_path = os.path.join(self.prefix, "bin")
@@ -83,9 +85,9 @@ class environment:
             self.copy_gdbinit()
         self.copy_readme()
         os.chdir(self.home_dir)
-        os.system(f"tar -cf {self.name}.tar {self.name}/")
+        run_command(f"tar -cf {self.name}.tar {self.name}/")
         memory_MB = psutil.virtual_memory().available // 1048576
-        os.system(f"xz -ev9 -T 0 --memlimit={memory_MB}MiB {self.name}.tar")
+        run_command(f"xz -ev9 -T 0 --memlimit={memory_MB}MiB {self.name}.tar")
 
 
 assert __name__ != "__main__", "Import this file instead of running it directly."
