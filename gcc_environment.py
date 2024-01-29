@@ -56,15 +56,17 @@ class environment:
         os.chdir(build_dir)
         return build_dir
 
-    def configure(self, option: str = "") -> None:
-        run_command(f"../configure {option}")
+    def configure(self, *option: str) -> None:
+        options = " ".join(("", *option))
+        run_command(f"../configure {options}")
 
-    def make(self, target: str = "") -> None:
-        run_command(f"make {target} -j {self.num_cores}")
+    def make(self, *target: str) -> None:
+        targets = " ".join(("", *target))
+        run_command(f"make {targets} -j {self.num_cores}")
 
-    def install(self, target: str = "") -> None:
-        target = target if target != "" else "install-strip"
-        run_command(f"make {target} -j {self.num_cores}")
+    def install(self, *target: str) -> None:
+        targets = " ".join(("", *target)) if target != () else "install-strip"
+        run_command(f"make {targets} -j {self.num_cores}")
 
     def register_in_env(self) -> None:
         bin_path = os.path.join(self.prefix, "bin")
