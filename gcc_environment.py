@@ -40,6 +40,7 @@ class environment:
         self.num_cores = psutil.cpu_count() + 4
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
         self.lib_prefix = os.path.join(self.prefix, self.target) if self.cross_compiler else self.prefix
+        self.symlink_list = []
 
     def update(self) -> None:
         for lib in ("expat", "gcc", "binutils", "linux", "mingw", "pexports", "glibc"):
@@ -91,12 +92,14 @@ class environment:
     def symlink_multilib(self) -> None:
         multilib_list = {}
         for multilib in os.listdir(self.lib_prefix):
-            if multilib != "lib" and multilib[0:3] == "lib" and os.path.isdir(multilib):
+            if multilib != "lib" and multilib[0:3] == "lib" and os.path.isdir(os.path.join(self.lib_prefix, multilib)):
                 multilib_list[multilib] = multilib[3:]
         lib_path = os.path.join(self.lib_prefix, "lib")
         cwd = os.getcwd()
         os.chdir(lib_path)
-        for multilib, suffix in multilib_list:
+        for multilib, suffix in multilib_list.items():
+            if os.path.exists(suffix):
+                os.unlink(suffix)
             os.symlink(os.path.join("..", multilib), suffix, True)
             self.symlink_list.append(os.path.join(lib_path, suffix))
         os.chdir(cwd)

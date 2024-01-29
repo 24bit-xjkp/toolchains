@@ -44,6 +44,12 @@ def build() -> None:
     env.make()
     env.install()
     env.delete_symlink()
+
+    # 编译pexports
+    env.enter_build_dir("pexports")
+    env.configure(f"--prefix={env.prefix}")
+    env.make()
+    env.install()
     env.package(False)
 
 

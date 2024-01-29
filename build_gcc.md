@@ -17,7 +17,7 @@
 ### 1.安装系统包
 
 ```shell
-sudo apt install bison flex texinfo make automake autoconf git gcc g++ gcc-multilib g++-multilib cmake ninja-build python3 tar xz-utils unzip libgmp-dev libmpfr-dev
+sudo apt install bison flex texinfo make automake autoconf libtool git gcc g++ gcc-multilib g++-multilib cmake ninja-build python3 tar xz-utils unzip libgmp-dev libmpfr-dev
 ```
 
 ### 2.下载源代码
@@ -31,6 +31,9 @@ git clone https://github.com/torvalds/linux.git --depth=1 linux
 # glibc版本要与目标系统使用的版本对应
 git clone https://github.com/bminor/glibc.git -b release/2.38/master --depth=1 glibc
 git clone https://github.com/bocke/pexports.git --depth=1 pexports
+cd ~/pexports
+autoreconf -if
+cd ~
 # 编译Windows下带有Python支持的gdb需要嵌入式Python环境，Python版本
 wget https://www.python.org/ftp/python/3.11.6/python-3.11.6-embed-amd64.zip -O python-embed.zip
 unzip -o python-embed.zip  python3*.dll python3*.zip *._pth -d python-embed -x python3.dll
@@ -44,7 +47,6 @@ cd ~/gcc
 contrib/download_prerequisites
 cp -rfL gmp mpfr ..
 cd ~
-
 ```
 
 ## 构建gcc本地工具链
@@ -172,7 +174,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY x86_64-linux-gnu-native-gcc14.tar
 ```shell
 export TARGET=x86_64-w64-mingw32
 export HOST=x86_64-linux-gnu
-export PREFIX=~/$HOST-host-$TARGET-cross-gcc14
+export PREFIX=~/$HOST-host-$TARGET-target-gcc14
 ```
 
 ### 2.编译安装binutils
@@ -273,6 +275,17 @@ ln -s ../lib32 32
 cd ~/gcc/build
 rm -rf *
 sh ../configure --disable-werror --enable-multilib --enable-languages=c,c++ --enable-nls --disable-sjlj-exceptions --enable-threads=win32 --prefix=$PREFIX --target=$TARGET
+make -j 20
+make install-strip -j 20
+```
+
+### 8.编译安装pexports
+
+```shell
+cd ~/pexports
+mkdir build
+cd build
+sh ../configure --prefix=$PREFIX
 make -j 20
 make install-strip -j 20
 ```
