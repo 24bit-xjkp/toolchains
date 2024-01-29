@@ -12,6 +12,7 @@
 - GDB：15.0.50
 - Binutils：2.42.50
 - Mingw-w64：10.0.0
+- PExports：0.47
 
 ## 组件
 
@@ -19,3 +20,4 @@
 - g++
 - binutils
 - mingw-w64(使用ucrt)
+- pexports

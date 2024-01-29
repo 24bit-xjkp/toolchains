@@ -11,6 +11,7 @@
 | Python    | 3.11.6       |
 | Glibc     | 2.38         |
 | Mingw-w64 | 10.0.0       |
+| PExports  | 0.47         |
 
 ## 准备工作
 
