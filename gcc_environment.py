@@ -15,7 +15,7 @@ def run_command(command: str) -> None:
 class environment:
     major_version: str  # < GCC的主版本号
     build: str  # < build平台
-    host: set  # < host平台
+    host: str  # < host平台
     target: str  # < target平台
     cross_compiler: bool  # < 是否是交叉编译器
     name_without_version: str  # < 不带版本号的工具链名
@@ -56,17 +56,15 @@ class environment:
         os.chdir(build_dir)
         return build_dir
 
-    def configure(self, *option: str) -> None:
-        options = " ".join(option)
-        run_command(f"../configure {options}")
+    def configure(self, option: str = "") -> None:
+        run_command(f"../configure {option}")
 
-    def make(self, *target: str) -> None:
-        targets = " ".join(target)
-        run_command(f"make {targets} -j {self.num_cores}")
+    def make(self, target: str = "") -> None:
+        run_command(f"make {target} -j {self.num_cores}")
 
-    def install(self, *target: str) -> None:
-        targets = " ".join(target) if target != [] else "install-strip"
-        run_command(f"make {targets} -j {self.num_cores}")
+    def install(self, target: str = "") -> None:
+        target = target if target != "" else "install-strip"
+        run_command(f"make {target} -j {self.num_cores}")
 
     def register_in_env(self) -> None:
         bin_path = os.path.join(self.prefix, "bin")
