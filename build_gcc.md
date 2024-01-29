@@ -15,13 +15,13 @@
 
 ## 准备工作
 
-### 1.安装系统包
+### 1安装系统包
 
 ```shell
 sudo apt install bison flex texinfo make automake autoconf libtool git gcc g++ gcc-multilib g++-multilib cmake ninja-build python3 tar xz-utils unzip libgmp-dev libmpfr-dev
 ```
 
-### 2.下载源代码
+### 2下载源代码
 
 ```shell
 git clone https://github.com/gcc-mirror/gcc.git --depth=1 gcc
@@ -41,7 +41,7 @@ unzip -o python-embed.zip  python3*.dll python3*.zip *._pth -d python-embed -x p
 rm python-embed.zip
 ```
 
-### 3.安装依赖库
+### 3安装依赖库
 
 ```shell
 cd ~/gcc
@@ -56,7 +56,7 @@ cd ~
 | :--------------- | :--------------- | :--------------- |
 | x86_64-linux-gnu | x86_64-linux-gnu | x86_64-linux-gnu |
 
-### 1.编译安装gcc
+### 4编译安装gcc
 
 ```shell
 export PREFIX=~/x86_64-linux-gnu-native-gcc14
@@ -72,7 +72,7 @@ source ~/.bashrc
 
 参阅[gcc配置选项](https://gcc.gnu.org/install/configure.html)。
 
-### 2.编译安装binutils和gdb
+### 5编译安装binutils和gdb
 
 ```shell
 cd ~/binutils
@@ -90,7 +90,7 @@ make install-strip -j 20
 `export ORIGIN='$$ORIGIN'`和`LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64"`选项是用于设置gdb的rpath。由于编译时使用的gcc版本比系统自带的更高，故链接的libstdc++版本也更高。
 因而需要将rpath设置到编译出来的libstdc++所在的目录。
 
-### 3.创建.gdbinit
+### 6创建.gdbinit
 
 由`libstdc++.so.6.0.33-gdb.py`配置pretty-printer：
 
@@ -107,7 +107,7 @@ gdb.execute(f"source {scriptPath}")
 end
 ```
 
-由`share/.gdbinit`直接配置pretty-printer，完成后直接跳转至第5步：
+由`share/.gdbinit`直接配置pretty-printer，完成后直接跳转至[第8步](#8打包工具链)：
 
 ```python
 # share/.gdbinit
@@ -134,7 +134,7 @@ else:
 end
 ```
 
-### 4.修改libstdc++的Python支持
+### 7修改libstdc++的Python支持
 
 ```python
 # lib64/libstdc++.so.6.0.33-gdb.py
@@ -155,7 +155,7 @@ register_libstdcxx_printers(gdb.current_objfile())
 
 同理，修改`lib32/libstdc++.so.6.0.33-gdb.py`，尽管在默认配置中该文件不会被加载。
 
-### 5.打包工具链
+### 8打包工具链
 
 ```shell
 cd ~
@@ -170,7 +170,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY x86_64-linux-gnu-native-gcc14.tar
 | :--------------- | :--------------- | :----------------- |
 | x86_64-linux-gnu | x86_64-linux-gnu | x86_64-w64-mingw32 |
 
-### 1.设置环境变量
+### 9设置环境变量
 
 ```shell
 export TARGET=x86_64-w64-mingw32
@@ -178,7 +178,7 @@ export HOST=x86_64-linux-gnu
 export PREFIX=~/$HOST-host-$TARGET-target-gcc14
 ```
 
-### 2.编译安装binutils
+### 10编译安装binutils
 
 ```shell
 cd binutils/build
@@ -191,7 +191,7 @@ echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### 3.安装mingw-w64头文件
+### 11安装mingw-w64头文件
 
 ```shell
 cd ~/mingw
@@ -202,7 +202,7 @@ sh ../configure --prefix=$PREFIX/$TARGET --with-default-msvcrt=ucrt --host=$TARG
 make install
 ```
 
-### 4.修改libgcc以支持win32线程模型下的条件变量
+### 12修改libgcc以支持win32线程模型下的条件变量
 
 ```c
 // libgcc/config/i386/gthr-win32.h
@@ -222,7 +222,7 @@ make install
 #define __GTHREADS_CXX0X 1
 ```
 
-### 5.编译安装gcc和libgcc
+### 13编译安装gcc和libgcc
 
 ```shell
 cd ~/gcc/build
@@ -257,7 +257,7 @@ make all-gcc all-target-libgcc -j 20
 make install-strip-gcc install-strip-target-libgcc -j 20
 ```
 
-### 6.编译安装完整mingw-w64
+### 14编译安装完整mingw-w64
 
 ```shell
 cd ~/mingw/build
@@ -270,7 +270,7 @@ cd $PREFIX/$TARGET/lib
 ln -s ../lib32 32
 ```
 
-### 7.编译安装完整gcc
+### 15编译安装完整gcc
 
 ```shell
 cd ~/gcc/build
@@ -280,7 +280,7 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 8.编译安装pexports
+### 16编译安装pexports
 
 ```shell
 cd ~/pexports
@@ -291,4 +291,69 @@ make -j 20
 make install-strip -j 20
 ```
 
+### 17打包工具链
+
+```shell
+cd ~
+export PACKAGE=$HOST-host-$TARGET-target-gcc14
+tar -cf $PACKAGE.tar $PACKAGE/
+xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
+```
+
 ## 构建mingw[加拿大工具链](https://en.wikipedia.org/wiki/Cross_compiler#Canadian_Cross)
+
+| build            | host               | target             |
+| :--------------- | :----------------- | :----------------- |
+| x86_64-linux-gnu | x86_64-w64-mingw32 | x86_64-w64-mingw32 |
+
+### 18设置环境变量
+
+```shell
+export BUILD=x86_64-linux-gnu
+export HOST=x86_64-w64-mingw32
+export TARGET=$HOST
+export PREFIX=~/$HOST-native-gcc14
+```
+
+### 19编译安装gcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+sh ../configure --disable-werror --enable-multilib --enable-languages=c,c++ --enable-nls --disable-sjlj-exceptions --enable-threads=win32 --prefix=$PREFIX --target=$TARGET --host=$HOST
+make -j 20
+make install-strip -j 20
+```
+
+此时我们执行如下命令：
+
+```shell
+cd $PREFIX/bin
+file *.dll
+```
+
+会得到如下结果：
+
+```log
+libatomic-1.dll:   PE32 executable (DLL) (console) Intel 80386 (stripped to external PDB), for MS Windows, 10 sections
+libquadmath-0.dll: PE32 executable (DLL) (console) Intel 80386 (stripped to external PDB), for MS Windows, 10 sections
+libssp-0.dll:      PE32 executable (DLL) (console) Intel 80386 (stripped to external PDB), for MS Windows, 10 sections
+libstdc++-6.dll:   PE32 executable (DLL) (console) Intel 80386 (stripped to external PDB), for MS Windows, 10 sections
+```
+
+由此可见，`make install-strip`时安装的dll是x86而非x86_64的，这是由于开启multilib后，gcc的安装脚本会后安装multilib对应的dll,导致32位dll覆盖64位dll。
+同时，我们会发现`lib`和`lib32`目录下没有这些dll，这是因为gcc的安装脚本默认将它们安装到了bin目录下。综上所述，dll的安装是完全错误的。
+还可以发现，`include`、`lib`和`lib32`目录下都没有libc和sdk文件。故我们需要手动从先前安装的[交叉工具链](#构建mingw交叉工具链)中复制这些文件。
+
+### 20从交叉工具链中复制所需的库和头文件
+
+```shell
+rm *.dll
+cd ~/$BUILD-host-$TARGET-target-gcc14/$TARGET
+# ldscripts会在后续安装binutils时安装
+cp -n lib/* $PREFIX/lib
+cp -n lib32/* $PREFIX/lib32
+cp -nr include/* $PREFIX/include
+```
+
+### 21为Python动态库创建归档文件
