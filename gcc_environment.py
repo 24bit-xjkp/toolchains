@@ -53,6 +53,10 @@ class environment:
         os.mkdir(build_dir)
         os.chdir(build_dir)
 
+    def configure(self, *option:str) -> None:
+        options = " ".join(option)
+        run_command(f"../configure {options}")
+
     def make(self, *target: str) -> None:
         targets = " ".join(target)
         run_command(f"make {targets} -j {self.num_cores}")

@@ -9,9 +9,10 @@ def build() -> None:
     # 更新源代码
     # env.update()
 
+    basic_option = ("--disable-werror", "--enable-nls", f"--prefix={env.prefix}")
     # 编译gcc
     env.enter_build_dir("gcc")
-    gcc.run_command(f"../configure --disable-werror --enable-multilib --enable-languages=c,c++ --disable-bootstrap --enable-nls --prefix={env.prefix}")
+    env.configure(basic_option + ("--disable-bootstrap", "--enable-multilib", "--enable-languages=c,c++"))
     env.make()
     env.install()
     # 第一次编译时需要注册环境变量，运行完该脚本后可以source ~/.bashrc来加载环境变量
@@ -20,7 +21,7 @@ def build() -> None:
     # 编译binutils
     env.enter_build_dir("binutils")
     os.environ["ORIGIN"] = "$$ORIGIN"
-    gcc.run_command(f"../configure --prefix={env.prefix} --disable-werror --enable-nls --with-system-gdbinit={env.prefix}/share/.gdbinit LDFLAGS=\"-Wl,-rpath='$ORIGIN'/../lib64\"")
+    env.configure(basic_option + (f"--with-system-gdbinit={env.prefix}/share/.gdbinit", "LDFLAGS=\"-Wl,-rpath='$ORIGIN'/../lib64\"", "--enable-gold"))
     env.make()
     env.install()
     del os.environ["ORIGIN"]
