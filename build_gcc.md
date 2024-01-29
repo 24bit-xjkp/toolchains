@@ -17,7 +17,7 @@
 ### 1.安装系统包
 
 ```shell
-sudo apt install bison flex texinfo make automake autoconf git gcc g++ gcc-multilib g++-multilib cmake ninja-build
+sudo apt install bison flex texinfo make automake autoconf git gcc g++ gcc-multilib g++-multilib cmake ninja-build python3 tar xz-utils
 ```
 
 ### 2.下载源代码
@@ -83,15 +83,45 @@ make install-strip -j 20
 
 ### 3.创建.gdbinit
 
+由`libstdc++.so.6.0.33-gdb.py`配置pretty-printer：
+
 ```python
 # share/.gdbinit
 python
 import os
 import gdb
 import sys
+
 # gdb启动时会将sys.path[0]设置为share/gdb/python
 scriptPath = os.path.join(sys.path[0], "../../../lib64/libstdc++.so.6.0.33-gdb.py")
 gdb.execute(f"source {scriptPath}")
+end
+```
+
+由`share/.gdbinit`直接配置pretty-printer，完成后直接跳转至第5步：
+
+```python
+# share/.gdbinit
+python
+import os
+import gdb
+import sys
+
+# gdb启动时会将sys.path[0]设置为share/gdb/python
+share_dir = os.path.abspath(os.path.join(sys.path[0], "../../"))
+# 在share目录下搜索gcc的python支持
+python_dir = ""
+for dir in os.listdir(share_dir):
+    current_dir = os.path.join(share_dir, dir, "python")
+    if dir[0:3] == "gcc" and os.path.isdir(current_dir):
+        python_dir = current_dir
+        break
+if python_dir != "":
+    sys.path.insert(0, python_dir)
+    from libstdcxx.v6 import register_libstdcxx_printers
+    register_libstdcxx_printers(gdb.current_objfile())
+else:
+    print("Cannot find gcc python support because share/gcc*/python directory does not exist.")
 end
 ```
 
@@ -106,7 +136,6 @@ import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 # pretty-printer所需的python脚本位于share/gcc-14.0.1/python下
 # 故使用哪个libstdc++.so.6.0.33-gdb.py都不影响结果，此处选择lib64下的
-# 同理，可以直接在.gdbinit中配置好pretty-printer
 python_dir  = os.path.normpath(os.path.join(current_dir, "../share/gcc-14.0.1/python"))
 if not python_dir in sys.path:
     sys.path.insert(0, python_dir)
@@ -122,8 +151,8 @@ register_libstdcxx_printers(gdb.current_objfile())
 ```shell
 cd ~
 export MEMORY=$(cat /proc/meminfo | awk '/MemTotal/ {printf "%dGiB\n", int($2/1024/1024)}')
-tar -cf $PREFIX.tar $PREFIX
-xz -ev9 -T 0 --memlimit=$MEMORY $PREFIX.tar
+tar -cf x86_64-linux-gnu-native-gcc14.tar x86_64-linux-gnu-native-gcc14/
+xz -ev9 -T 0 --memlimit=$MEMORY x86_64-linux-gnu-native-gcc14.tar
 ```
 
 ## 构建mingw[交叉工具链](https://en.wikipedia.org/wiki/Cross_compiler)
