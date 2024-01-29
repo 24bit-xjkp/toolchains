@@ -76,7 +76,7 @@ cd ~/binutils
 mkdir build
 cd build
 export ORIGIN='$$ORIGIN'
-sh ../configure --prefix=$PREFIX --disable-werror --enable-nls --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64"
+sh ../configure --prefix=$PREFIX --disable-werror --enable-nls --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64" --enable-gold
 make -j 20
 make install-strip -j 20
 ```
@@ -254,7 +254,7 @@ make all-gcc all-target-libgcc -j 20
 make install-strip-gcc install-strip-target-libgcc -j 20
 ```
 
-### 6.编译安装mingw-w64运行时
+### 6.编译安装完整mingw-w64
 
 ```shell
 cd ~/mingw/build

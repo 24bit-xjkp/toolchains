@@ -24,6 +24,8 @@ class environment:
     prefix: str  # < 工具链安装位置
     num_cores: int  # < 编译所用线程数
     current_dir: str  # < 该文件所在目录
+    lib_prefix: str  # < 安装后库所在路径
+    symlink_list: list  # < 构建过程中创建的软链接表
 
     def __init__(self, major_version: str, build: str = "x86_64-linux-gnu", host: str = "", target: str = "") -> None:
         self.major_version = major_version
@@ -37,7 +39,7 @@ class environment:
         self.prefix = os.path.join(self.home_dir, self.name)
         self.num_cores = psutil.cpu_count() + 4
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
-        assert os.path.isfile(os.path.join(self.current_dir, f"{self.name_without_version}.md")), "We must run the script in the project directory and ensure that the project is unbroken."
+        self.lib_prefix = os.path.join(self.prefix, self.target) if self.cross_compiler else self.prefix
 
     def update(self) -> None:
         for lib in ("expat", "gcc", "binutils", "linux", "mingw", "pexports", "glibc"):
@@ -45,15 +47,16 @@ class environment:
             os.chdir(path)
             run_command("git pull")
 
-    def enter_build_dir(self, lib: str) -> None:
+    def enter_build_dir(self, lib: str) -> str:
         assert lib in lib_list
         build_dir = os.path.join(self.home_dir, lib, "build" if lib != "expat" else "expat/build")
         if os.path.isdir(build_dir):
             shutil.rmtree(build_dir)
         os.mkdir(build_dir)
         os.chdir(build_dir)
+        return build_dir
 
-    def configure(self, *option:str) -> None:
+    def configure(self, *option: str) -> None:
         options = " ".join(option)
         run_command(f"../configure {options}")
 
@@ -84,6 +87,23 @@ class environment:
         readme_path = os.path.join(self.current_dir, f"{self.name_without_version}.md")
         target_path = os.path.join(self.prefix, "README.md")
         shutil.copyfile(readme_path, target_path)
+
+    def symlink_multilib(self) -> None:
+        multilib_list = {}
+        for multilib in os.listdir(self.lib_prefix):
+            if multilib != "lib" and multilib[0:3] == "lib" and os.path.isdir(multilib):
+                multilib_list[multilib] = multilib[3:]
+        lib_path = os.path.join(self.lib_prefix, "lib")
+        cwd = os.getcwd()
+        os.chdir(lib_path)
+        for multilib, suffix in multilib_list:
+            os.symlink(os.path.join("..", multilib), suffix, True)
+            self.symlink_list.append(os.path.join(lib_path, suffix))
+        os.chdir(cwd)
+
+    def delete_symlink(self) -> None:
+        for symlink in self.symlink_list:
+            os.unlink(symlink)
 
     def package(self, need_gdbinit: bool = True) -> None:
         if need_gdbinit:
