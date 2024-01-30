@@ -1,10 +1,13 @@
 #!/usr/bin/python3
+# -*- coding: utf-8 -*-
 import os
 import psutil
 import shutil
 import io
+import sys
 
 lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports", "iconv")
+rpath_lib = "\"-Wl,-rpath='$ORIGIN'/../lib64\""
 
 
 def run_command(command: str) -> None:
@@ -20,13 +23,14 @@ class environment:
     cross_compiler: bool  # < 是否是交叉编译器
     name_without_version: str  # < 不带版本号的工具链名
     name: str  # < 工具链名
-    home_dir: str  # < $HOME
+    home_dir: str  # < 源代码所在的目录，默认为$HOME
     prefix: str  # < 工具链安装位置
     num_cores: int  # < 编译所用线程数
     current_dir: str  # < 该文件所在目录
     lib_prefix: str  # < 安装后库目录的前缀
     bin_dir: str  # <安装后可执行文件所在目录
     symlink_list: list  # < 构建过程中创建的软链接表
+    gdbinit_path: str  # <安装后.gdbinit文件所在路径
 
     def __init__(self, major_version: str, build: str = "x86_64-linux-gnu", host: str = "", target: str = "") -> None:
         self.major_version = major_version
@@ -36,13 +40,22 @@ class environment:
         self.cross_compiler = self.host != self.target
         self.name_without_version = (f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native") + "-gcc"
         self.name = self.name_without_version + major_version
-        self.home_dir = os.environ["HOME"]
+        self.home_dir = ""
+        for option in sys.argv:
+            if option.startswith("--home="):
+                self.home_dir = option[7:]
+                break
+        if self.home_dir == "":
+            self.home_dir = os.environ["HOME"]
+        for lib in lib_list:
+            assert os.path.isdir(os.path.join(self.home_dir, lib)), f'Cannot find "{lib}" in directory "{self.home_dir}".'
         self.prefix = os.path.join(self.home_dir, self.name)
         self.num_cores = psutil.cpu_count() + 4
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
         self.lib_prefix = os.path.join(self.prefix, self.target) if self.cross_compiler else self.prefix
         self.bin_dir = os.path.join(self.prefix, "bin")
         self.symlink_list = []
+        self.gdbinit_path = os.path.join(self.prefix, "share", ".gdbinit")
 
     def update(self) -> None:
         for lib in ("expat", "gcc", "binutils", "linux", "mingw", "pexports", "glibc"):
@@ -81,9 +94,8 @@ class environment:
         self.register_in_env()
 
     def copy_gdbinit(self) -> None:
-        gdbinit_path = os.path.join(self.current_dir, ".gdbinit")
-        target_path = os.path.join(self.prefix, "share", ".gdbinit")
-        shutil.copyfile(gdbinit_path, target_path)
+        gdbinit_src_path = os.path.join(self.current_dir, ".gdbinit")
+        shutil.copyfile(gdbinit_src_path, self.gdbinit_path)
 
     def copy_readme(self) -> None:
         readme_path = os.path.join(self.current_dir, f"{self.name_without_version}.md")

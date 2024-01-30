@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# -*- coding: utf-8 -*-
 import gcc_environment as gcc
 import os
 
@@ -21,7 +22,7 @@ def build() -> None:
     # 编译binutils
     env.enter_build_dir("binutils")
     os.environ["ORIGIN"] = "$$ORIGIN"
-    env.configure(basic_option, f"--with-system-gdbinit={env.prefix}/share/.gdbinit LDFLAGS=\"-Wl,-rpath='$ORIGIN'/../lib64\" --enable-gold")
+    env.configure(basic_option, f"--with-system-gdbinit={env.gdbinit_path} LDFLAGS={gcc.rpath_lib} --enable-gold")
     env.make()
     env.install()
     del os.environ["ORIGIN"]
