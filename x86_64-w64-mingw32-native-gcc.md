@@ -19,8 +19,15 @@
 - gcc
 - g++
 - binutils
-- gold
 - gdb (需要Python3.11)
 - Python3.11.6 embed package
 - .gdbinit (位于share下)
 - pexports
+
+## 注意事项
+
+将下列文件夹添加到PATH环境变量：
+
+- bin
+- lib
+- lib32
