@@ -509,3 +509,10 @@ export PACKAGE=$HOST-native-gcc14
 tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 ```
+
+### 30使用工具链
+
+在开启multilib后，`lib`和`lib32`目录下会各有一份dll，这也就是为什么不能将dll文件复制到`bin`目录下。
+因而在使用时需要将`bin`，`lib`和`lib32`文件夹都添加到PATH环境变量。程序在加载dll时Windows会顺序搜索PATH中的目录，直到找到一个dll可以被加载。
+因此同时将`lib`和`lib32`添加到PATH即可实现根据程序体系结构选择相应的dll。
+如果将`lib`和`lib32`下的dll分别复制到`System32`和`SysWOW64`目录下，则只需要将`bin`文件夹添加到PATH环境变量，但不推荐这么做。
