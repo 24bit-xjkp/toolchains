@@ -4,7 +4,7 @@ import psutil
 import shutil
 import io
 
-lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports")
+lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports", "iconv")
 
 
 def run_command(command: str) -> None:
@@ -24,7 +24,8 @@ class environment:
     prefix: str  # < 工具链安装位置
     num_cores: int  # < 编译所用线程数
     current_dir: str  # < 该文件所在目录
-    lib_prefix: str  # < 安装后库所在路径
+    lib_prefix: str  # < 安装后库目录的前缀
+    bin_dir: str  # <安装后可执行文件所在目录
     symlink_list: list  # < 构建过程中创建的软链接表
 
     def __init__(self, major_version: str, build: str = "x86_64-linux-gnu", host: str = "", target: str = "") -> None:
@@ -40,6 +41,7 @@ class environment:
         self.num_cores = psutil.cpu_count() + 4
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
         self.lib_prefix = os.path.join(self.prefix, self.target) if self.cross_compiler else self.prefix
+        self.bin_dir = os.path.join(self.prefix, "bin")
         self.symlink_list = []
 
     def update(self) -> None:
@@ -70,13 +72,11 @@ class environment:
         run_command(f"make {targets} -j {self.num_cores}")
 
     def register_in_env(self) -> None:
-        bin_path = os.path.join(self.prefix, "bin")
-        os.environ["PATH"] = bin_path + ":" + os.environ["PATH"]
+        os.environ["PATH"] = self.bin_dir + ":" + os.environ["PATH"]
 
     def register_in_bashrc(self) -> None:
-        bin_path = os.path.join(self.prefix, "bin")
         bashrc_file = io.open(os.path.join(self.home_dir, ".bashrc"), "a")
-        bashrc_file.writelines(f"export PATH={bin_path}:$PATH")
+        bashrc_file.writelines(f"export PATH={self.bin_dir}:$PATH")
         self.register_in_env()
 
     def copy_gdbinit(self) -> None:

@@ -12,13 +12,16 @@
 | Glibc     | 2.38         |
 | Mingw-w64 | 10.0.0       |
 | PExports  | 0.47         |
+| Iconv     | 1.17         |
+| Gmp       | 6.2.1        |
+| Mpfr      | 4.1.0        |
 
 ## 准备工作
 
 ### 1安装系统包
 
 ```shell
-sudo apt install bison flex texinfo make automake autoconf libtool git gcc g++ gcc-multilib g++-multilib cmake ninja-build python3 tar xz-utils unzip libgmp-dev libmpfr-dev
+sudo apt install bison flex texinfo make automake autoconf libtool git gcc g++ gcc-multilib g++-multilib cmake ninja-build python3 tar xz-utils unzip libgmp-dev libmpfr-dev zlib1g-dev
 ```
 
 ### 2下载源代码
@@ -35,10 +38,25 @@ git clone https://github.com/bocke/pexports.git --depth=1 pexports
 cd ~/pexports
 autoreconf -if
 cd ~
-# 编译Windows下带有Python支持的gdb需要嵌入式Python环境，Python版本
+# 编译Windows下带有Python支持的gdb需要嵌入式Python3环境
 wget https://www.python.org/ftp/python/3.11.6/python-3.11.6-embed-amd64.zip -O python-embed.zip
 unzip -o python-embed.zip  python3*.dll python3*.zip *._pth -d python-embed -x python3.dll
 rm python-embed.zip
+# 下载Python源代码以提取include目录
+wget https://www.python.org/ftp/python/3.11.6/Python-3.11.6.tar.xz -O Python.tar.xz
+tar -xaf Python.tar.xz
+rm Python.tar.xz
+cd Python-3.11.6/Include
+mkdir ~/python-embed/include
+cp -r * ~/python-embed/include
+cd ../PC
+cp pyconfig.h ~/python-embed/include
+cd ~
+rm -rf Python-3.11.6
+wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.17.tar.gz -O iconv.tar.gz
+tar -axf iconv.tar.gz
+rm iconv.tar.gz
+mv libiconv-1.17/ iconv
 ```
 
 ### 3安装依赖库
@@ -357,3 +375,10 @@ cp -nr include/* $PREFIX/include
 ```
 
 ### 21为Python动态库创建归档文件
+
+```shell
+cd python-embed
+pexports python311.dll > libpython.def
+x86_64-w64-mingw32-dlltool -D python311.dll -d libpython.def -l libpython.a
+rm libpython.def 
+```
