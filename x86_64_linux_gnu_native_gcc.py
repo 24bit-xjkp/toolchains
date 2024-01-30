@@ -26,6 +26,8 @@ def build() -> None:
     env.make()
     env.install()
     del os.environ["ORIGIN"]
+
+    # 打包工具链
     env.package()
 
 

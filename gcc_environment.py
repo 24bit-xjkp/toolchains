@@ -26,7 +26,7 @@ class environment:
     home_dir: str  # < 源代码所在的目录，默认为$HOME
     prefix: str  # < 工具链安装位置
     num_cores: int  # < 编译所用线程数
-    current_dir: str  # < 该文件所在目录
+    current_dir: str  # < toolchains项目所在目录
     lib_prefix: str  # < 安装后库目录的前缀
     bin_dir: str  # <安装后可执行文件所在目录
     symlink_list: list  # < 构建过程中创建的软链接表

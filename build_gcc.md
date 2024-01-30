@@ -32,6 +32,9 @@ git clone https://github.com/gcc-mirror/gcc.git --depth=1 gcc
 git clone https://github.com/bminor/binutils-gdb.git --depth=1 binutils
 git clone https://github.com/mirror/mingw-w64.git --depth=1 mingw
 git clone https://github.com/libexpat/libexpat.git --depth=1 expat
+cd ~/pexports
+autoreconf -if
+cd ~
 git clone https://github.com/torvalds/linux.git --depth=1 linux
 # glibc版本要与目标系统使用的版本对应
 git clone https://github.com/bminor/glibc.git -b release/2.38/master --depth=1 glibc
@@ -41,7 +44,7 @@ autoreconf -if
 cd ~
 # 编译Windows下带有Python支持的gdb需要嵌入式Python3环境
 wget https://www.python.org/ftp/python/3.11.6/python-3.11.6-embed-amd64.zip -O python-embed.zip
-unzip -o python-embed.zip  python3*.dll python3*.zip *._pth python.exe -d python-embed -x python3.dll
+unzip -o python-embed.zip  python3*.dll python3*.zip *._pth -d python-embed -x python3.dll
 rm python-embed.zip
 # 下载Python源代码以提取include目录
 wget https://www.python.org/ftp/python/3.11.6/Python-3.11.6.tar.xz -O Python.tar.xz
@@ -153,7 +156,7 @@ else:
 end
 ```
 
-### 7修改libstdc++的Python支持
+### 7修改libstdc++的python支持
 
 ```python
 # lib64/libstdc++.so.6.0.33-gdb.py
@@ -377,7 +380,9 @@ cp -n lib32/* $PREFIX/lib32
 cp -nr include/* $PREFIX/include
 ```
 
-### 21为Python动态库创建归档文件
+### 21为python动态库创建归档文件
+
+在接下来的5步中，我们将构建编译gdb所需的依赖项。具体说明请参见[构建gdb的要求](https://sourceware.org/gdb/current/onlinedocs/gdb.html/Requirements.html#Requirements)。
 
 ```shell
 cd ~/python-embed
@@ -398,7 +403,33 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 23编译安装libmpfr
+### 23编译安装libexpat
+
+```shell
+cd ~/expat/expat
+export EXPAT=~/expat/install
+mkdir build
+cd build
+# 此处也需要禁用动态库
+../configure --prefix=$EXPAT --host=$HOST --disable-shared
+make -j 20
+make install-strip -j 20
+```
+
+### 24编译安装libiconv
+
+```shell
+cd ~/iconv
+export ICONV=~/iconv/install
+mkdir build
+cd build
+# 此处也需要禁用动态库
+../configure --prefix=$ICONV --host=$HOST --disable-shared
+make -j 20
+make install-strip -j 20
+```
+
+### 25编译安装libmpfr
 
 ```shell
 cd ~/mpfr
@@ -411,14 +442,70 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 24编译安装libexpat
+### 26编译安装binutils和gdb
+
+要编译带有python支持的gdb就必须在编译gdb时传入python安装信息，但在交叉环境中提供这些信息是困难的。因此我们需要手动将这些信息传递给`configure`脚本。
+具体说明请参见[使用交叉编译器编译带有python支持的gdb](https://sourceware.org/gdb/wiki/CrossCompilingWithPythonSupport)。
+编写一个python脚本以提供上述信息：
+
+```python
+import sys
+import os
+from gcc_environment import environment
+
+assert len(sys.argv) == 3, "Too many args." if len(sys.argv) > 3 else "Too few args"
+# sys.argv[0]是当前脚本的路径
+# sys.argv[1]是当前gdb自带的python-config.py脚本的路径
+# sys.argv[2]是传入的选项
+option = sys.argv[2]
+env = environment("")
+python_dir = os.path.join(env.home_dir, "python-embed")
+
+match option:
+    case "--includes":
+        print(f"-I{os.path.join(python_dir, 'include')}")
+    case "--ldflags":
+        print(f"-L{python_dir} -lpython")
+    case "--exec-prefix":
+        print(f"-L{python_dir}")
+    case _:
+        assert False, f'Invalid option "{option}"'
+```
+
+交叉编译带python支持的gdb的所有要求都已经满足了，下面开始编译binutils和gdb：
 
 ```shell
-cd ~/expat/expat
-export EXPAT=~/expat/install
-mkdir build
-cd build
-../configure --prefix=$EXPAT --host=$HOST --disable-shared
+cd ~/binutils/gdb/build
+rm -rf *
+../configure --host=$HOST --target=$TARGET --prefix=$PREFIX --disable-werror --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/python_config.sh
 make -j 20
 make install-strip -j 20
+```
+
+### 27编译安装pexports
+
+我们在Window下也提供pexports实用工具，下面开始编译pexports：
+
+```shell
+cd ~/pexports/build
+rm -rf *
+../configure --prefix=$PREFIX --host=$HOST
+make -j 20
+make install-strip -j 20
+```
+
+### 28复制python embed package
+
+```shell
+cp ~/python-embed
+cp python* $PREFIX/bin
+```
+
+### 29打包工具链
+
+```shell
+cd ~
+export PACKAGE=$HOST-native-gcc14
+tar -cf $PACKAGE.tar $PACKAGE/
+xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 ```

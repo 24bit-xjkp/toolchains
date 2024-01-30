@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# -*- coding: utf-8 -*-
 import gcc_environment as gcc
 import x86_64_linux_gnu_host_x86_64_w64_mingw32_target_gcc as cross_gcc
 import os
@@ -6,7 +7,7 @@ import shutil
 
 env = gcc.environment("14", host="x86_64-w64-mingw32")
 lib_install_dir = {}
-for lib in ("gmp", "mpfr", "expat", "iconv"):
+for lib in ("gmp", "expat", "iconv", "mpfr"):
     lib_install_dir[lib] = os.path.join(env.home_dir, lib, "install")
 
 
@@ -39,7 +40,8 @@ def build():
                 shutil.copytree(src_path, dst_path) if os.path.isdir(src_path) else shutil.copyfile(src_path, dst_path)
 
     # 创建libpython.a
-    os.chdir(os.path.join(env.home_dir, "python-embed"))
+    python_dir = os.path.join(env.home_dir, "python-embed")
+    os.chdir(python_dir)
     if not os.path.exists("libpython.a"):
         dll_name = ""
         for file in os.listdir("."):
@@ -50,22 +52,33 @@ def build():
         gcc.run_command(f"{env.target}-pexports {dll_name} > libpython.def")
         gcc.run_command(f"{env.target}-dlltool -D {dll_name} -d libpython.def -l libpython.a")
 
-    # 编译安装libgmp
-    env.enter_build_dir("gmp")
-    env.configure(lib_option, f"--prefix={lib_install_dir['gmp']}")
-    env.make()
-    env.install()
-    # 编译安装libmpfr
-    env.enter_build_dir("mpfr")
-    env.configure(lib_option, f"--prefix={lib_install_dir['mpfr']} --with-gmp={lib_install_dir['gmp']}")
-    env.make()
-    env.install()
-    # 编译安装libexpat
-    env.enter_build_dir("expat")
-    env.configure(lib_option, f"--prefix={lib_install_dir['expat']}")
+    # 编译安装libgmp, libexpat, libiconv, libmpfr
+    for lib, prefix in lib_install_dir.items():
+        env.enter_build_dir(lib)
+        env.configure(lib_option, f"--prefix={prefix}", f"--with-gmp={lib_install_dir['gmp']}" if lib == "mpfr" else "")
+        env.make()
+        env.install()
+
+    lib_option = ["--with-expat"]
+    for lib in ("gmp", "mpfr"):
+        lib_option.append(f"--with-{lib}={lib_install_dir[lib]}")
+    for lib in ("expat", "iconv"):
+        lib_option.append(f"--with-lib{lib}-prefix={lib_install_dir[lib]}")
+
+    # 编译安装binutils和gdb
+    env.enter_build_dir("binutils")
+    env.configure(basic_option, *lib_option, f"--with-system-gdbinit={env.gdbinit_path} --with-python={os.path.join(env.current_dir, 'python_config.sh')}")
     env.make()
     env.install()
 
+    # 复制python embed package
+    os.chdir(python_dir)
+    for file in os.listdir("."):
+        if file.startswith("python"):
+            shutil.copyfile(os.path.join(python_dir, file), os.path.join(env.bin_dir, file))
+
+    # 打包工具链
+    env.package()
 
 if __name__ == "__main__":
     build()
