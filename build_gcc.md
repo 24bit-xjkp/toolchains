@@ -15,13 +15,14 @@
 | Iconv     | 1.17         |
 | Gmp       | 6.2.1        |
 | Mpfr      | 4.1.0        |
+| Expat     | 2.5.0        |
 
 ## 准备工作
 
 ### 1安装系统包
 
 ```shell
-sudo apt install bison flex texinfo make automake autoconf libtool git gcc g++ gcc-multilib g++-multilib cmake ninja-build python3 tar xz-utils unzip libgmp-dev libmpfr-dev zlib1g-dev
+sudo apt install bison flex texinfo make automake autoconf libtool git gcc g++ gcc-multilib g++-multilib cmake ninja-build python3 tar xz-utils unzip libgmp-dev libmpfr-dev zlib1g-dev libexpat1-dev
 ```
 
 ### 2下载源代码
@@ -40,7 +41,7 @@ autoreconf -if
 cd ~
 # 编译Windows下带有Python支持的gdb需要嵌入式Python3环境
 wget https://www.python.org/ftp/python/3.11.6/python-3.11.6-embed-amd64.zip -O python-embed.zip
-unzip -o python-embed.zip  python3*.dll python3*.zip *._pth -d python-embed -x python3.dll
+unzip -o python-embed.zip  python3*.dll python3*.zip *._pth python.exe -d python-embed -x python3.dll
 rm python-embed.zip
 # 下载Python源代码以提取include目录
 wget https://www.python.org/ftp/python/3.11.6/Python-3.11.6.tar.xz -O Python.tar.xz
@@ -81,7 +82,7 @@ export PREFIX=~/x86_64-linux-gnu-native-gcc14
 cd ~/gcc
 mkdir build
 cd build
-sh ../configure --disable-werror --enable-multilib --enable-languages=c,c++ --disable-bootstrap --enable-nls --prefix=$PREFIX
+../configure --disable-werror --enable-multilib --enable-languages=c,c++ --disable-bootstrap --enable-nls --prefix=$PREFIX
 make -j 20
 make install-strip -j 20
 echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
@@ -97,7 +98,7 @@ cd ~/binutils
 mkdir build
 cd build
 export ORIGIN='$$ORIGIN'
-sh ../configure --prefix=$PREFIX --disable-werror --enable-nls --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64" --enable-gold
+../configure --prefix=$PREFIX --disable-werror --enable-nls --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64" --enable-gold
 make -j 20
 make install-strip -j 20
 ```
@@ -202,7 +203,7 @@ export PREFIX=~/$HOST-host-$TARGET-target-gcc14
 cd binutils/build
 rm -rf *
 # Linux下不便于调试Windows,故不编译gdb
-sh ../configure --disable-werror --enable-nls --disable-gdb --prefix=$PREFIX --target=$TARGET
+../configure --disable-werror --enable-nls --disable-gdb --prefix=$PREFIX --target=$TARGET
 make -j 20
 make install-strip -j 20
 echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
@@ -216,7 +217,7 @@ cd ~/mingw
 mkdir build
 cd build
 # 这是交叉编译器，故目标平台的头文件需要装在$TARGET目录下
-sh ../configure --prefix=$PREFIX/$TARGET --with-default-msvcrt=ucrt --host=$TARGET --without-crt
+../configure --prefix=$PREFIX/$TARGET --with-default-msvcrt=ucrt --host=$TARGET --without-crt
 make install
 ```
 
@@ -245,7 +246,7 @@ make install
 ```shell
 cd ~/gcc/build
 rm -rf *
-sh ../configure --disable-werror --enable-multilib --enable-languages=c,c++ --enable-nls --disable-sjlj-exceptions --enable-threads=win32 --prefix=$PREFIX --target=$TARGET
+../configure --disable-werror --enable-multilib --enable-languages=c,c++ --enable-nls --disable-sjlj-exceptions --enable-threads=win32 --prefix=$PREFIX --target=$TARGET
 make all-gcc all-target-libgcc -j 20
 make install-strip-gcc install-strip-target-libgcc -j 20
 ```
@@ -270,7 +271,7 @@ make install-strip-gcc install-strip-target-libgcc -j 20
 ```shell
 cd ~/gcc/build
 rm -rf *
-sh ../configure --disable-werror --enable-multilib --enable-languages=c,c++ --enable-nls --disable-sjlj-exceptions --enable-threads=win32 --prefix=$PREFIX --target=$TARGET --disable-shared
+../configure --disable-werror --enable-multilib --enable-languages=c,c++ --enable-nls --disable-sjlj-exceptions --enable-threads=win32 --prefix=$PREFIX --target=$TARGET --disable-shared
 make all-gcc all-target-libgcc -j 20
 make install-strip-gcc install-strip-target-libgcc -j 20
 ```
@@ -280,7 +281,7 @@ make install-strip-gcc install-strip-target-libgcc -j 20
 ```shell
 cd ~/mingw/build
 rm -rf *
-sh ../configure --prefix=$PREFIX/$TARGET --with-default-msvcrt=ucrt --host=$TARGET
+../configure --prefix=$PREFIX/$TARGET --with-default-msvcrt=ucrt --host=$TARGET
 make -j 24
 make install-strip -j 24
 # 构建交叉工具链时multilib在$TARGET/lib/32而不是$TARGET/lib32下
@@ -293,7 +294,7 @@ ln -s ../lib32 32
 ```shell
 cd ~/gcc/build
 rm -rf *
-sh ../configure --disable-werror --enable-multilib --enable-languages=c,c++ --enable-nls --disable-sjlj-exceptions --enable-threads=win32 --prefix=$PREFIX --target=$TARGET
+../configure --disable-werror --enable-multilib --enable-languages=c,c++ --enable-nls --disable-sjlj-exceptions --enable-threads=win32 --prefix=$PREFIX --target=$TARGET
 make -j 20
 make install-strip -j 20
 ```
@@ -304,7 +305,7 @@ make install-strip -j 20
 cd ~/pexports
 mkdir build
 cd build
-sh ../configure --prefix=$PREFIX
+../configure --prefix=$PREFIX
 make -j 20
 make install-strip -j 20
 # 添加pexports前缀
@@ -340,7 +341,7 @@ export PREFIX=~/$HOST-native-gcc14
 ```shell
 cd ~/gcc/build
 rm -rf *
-sh ../configure --disable-werror --enable-multilib --enable-languages=c,c++ --enable-nls --disable-sjlj-exceptions --enable-threads=win32 --prefix=$PREFIX --target=$TARGET --host=$HOST
+../configure --disable-werror --enable-multilib --enable-languages=c,c++ --enable-nls --disable-sjlj-exceptions --enable-threads=win32 --prefix=$PREFIX --target=$TARGET --host=$HOST
 make -j 20
 make install-strip -j 20
 ```
@@ -379,8 +380,45 @@ cp -nr include/* $PREFIX/include
 ### 21为Python动态库创建归档文件
 
 ```shell
-cd python-embed
-pexports python311.dll > libpython.def
-x86_64-w64-mingw32-dlltool -D python311.dll -d libpython.def -l libpython.a
-rm libpython.def
+cd ~/python-embed
+$TARGET-pexports python311.dll > libpython.def
+$TARGET-dlltool -D python311.dll -d libpython.def -l libpython.a
+```
+
+### 22编译安装libgmp
+
+```shell
+cd ~/gmp
+export GMP=~/gmp/install
+mkdir build
+cd build
+# 禁用动态库，否则编译出来的gdb会依赖libgmp.dll
+../configure --host=$HOST --prefix=$GMP --disable-shared
+make -j 20
+make install-strip -j 20
+```
+
+### 23编译安装libmpfr
+
+```shell
+cd ~/mpfr
+export MPFR=~/mpfr/install
+mkdir build
+cd build
+# 此处也需要禁用动态库
+../configure --prefix=$MPFR --host=$HOST --with-gmp=$GMP --disable-shared
+make -j 20
+make install-strip -j 20
+```
+
+### 24编译安装libexpat
+
+```shell
+cd ~/expat/expat
+export EXPAT=~/expat/install
+mkdir build
+cd build
+../configure --prefix=$EXPAT --host=$HOST --disable-shared
+make -j 20
+make install-strip -j 20
 ```

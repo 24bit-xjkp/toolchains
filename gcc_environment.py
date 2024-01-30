@@ -77,6 +77,7 @@ class environment:
     def register_in_bashrc(self) -> None:
         bashrc_file = io.open(os.path.join(self.home_dir, ".bashrc"), "a")
         bashrc_file.writelines(f"export PATH={self.bin_dir}:$PATH")
+        bashrc_file.close()
         self.register_in_env()
 
     def copy_gdbinit(self) -> None:
@@ -92,7 +93,7 @@ class environment:
     def symlink_multilib(self) -> None:
         multilib_list = {}
         for multilib in os.listdir(self.lib_prefix):
-            if multilib != "lib" and multilib[0:3] == "lib" and os.path.isdir(os.path.join(self.lib_prefix, multilib)):
+            if multilib != "lib" and multilib.startswith("lib") and os.path.isdir(os.path.join(self.lib_prefix, multilib)):
                 multilib_list[multilib] = multilib[3:]
         lib_path = os.path.join(self.lib_prefix, "lib")
         cwd = os.getcwd()
