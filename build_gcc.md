@@ -307,6 +307,8 @@ cd build
 sh ../configure --prefix=$PREFIX
 make -j 20
 make install-strip -j 20
+# 添加pexports前缀
+mv $PREFIX/bin/pexports $PREFIX/bin/$TARGET-pexports
 ```
 
 ### 17打包工具链
@@ -380,5 +382,5 @@ cp -nr include/* $PREFIX/include
 cd python-embed
 pexports python311.dll > libpython.def
 x86_64-w64-mingw32-dlltool -D python311.dll -d libpython.def -l libpython.a
-rm libpython.def 
+rm libpython.def
 ```
