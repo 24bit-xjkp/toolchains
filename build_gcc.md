@@ -244,6 +244,8 @@ make install
 #define __GTHREADS_CXX0X 1
 ```
 
+在新gcc中，该bug可能已被修复，如果不改可以通过编译则不需要修改。
+
 ### 13编译安装gcc和libgcc
 
 ```shell
