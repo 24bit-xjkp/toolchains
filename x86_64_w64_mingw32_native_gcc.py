@@ -6,9 +6,30 @@ import os
 import shutil
 
 env = gcc.environment("14", host="x86_64-w64-mingw32")
-lib_install_dir = {}
+lib_install_dir_list: dict[str, str] = {}
 for lib in ("gmp", "expat", "iconv", "mpfr"):
-    lib_install_dir[lib] = os.path.join(env.home_dir, lib, "install")
+    lib_install_dir_list[lib] = os.path.join(env.home_dir, lib, "install")
+
+
+def build_gdb_requirements() -> list[str]:
+    """编译安装libgmp, libexpat, libiconv, libmpfr
+    
+    Returns:
+        list[str]: gdb依赖库相关的配置选项
+    """
+    lib_option = f"--host={env.host} --disable-shared"
+    for lib, prefix in lib_install_dir_list.items():
+        env.enter_build_dir(lib)
+        env.configure(lib_option, f"--prefix={prefix}", f"--with-gmp={lib_install_dir_list['gmp']}" if lib == "mpfr" else "")
+        env.make()
+        env.install()
+
+    lib_option = ["--with-expat"]
+    for lib in ("gmp", "mpfr"):
+        lib_option.append(f"--with-{lib}={lib_install_dir_list[lib]}")
+    for lib in ("expat", "iconv"):
+        lib_option.append(f"--with-lib{lib}-prefix={lib_install_dir_list[lib]}")
+    return lib_option
 
 
 def build():
@@ -17,7 +38,6 @@ def build():
 
     basic_option = f"--disable-werror --prefix={env.prefix} --host={env.host} --target={env.target}"
     gcc_option = "--enable-multilib --enable-languages=c,c++ --disable-sjlj-exceptions --enable-threads=win32"
-    lib_option = f"--host={env.host} --disable-shared"
     # 编译安装完整gcc
     env.enter_build_dir("gcc")
     env.configure(basic_option, gcc_option)
@@ -40,45 +60,20 @@ def build():
                 shutil.copytree(src_path, dst_path) if os.path.isdir(src_path) else shutil.copyfile(src_path, dst_path)
 
     # 创建libpython.a
-    python_dir = os.path.join(env.home_dir, "python-embed")
-    os.chdir(python_dir)
-    if not os.path.exists("libpython.a"):
-        dll_name = ""
-        for file in os.listdir("."):
-            if file.endswith(".dll"):
-                dll_name = file
-                break
-        assert dll_name != "", 'Cannot find python*.dll in "~/python-embed" directory.'
-        gcc.run_command(f"{env.target}-pexports {dll_name} > libpython.def")
-        gcc.run_command(f"{env.target}-dlltool -D {dll_name} -d libpython.def -l libpython.a")
+    env.build_libpython()
 
     # 编译安装libgmp, libexpat, libiconv, libmpfr
-    for lib, prefix in lib_install_dir.items():
-        env.enter_build_dir(lib)
-        env.configure(lib_option, f"--prefix={prefix}", f"--with-gmp={lib_install_dir['gmp']}" if lib == "mpfr" else "")
-        env.make()
-        env.install()
-
-    lib_option = ["--with-expat"]
-    for lib in ("gmp", "mpfr"):
-        lib_option.append(f"--with-{lib}={lib_install_dir[lib]}")
-    for lib in ("expat", "iconv"):
-        lib_option.append(f"--with-lib{lib}-prefix={lib_install_dir[lib]}")
+    lib_option = build_gdb_requirements()
 
     # 编译安装binutils和gdb
     env.enter_build_dir("binutils")
-    env.configure(basic_option, *lib_option, f"--with-system-gdbinit={env.gdbinit_path} --with-python={os.path.join(env.current_dir, 'python_config.sh')}")
+    env.configure(basic_option, *lib_option, f"--with-system-gdbinit={env.gdbinit_path} --with-python={os.path.join(env.current_dir, 'python_config.sh')} --enable-source-highlight")
     env.make()
     env.install()
 
-    # 复制python embed package
-    os.chdir(python_dir)
-    for file in os.listdir("."):
-        if file.startswith("python"):
-            shutil.copyfile(os.path.join(python_dir, file), os.path.join(env.bin_dir, file))
-
     # 打包工具链
-    env.package()
+    env.package(need_python_embed_package=True)
+
 
 if __name__ == "__main__":
     build()

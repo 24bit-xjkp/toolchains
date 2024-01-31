@@ -16,13 +16,14 @@ def build() -> None:
     env.configure(basic_option, "--disable-bootstrap --enable-multilib --enable-languages=c,c++")
     env.make()
     env.install()
+    env.strip_debug_symbol()
     # 第一次编译时需要注册环境变量，运行完该脚本后可以source ~/.bashrc来加载环境变量
     # env.register_in_bashrc()
 
     # 编译binutils
     env.enter_build_dir("binutils")
     os.environ["ORIGIN"] = "$$ORIGIN"
-    env.configure(basic_option, f"--with-system-gdbinit={env.gdbinit_path} LDFLAGS={gcc.rpath_lib} --enable-gold")
+    env.configure(basic_option, f"--with-system-gdbinit={env.gdbinit_path} LDFLAGS={gcc.rpath_lib} --enable-gold --enable-source-highlight")
     env.make()
     env.install()
     del os.environ["ORIGIN"]
