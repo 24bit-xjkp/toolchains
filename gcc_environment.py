@@ -6,7 +6,8 @@ import shutil
 import io
 import sys
 
-lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports", "iconv")
+lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports", "iconv", "python-embed")
+dll_list = ("libgcc", "libstdc++-v3", "libatomic", "libquadmath", "libgomp")
 rpath_lib = "\"-Wl,-rpath='$ORIGIN'/../lib64\""
 
 
@@ -29,8 +30,9 @@ class environment:
     current_dir: str  # < toolchains项目所在目录
     lib_prefix: str  # < 安装后库目录的前缀
     bin_dir: str  # <安装后可执行文件所在目录
-    symlink_list: list  # < 构建过程中创建的软链接表
+    symlink_list: list[str]  # < 构建过程中创建的软链接表
     gdbinit_path: str  # <安装后.gdbinit文件所在路径
+    lib_dir_list: dict[str, str]  # <所有库所在目录
 
     def __init__(self, major_version: str, build: str = "x86_64-linux-gnu", host: str = "", target: str = "") -> None:
         self.major_version = major_version
@@ -56,6 +58,9 @@ class environment:
         self.bin_dir = os.path.join(self.prefix, "bin")
         self.symlink_list = []
         self.gdbinit_path = os.path.join(self.prefix, "share", ".gdbinit")
+        self.lib_dir_list = {}
+        for lib in lib_list:
+            self.lib_dir_list[lib] = os.path.join(self.home_dir, lib)
 
     def update(self) -> None:
         """更新源代码
@@ -73,10 +78,12 @@ class environment:
             lib (str): 要构建的库
         """
         assert lib in lib_list
-        build_dir = os.path.join(self.home_dir, lib, "build" if lib != "expat" else "expat/build")
-        if os.path.isdir(build_dir):
-            shutil.rmtree(build_dir)
-        os.mkdir(build_dir)
+        build_dir = self.lib_dir_list[lib]
+        if lib != "python-embed":
+            build_dir = os.path.join(self.home_dir, lib, "build" if lib != "expat" else "expat/build")
+            if os.path.isdir(build_dir):
+                shutil.rmtree(build_dir)
+            os.mkdir(build_dir)
         os.chdir(build_dir)
 
     def configure(self, *option: str) -> None:
@@ -112,6 +119,22 @@ class environment:
                 targets += f"install-target-{dll} "
         run_command(f"make {targets} -j {self.num_cores}")
 
+    def strip_debug_symbol(self) -> None:
+        """剥离动态库的调试符号到独立的符号文件
+        """
+        prefix = f"{self.target}-" if self.cross_compiler else ""
+        for dir in os.listdir(self.lib_prefix):
+            if dir.startswith("lib"):
+                lib_dir = os.path.join(self.lib_prefix, dir)
+                for file in os.listdir(lib_dir):
+                    if file.startswith(dll_list[1:]) and file.endswith(".so") or file == "libgcc_s.so.1":
+                        dll_path = os.path.join(lib_dir, file)
+                        symbol_file = file + ".debug"
+                        symbol_path = os.path.join(lib_dir, symbol_file)
+                        run_command(f"{prefix}objcopy --only-keep-debug {dll_path} {symbol_path}")
+                        run_command(f"{prefix}strip {dll_path}")
+                        run_command(f"{prefix}objcopy --add-gnu-debuglink={symbol_file} {dll_path}")
+
     def register_in_env(self) -> None:
         """注册安装路径到环境变量
         """
@@ -132,9 +155,35 @@ class environment:
         shutil.copyfile(gdbinit_src_path, self.gdbinit_path)
 
     def copy_readme(self) -> None:
+        """复制工具链说明文件
+        """
         readme_path = os.path.join(self.current_dir, f"{self.name_without_version}.md")
         target_path = os.path.join(self.prefix, "README.md")
         shutil.copyfile(readme_path, target_path)
+
+    def build_libpython(self) -> None:
+        """创建libpython.a
+        """
+        lib_dir = self.lib_dir_list["python-embed"]
+        lib_path = os.path.join(lib_dir, "libpython.a")
+        def_path = os.path.join(lib_dir, "libpython.def")
+        if not os.path.exists(lib_path):
+            dll_name = ""
+            for file in os.listdir(lib_dir):
+                if file.endswith(".dll"):
+                    dll_name = file
+                    break
+            assert dll_name != "", f'Cannot find python*.dll in "{lib_dir}" directory.'
+            dll_path = os.path.join(lib_dir, dll_name)
+            run_command(f"{self.target}-pexports {dll_path} > {def_path}")
+            run_command(f"{self.target}-dlltool -D {dll_path} -d {def_path} -l {lib_path}")
+
+    def copy_python_embed_package(self) -> None:
+        """复制python embed package到安装目录
+        """
+        for file in os.listdir(self.lib_dir_list["python-embed"]):
+            if file.startswith("python"):
+                shutil.copyfile(os.path.join(self.lib_dir_list["python-embed"], file), os.path.join(self.bin_dir, file))
 
     def symlink_multilib(self) -> None:
         """为编译带有multilib支持的交叉编译器创建软链接，如将lib/32链接到lib32
@@ -159,9 +208,17 @@ class environment:
         for symlink in self.symlink_list:
             os.unlink(symlink)
 
-    def package(self, need_gdbinit: bool = True) -> None:
+    def package(self, need_gdbinit: bool = True, need_python_embed_package: bool = False) -> None:
+        """打包工具链
+
+        Args:
+            need_gdbinit (bool, optional): 是否需要打包.gdbinit文件. 默认需要.
+            need_python_embed_package (bool, optional): 是否需要打包python embed package. 默认不需要.
+        """
         if need_gdbinit:
             self.copy_gdbinit()
+        if need_python_embed_package:
+            self.copy_python_embed_package()
         self.copy_readme()
         os.chdir(self.home_dir)
         run_command(f"tar -cf {self.name}.tar {self.name}/")
