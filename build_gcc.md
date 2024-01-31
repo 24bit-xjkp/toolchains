@@ -474,6 +474,17 @@ match option:
         assert False, f'Invalid option "{option}"'
 ```
 
+编写一个shell脚本以转发参数给上述python脚本：
+
+```shell
+# 获取当前文件的绝对路径
+current_file="$(readlink -f $0)"
+# 提取当前文件夹
+current_dir="$(dirname $current_file)"
+# 将接受到的参数转发给python_config.py
+python3 "$current_dir/python_config.py" $@
+```
+
 交叉编译带python支持的gdb的所有要求都已经满足了，下面开始编译binutils和gdb：
 
 ```shell
