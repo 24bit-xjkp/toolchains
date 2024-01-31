@@ -88,6 +88,8 @@ cd build
 ../configure --disable-werror --enable-multilib --enable-languages=c,c++ --disable-bootstrap --enable-nls --prefix=$PREFIX
 make -j 20
 make install-strip -j 20
+# 单独安装带调试符号的库文件
+make install-target-libgcc install-target-libstdc++-v3 install-target-libatomic install-target-libquadmath install-target-libgomp -j 20
 echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
 source ~/.bashrc
 ```
@@ -101,7 +103,7 @@ cd ~/binutils
 mkdir build
 cd build
 export ORIGIN='$$ORIGIN'
-../configure --prefix=$PREFIX --disable-werror --enable-nls --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64" --enable-gold
+../configure --prefix=$PREFIX --disable-werror --enable-nls --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64" --enable-gold --enable-source-highlight
 make -j 20
 make install-strip -j 20
 ```
@@ -129,7 +131,7 @@ gdb.execute(f"source {scriptPath}")
 end
 ```
 
-由`share/.gdbinit`直接配置pretty-printer，完成后直接跳转至[第8步](#8打包工具链)：
+由`share/.gdbinit`直接配置pretty-printer，完成后直接跳转至[第9步](#9打包工具链)：
 
 ```python
 # share/.gdbinit
@@ -177,7 +179,25 @@ register_libstdcxx_printers(gdb.current_objfile())
 
 同理，修改`lib32/libstdc++.so.6.0.33-gdb.py`，尽管在默认配置中该文件不会被加载。
 
-### 8打包工具链
+### 8剥离调试符号到独立符号文件
+
+通过`make install-target`命令可以安装未strip的运行库，但这样的运行库体积过大，不利于部署。因此需要剥离调试符号到独立的符号文件中。
+
+在[第4步](#4编译安装gcc)中我们保留了以下库的调试符号：libgcc libstdc++ libatomic libquadmath libgomp
+
+接下来逐个完成剥离操作：
+
+```shell
+# 生成独立的调试符号文件
+objcopy --only-keep-debug libgcc_s.so.1 libgcc_so.1.debug
+# 剥离动态库的调试符号
+strip libgcc_s.so.1
+# 关联调试符号和动态库
+objcopy --add-gnu-debuglink=libgcc_s.so.1.debug libgcc_s.so.1
+# 重复上述操作直到处理完所有动态库
+```
+
+### 9打包工具链
 
 ```shell
 cd ~
@@ -192,7 +212,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY x86_64-linux-gnu-native-gcc14.tar
 | :--------------- | :--------------- | :----------------- |
 | x86_64-linux-gnu | x86_64-linux-gnu | x86_64-w64-mingw32 |
 
-### 9设置环境变量
+### 10设置环境变量
 
 ```shell
 export TARGET=x86_64-w64-mingw32
@@ -244,7 +264,7 @@ make install
 #define __GTHREADS_CXX0X 1
 ```
 
-在新gcc中，该bug可能已被修复，如果不改可以通过编译则不需要修改。
+在gcc14.0.1中，该bug已被修复，如果不改可以通过编译则不需要修改。
 
 ### 13编译安装gcc和libgcc
 
@@ -490,7 +510,7 @@ python3 "$current_dir/python_config.py" $@
 ```shell
 cd ~/binutils/gdb/build
 rm -rf *
-../configure --host=$HOST --target=$TARGET --prefix=$PREFIX --disable-werror --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/python_config.sh
+../configure --host=$HOST --target=$TARGET --prefix=$PREFIX --disable-werror --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/python_config.sh --enable-source-highlight
 make -j 20
 make install-strip -j 20
 ```

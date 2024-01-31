@@ -20,7 +20,7 @@
 - gold
 - gdb (需要python3.11)
 - .gdbinit (位于share下)
-- 调试符号：libgcc libstdc++-v3 libatomic libquadmath libgomp
+- 调试符号：libgcc libstdc++ libatomic libquadmath libgomp
 
 ## 注意事项
 

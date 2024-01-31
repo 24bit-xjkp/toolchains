@@ -7,7 +7,7 @@ import io
 import sys
 
 lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports", "iconv", "python-embed")
-dll_list = ("libgcc", "libstdc++-v3", "libatomic", "libquadmath", "libgomp")
+dll_list = ("libgcc", "libstdc++", "libatomic", "libquadmath", "libgomp")
 rpath_lib = "\"-Wl,-rpath='$ORIGIN'/../lib64\""
 
 
@@ -129,11 +129,10 @@ class environment:
                 for file in os.listdir(lib_dir):
                     if file.startswith(dll_list[1:]) and file.endswith(".so") or file == "libgcc_s.so.1":
                         dll_path = os.path.join(lib_dir, file)
-                        symbol_file = file + ".debug"
-                        symbol_path = os.path.join(lib_dir, symbol_file)
+                        symbol_path = dll_path + ".debug"
                         run_command(f"{prefix}objcopy --only-keep-debug {dll_path} {symbol_path}")
                         run_command(f"{prefix}strip {dll_path}")
-                        run_command(f"{prefix}objcopy --add-gnu-debuglink={symbol_file} {dll_path}")
+                        run_command(f"{prefix}objcopy --add-gnu-debuglink={symbol_path} {dll_path}")
 
     def register_in_env(self) -> None:
         """注册安装路径到环境变量
