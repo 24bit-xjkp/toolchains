@@ -7,6 +7,7 @@
 - 支持pretty-printer的.gdbinit
 - 使用相对路径，可重新部署
 - 已配置rpath并带有必要的动态库
+- 支持调试符号
 
 支持如下工具链：
 | 工具链 | Host               | Target                                    |
