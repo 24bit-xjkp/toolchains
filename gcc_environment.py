@@ -25,12 +25,19 @@ dll_target_list = (
     "install-target-libquadmath",
     "install-target-libgomp",
 )
-dll_name_list = (
+dll_name_list_linux = (
     "libgcc_s.so.1",
     "libstdc++.so",
     "libatomic.so",
     "libquadmath.so",
     "libgomp.so",
+)
+dll_name_list_windows = (
+    "libgcc_s_seh-1.dll",
+    "libgcc_s_dw2-1.dll",
+    "libstdc++-6.dll",
+    "libatomic-1.dll",
+    "libquadmath-0.dll",
 )
 rpath_lib = "\"-Wl,-rpath='$ORIGIN'/../lib64\""
 
@@ -58,6 +65,7 @@ class environment:
     gdbinit_path: str  # <安装后.gdbinit文件所在路径
     lib_dir_list: dict[str, str]  # <所有库所在目录
     tool_prefix: str  # <工具的前缀，如x86_64-w64-mingw32-
+    dll_name_list: tuple  # <该平台上需要保留调试符号的dll列表
 
     def __init__(self, major_version: str, build: str = "x86_64-linux-gnu", host: str = "", target: str = "") -> None:
         self.major_version = major_version
@@ -89,6 +97,11 @@ class environment:
         for lib in lib_list:
             self.lib_dir_list[lib] = os.path.join(self.home_dir, lib)
         self.tool_prefix = f"{self.target}-" if self.cross_compiler else ""
+        # NOTE：添加平台后需要在此处注册dll_name_list
+        if self.target.endswith("linux-gnu"):
+            self.dll_name_list = dll_name_list_linux
+        elif self.target.endswith("w64-mingw32"):
+            self.dll_name_list = dll_name_list_windows
 
     def update(self) -> None:
         """更新源代码"""
@@ -147,7 +160,7 @@ class environment:
         """剥离动态库的调试符号到独立的符号文件"""
         for dir in filter(lambda dir: dir.startswith("lib"), os.listdir(self.lib_prefix)):
             lib_dir = os.path.join(self.lib_prefix, dir)
-            for file in filter(lambda file: file in dll_name_list, os.listdir(lib_dir)):
+            for file in filter(lambda file: file in self.dll_name_list, os.listdir(lib_dir)):
                 dll_path = os.path.join(lib_dir, file)
                 symbol_path = dll_path + ".debug"
                 run_command(f"{self.tool_prefix}objcopy --only-keep-debug {dll_path} {symbol_path}")

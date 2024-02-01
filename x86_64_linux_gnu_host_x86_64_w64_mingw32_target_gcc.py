@@ -45,6 +45,7 @@ def build() -> None:
     env.make()
     env.install()
     env.delete_symlink()
+    env.strip_debug_symbol()
 
     # 编译pexports
     env.enter_build_dir("pexports")
