@@ -189,11 +189,11 @@ register_libstdcxx_printers(gdb.current_objfile())
 
 ```shell
 # 生成独立的调试符号文件
-objcopy --only-keep-debug libgcc_s.so.1 libgcc_so.1.debug
+objcopy --only-keep-debug $PREFIX/lib64/libgcc_s.so.1 $PREFIX/lib64/libgcc_so.1.debug
 # 剥离动态库的调试符号
-strip libgcc_s.so.1
+strip $PREFIX/lib64/libgcc_s.so.1
 # 关联调试符号和动态库
-objcopy --add-gnu-debuglink=libgcc_s.so.1.debug libgcc_s.so.1
+objcopy --add-gnu-debuglink=$PREFIX/lib64/libgcc_s.so.1.debug $PREFIX/lib64/libgcc_s.so.1
 # 重复上述操作直到处理完所有动态库
 ```
 
@@ -220,7 +220,7 @@ export HOST=x86_64-linux-gnu
 export PREFIX=~/$HOST-host-$TARGET-target-gcc14
 ```
 
-### 10编译安装binutils
+### 11编译安装binutils
 
 ```shell
 cd binutils/build
@@ -233,7 +233,7 @@ echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### 11安装mingw-w64头文件
+### 12安装mingw-w64头文件
 
 ```shell
 cd ~/mingw
@@ -244,7 +244,7 @@ cd build
 make install
 ```
 
-### 12修改libgcc以支持win32线程模型下的条件变量
+### 13修改libgcc以支持win32线程模型下的条件变量
 
 ```c
 // libgcc/config/i386/gthr-win32.h
@@ -266,7 +266,7 @@ make install
 
 在gcc14.0.1中，该bug已被修复，如果不改可以通过编译则不需要修改。
 
-### 13编译安装gcc和libgcc
+### 14编译安装gcc和libgcc
 
 ```shell
 cd ~/gcc/build
@@ -301,7 +301,7 @@ make all-gcc all-target-libgcc -j 20
 make install-strip-gcc install-strip-target-libgcc -j 20
 ```
 
-### 14编译安装完整mingw-w64
+### 15编译安装完整mingw-w64
 
 ```shell
 cd ~/mingw/build
@@ -314,7 +314,7 @@ cd $PREFIX/$TARGET/lib
 ln -s ../lib32 32
 ```
 
-### 15编译安装完整gcc
+### 16编译安装完整gcc
 
 ```shell
 cd ~/gcc/build
@@ -322,9 +322,27 @@ rm -rf *
 ../configure --disable-werror --enable-multilib --enable-languages=c,c++ --enable-nls --disable-sjlj-exceptions --enable-threads=win32 --prefix=$PREFIX --target=$TARGET
 make -j 20
 make install-strip -j 20
+# 单独安装带调试符号的库文件
+make install-target-libgcc install-target-libstdc++-v3 install-target-libatomic install-target-libquadmath -j 20
 ```
 
-### 16编译安装pexports
+### 17剥离调试符号到独立符号文件
+
+在[第16步](#16编译安装完整gcc)中我们保留了以下库的调试符号：libgcc libstdc++ libatomic libquadmath。但需要注意的是，x86_64下libgcc名为`libgcc_s_seh-1.dll`，而i386下libgcc名为`libgcc_s_dw2-1.dll`。
+
+接下来逐个完成剥离操作：
+
+```shell
+# 生成独立的调试符号文件
+$TARGET-objcopy --only-keep-debug $PREFIX/$TARGET/lib/libgcc_s_seh-1.dll $PREFIX/$TARGET/lib/libgcc_s_seh-1.dll.debug
+# 剥离动态库的调试符号
+$TARGET-strip $PREFIX/$TARGET/lib/libgcc_s_seh-1.dll
+# 关联调试符号和动态库
+$TARGET-objcopy --add-gnu-debuglink=$PREFIX/$TARGET/lib/libgcc_s_seh-1.dll.debug $PREFIX/$TARGET/lib/libgcc_s_seh-1.dll
+# 重复上述操作直到处理完所有动态库
+```
+
+### 18编译安装pexports
 
 ```shell
 cd ~/pexports
@@ -337,7 +355,7 @@ make install-strip -j 20
 mv $PREFIX/bin/pexports $PREFIX/bin/$TARGET-pexports
 ```
 
-### 17打包工具链
+### 19打包工具链
 
 ```shell
 cd ~
@@ -352,7 +370,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 | :--------------- | :----------------- | :----------------- |
 | x86_64-linux-gnu | x86_64-w64-mingw32 | x86_64-w64-mingw32 |
 
-### 18设置环境变量
+### 20设置环境变量
 
 ```shell
 export BUILD=x86_64-linux-gnu
@@ -361,7 +379,7 @@ export TARGET=$HOST
 export PREFIX=~/$HOST-native-gcc14
 ```
 
-### 19编译安装gcc
+### 21编译安装gcc
 
 ```shell
 cd ~/gcc/build
@@ -391,7 +409,9 @@ libstdc++-6.dll:   PE32 executable (DLL) (console) Intel 80386 (stripped to exte
 同时，我们会发现`lib`和`lib32`目录下没有这些dll，这是因为gcc的安装脚本默认将它们安装到了bin目录下。综上所述，dll的安装是完全错误的。
 还可以发现，`include`、`lib`和`lib32`目录下都没有libc和sdk文件。故我们需要手动从先前安装的[交叉工具链](#构建mingw交叉工具链)中复制这些文件。
 
-### 20从交叉工具链中复制所需的库和头文件
+### 22从交叉工具链中复制所需的库和头文件
+
+这样不但不需要再次编译mingw-w64，而且可以直接复制[编译交叉工具链](#17剥离调试符号到独立符号文件)时生成的调试符号文件，不需要再次剥离调试符号。
 
 ```shell
 rm *.dll
@@ -402,7 +422,7 @@ cp -n lib32/* $PREFIX/lib32
 cp -nr include/* $PREFIX/include
 ```
 
-### 21为python动态库创建归档文件
+### 23为python动态库创建归档文件
 
 在接下来的5步中，我们将构建编译gdb所需的依赖项。具体说明请参见[构建gdb的要求](https://sourceware.org/gdb/current/onlinedocs/gdb.html/Requirements.html#Requirements)。
 
@@ -412,7 +432,7 @@ $TARGET-pexports python311.dll > libpython.def
 $TARGET-dlltool -D python311.dll -d libpython.def -l libpython.a
 ```
 
-### 22编译安装libgmp
+### 24编译安装libgmp
 
 ```shell
 cd ~/gmp
@@ -425,7 +445,7 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 23编译安装libexpat
+### 25编译安装libexpat
 
 ```shell
 cd ~/expat/expat
@@ -438,7 +458,7 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 24编译安装libiconv
+### 26编译安装libiconv
 
 ```shell
 cd ~/iconv
@@ -451,7 +471,7 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 25编译安装libmpfr
+### 27编译安装libmpfr
 
 ```shell
 cd ~/mpfr
@@ -464,7 +484,7 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 26编译安装binutils和gdb
+### 28编译安装binutils和gdb
 
 要编译带有python支持的gdb就必须在编译gdb时传入python安装信息，但在交叉环境中提供这些信息是困难的。因此我们需要手动将这些信息传递给`configure`脚本。
 具体说明请参见[使用交叉编译器编译带有python支持的gdb](https://sourceware.org/gdb/wiki/CrossCompilingWithPythonSupport)。
@@ -475,23 +495,27 @@ import sys
 import os
 from gcc_environment import environment
 
-assert len(sys.argv) == 3, "Too many args." if len(sys.argv) > 3 else "Too few args"
-# sys.argv[0]是当前脚本的路径
-# sys.argv[1]是当前gdb自带的python-config.py脚本的路径
-# sys.argv[2]是传入的选项
-option = sys.argv[2]
-env = environment("")
-python_dir = os.path.join(env.home_dir, "python-embed")
+# sys.argv[0] shell脚本路径
+# sys.argv[1] binutils/gdb/python-config.py路径
+# sys.argv[2:] python脚本所需的参数
+def get_config() -> None:
+    assert len(sys.argv) >= 3, "Too few args"
+    env = environment("")
+    python_dir = env.lib_dir_list["python-embed"]
+    result_list = {
+        "--includes": f"-I{os.path.join(python_dir, 'include')}",
+        "--ldflags": f"-L{python_dir} -lpython",
+        "--exec-prefix": f"-L{python_dir}",
+    }
+    option_list = sys.argv[2:]
+    for option in option_list:
+        if option in result_list:
+            print(result_list[option])
+            return
+    assert False, f'Invalid option list: {" ".join(option_list)}'
 
-match option:
-    case "--includes":
-        print(f"-I{os.path.join(python_dir, 'include')}")
-    case "--ldflags":
-        print(f"-L{python_dir} -lpython")
-    case "--exec-prefix":
-        print(f"-L{python_dir}")
-    case _:
-        assert False, f'Invalid option "{option}"'
+if __name__ == "__main__":
+    get_config()
 ```
 
 编写一个shell脚本以转发参数给上述python脚本：
@@ -515,7 +539,7 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 27编译安装pexports
+### 29编译安装pexports
 
 我们在Window下也提供pexports实用工具，下面开始编译pexports：
 
@@ -527,14 +551,14 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 28复制python embed package
+### 30复制python embed package
 
 ```shell
 cp ~/python-embed
 cp python* $PREFIX/bin
 ```
 
-### 29打包工具链
+### 31打包工具链
 
 ```shell
 cd ~
@@ -543,9 +567,10 @@ tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 ```
 
-### 30使用工具链
+### 32使用工具链
 
 在开启multilib后，`lib`和`lib32`目录下会各有一份dll，这也就是为什么不能将dll文件复制到`bin`目录下。
 因而在使用时需要将`bin`，`lib`和`lib32`文件夹都添加到PATH环境变量。程序在加载dll时Windows会顺序搜索PATH中的目录，直到找到一个dll可以被加载。
 因此同时将`lib`和`lib32`添加到PATH即可实现根据程序体系结构选择相应的dll。
 如果将`lib`和`lib32`下的dll分别复制到`System32`和`SysWOW64`目录下，则只需要将`bin`文件夹添加到PATH环境变量，但不推荐这么做。
+值得注意的是，.debug文件需要和.dll文件处于同一级目录下，否则调试时需要手动加载符号文件。
