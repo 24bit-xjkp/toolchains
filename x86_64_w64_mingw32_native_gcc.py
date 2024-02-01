@@ -75,8 +75,14 @@ def build():
     env.configure(
         basic_option,
         *lib_option,
-        f"--with-system-gdbinit={env.gdbinit_path} --with-python={os.path.join(env.current_dir, 'python_config.sh')}",
+        f"--with-system-gdbinit={env.gdbinit_path} --with-python={os.path.join(env.current_dir, 'python_config.sh')} CXXFLAGS=-D_WIN32_WINNT=0x0600",
     )
+    env.make()
+    env.install()
+
+    # 编译安装pexports
+    env.enter_build_dir("pexports")
+    env.configure(f"--prefix={env.prefix} --host={env.host}")
     env.make()
     env.install()
 
