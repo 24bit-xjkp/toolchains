@@ -95,7 +95,9 @@ class environment:
         self.gdbinit_path = os.path.join(self.prefix, "share", ".gdbinit")
         self.lib_dir_list = {}
         for lib in lib_list:
-            self.lib_dir_list[lib] = os.path.join(self.home_dir, lib)
+            lib_dir = os.path.join(self.home_dir, lib)
+            assert os.path.exists(lib_dir),f'Cannot find lib "{lib}" in directory "{lib_dir}"'
+            self.lib_dir_list[lib] = lib_dir
         self.tool_prefix = f"{self.target}-" if self.cross_compiler else ""
         # NOTE：添加平台后需要在此处注册dll_name_list
         if self.target.endswith("linux-gnu"):
@@ -151,9 +153,11 @@ class environment:
         """
         if target != ():
             targets = " ".join(("", *target))
-        else:
+        elif os.getcwd() == os.path.join(self.lib_dir_list["gcc"], "build"):
             run_command(f"make install-strip -j {self.num_cores}")
             targets = " ".join(dll_target_list)
+        else:
+            targets = "install-strip"
         run_command(f"make {targets} -j {self.num_cores}")
 
     def strip_debug_symbol(self) -> None:

@@ -46,7 +46,8 @@ def build():
     env.enter_build_dir("gcc")
     env.configure(basic_option, gcc_option)
     env.make()
-    env.install()
+    # 调试库将从交叉工具链中复制，不需要单独安装
+    env.install("install-strip")
 
     # 删除已安装的dll
     os.chdir(env.bin_dir)
