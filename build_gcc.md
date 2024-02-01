@@ -103,7 +103,7 @@ cd ~/binutils
 mkdir build
 cd build
 export ORIGIN='$$ORIGIN'
-../configure --prefix=$PREFIX --disable-werror --enable-nls --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64" --enable-gold --enable-source-highlight
+../configure --prefix=$PREFIX --disable-werror --enable-nls --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64" --enable-gold
 make -j 20
 make install-strip -j 20
 ```
@@ -510,7 +510,7 @@ python3 "$current_dir/python_config.py" $@
 ```shell
 cd ~/binutils/gdb/build
 rm -rf *
-../configure --host=$HOST --target=$TARGET --prefix=$PREFIX --disable-werror --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/python_config.sh --enable-source-highlight
+../configure --host=$HOST --target=$TARGET --prefix=$PREFIX --disable-werror --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/python_config.sh
 make -j 20
 make install-strip -j 20
 ```

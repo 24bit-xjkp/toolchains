@@ -6,8 +6,32 @@ import shutil
 import io
 import sys
 
-lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports", "iconv", "python-embed")
-dll_list = ("libgcc", "libstdc++", "libatomic", "libquadmath", "libgomp")
+lib_list = (
+    "expat",
+    "gcc",
+    "binutils",
+    "gmp",
+    "mpfr",
+    "linux",
+    "mingw",
+    "pexports",
+    "iconv",
+    "python-embed",
+)
+dll_target_list = (
+    "install-target-libgcc",
+    "install-target-libstdc++-v3",
+    "install-target-libatomic",
+    "install-target-libquadmath",
+    "install-target-libgomp",
+)
+dll_name_list = (
+    "libgcc_s.so.1",
+    "libstdc++.so",
+    "libatomic.so",
+    "libquadmath.so",
+    "libgomp.so",
+)
 rpath_lib = "\"-Wl,-rpath='$ORIGIN'/../lib64\""
 
 
@@ -33,6 +57,7 @@ class environment:
     symlink_list: list[str]  # < 构建过程中创建的软链接表
     gdbinit_path: str  # <安装后.gdbinit文件所在路径
     lib_dir_list: dict[str, str]  # <所有库所在目录
+    tool_prefix: str  # <工具的前缀，如x86_64-w64-mingw32-
 
     def __init__(self, major_version: str, build: str = "x86_64-linux-gnu", host: str = "", target: str = "") -> None:
         self.major_version = major_version
@@ -40,7 +65,9 @@ class environment:
         self.host = host if host != "" else build
         self.target = target if target != "" else self.host
         self.cross_compiler = self.host != self.target
-        self.name_without_version = (f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native") + "-gcc"
+        self.name_without_version = (
+            f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native"
+        ) + "-gcc"
         self.name = self.name_without_version + major_version
         self.home_dir = ""
         for option in sys.argv:
@@ -61,11 +88,10 @@ class environment:
         self.lib_dir_list = {}
         for lib in lib_list:
             self.lib_dir_list[lib] = os.path.join(self.home_dir, lib)
+        self.tool_prefix = f"{self.target}-" if self.cross_compiler else ""
 
     def update(self) -> None:
-        """更新源代码
-
-        """
+        """更新源代码"""
         for lib in ("expat", "gcc", "binutils", "linux", "mingw", "pexports", "glibc"):
             path = os.path.join(self.home_dir, lib)
             os.chdir(path)
@@ -114,79 +140,66 @@ class environment:
             targets = " ".join(("", *target))
         else:
             run_command(f"make install-strip -j {self.num_cores}")
-            targets = ""
-            for dll in dll_list:
-                targets += f"install-target-{dll} "
+            targets = " ".join(dll_target_list)
         run_command(f"make {targets} -j {self.num_cores}")
 
     def strip_debug_symbol(self) -> None:
-        """剥离动态库的调试符号到独立的符号文件
-        """
-        prefix = f"{self.target}-" if self.cross_compiler else ""
-        for dir in os.listdir(self.lib_prefix):
-            if dir.startswith("lib"):
-                lib_dir = os.path.join(self.lib_prefix, dir)
-                for file in os.listdir(lib_dir):
-                    if file.startswith(dll_list[1:]) and file.endswith(".so") or file == "libgcc_s.so.1":
-                        dll_path = os.path.join(lib_dir, file)
-                        symbol_path = dll_path + ".debug"
-                        run_command(f"{prefix}objcopy --only-keep-debug {dll_path} {symbol_path}")
-                        run_command(f"{prefix}strip {dll_path}")
-                        run_command(f"{prefix}objcopy --add-gnu-debuglink={symbol_path} {dll_path}")
+        """剥离动态库的调试符号到独立的符号文件"""
+        for dir in filter(lambda dir: dir.startswith("lib"), os.listdir(self.lib_prefix)):
+            lib_dir = os.path.join(self.lib_prefix, dir)
+            for file in filter(lambda file: file in dll_name_list, os.listdir(lib_dir)):
+                dll_path = os.path.join(lib_dir, file)
+                symbol_path = dll_path + ".debug"
+                run_command(f"{self.tool_prefix}objcopy --only-keep-debug {dll_path} {symbol_path}")
+                run_command(f"{self.tool_prefix}strip {dll_path}")
+                run_command(f"{self.tool_prefix}objcopy --add-gnu-debuglink={symbol_path} {dll_path}")
 
     def register_in_env(self) -> None:
-        """注册安装路径到环境变量
-        """
-        os.environ["PATH"] = self.bin_dir + ":" + os.environ["PATH"]
+        """注册安装路径到环境变量"""
+        os.environ["PATH"] = f"{self.bin_dir}:{os.environ['PATH']}"
 
     def register_in_bashrc(self) -> None:
-        """注册安装路径到用户配置文件
-        """
+        """注册安装路径到用户配置文件"""
         bashrc_file = io.open(os.path.join(self.home_dir, ".bashrc"), "a")
         bashrc_file.writelines(f"export PATH={self.bin_dir}:$PATH")
         bashrc_file.close()
         self.register_in_env()
 
     def copy_gdbinit(self) -> None:
-        """复制.gdbinit文件
-        """
+        """复制.gdbinit文件"""
         gdbinit_src_path = os.path.join(self.current_dir, ".gdbinit")
         shutil.copyfile(gdbinit_src_path, self.gdbinit_path)
 
     def copy_readme(self) -> None:
-        """复制工具链说明文件
-        """
+        """复制工具链说明文件"""
         readme_path = os.path.join(self.current_dir, f"{self.name_without_version}.md")
         target_path = os.path.join(self.prefix, "README.md")
         shutil.copyfile(readme_path, target_path)
 
     def build_libpython(self) -> None:
-        """创建libpython.a
-        """
+        """创建libpython.a"""
         lib_dir = self.lib_dir_list["python-embed"]
         lib_path = os.path.join(lib_dir, "libpython.a")
         def_path = os.path.join(lib_dir, "libpython.def")
         if not os.path.exists(lib_path):
-            dll_name = ""
-            for file in os.listdir(lib_dir):
-                if file.endswith(".dll"):
-                    dll_name = file
-                    break
-            assert dll_name != "", f'Cannot find python*.dll in "{lib_dir}" directory.'
-            dll_path = os.path.join(lib_dir, dll_name)
+            dll_list = tuple(filter(lambda dll: dll.startswith("python") and dll.endswith(".dll"), os.listdir(lib_dir)))
+            assert dll_list != (), f'Cannot find python*.dll in "{lib_dir}" directory.'
+            assert len(dll_list) == 1, f'Find too many python*.dll in "{lib_dir}" directory:\n{" ".join(dll_list)}'
+            dll_path = os.path.join(lib_dir, dll_list[0])
             run_command(f"{self.target}-pexports {dll_path} > {def_path}")
             run_command(f"{self.target}-dlltool -D {dll_path} -d {def_path} -l {lib_path}")
 
     def copy_python_embed_package(self) -> None:
-        """复制python embed package到安装目录
-        """
+        """复制python embed package到安装目录"""
         for file in os.listdir(self.lib_dir_list["python-embed"]):
             if file.startswith("python"):
-                shutil.copyfile(os.path.join(self.lib_dir_list["python-embed"], file), os.path.join(self.bin_dir, file))
+                shutil.copyfile(
+                    os.path.join(self.lib_dir_list["python-embed"], file),
+                    os.path.join(self.bin_dir, file),
+                )
 
     def symlink_multilib(self) -> None:
-        """为编译带有multilib支持的交叉编译器创建软链接，如将lib/32链接到lib32
-        """
+        """为编译带有multilib支持的交叉编译器创建软链接，如将lib/32链接到lib32"""
         multilib_list = {}
         for multilib in os.listdir(self.lib_prefix):
             if multilib != "lib" and multilib.startswith("lib") and os.path.isdir(os.path.join(self.lib_prefix, multilib)):
@@ -202,8 +215,7 @@ class environment:
         os.chdir(cwd)
 
     def delete_symlink(self) -> None:
-        """删除编译交叉编译器所需的软链接，在完成编译后不再需要这些软链接
-        """
+        """删除编译交叉编译器所需的软链接，在完成编译后不再需要这些软链接"""
         for symlink in self.symlink_list:
             os.unlink(symlink)
 

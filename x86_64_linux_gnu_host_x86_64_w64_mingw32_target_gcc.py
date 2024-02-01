@@ -52,7 +52,7 @@ def build() -> None:
     env.make()
     env.install()
     # 添加target前缀
-    os.rename(os.path.join(env.bin_dir,"pexports"), os.path.join(env.bin_dir, f"{env.target}-pexports"))
+    os.rename(os.path.join(env.bin_dir, "pexports"), os.path.join(env.bin_dir, f"{env.target}-pexports"))
     env.package(False)
 
 

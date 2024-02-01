@@ -13,14 +13,18 @@ for lib in ("gmp", "expat", "iconv", "mpfr"):
 
 def build_gdb_requirements() -> list[str]:
     """编译安装libgmp, libexpat, libiconv, libmpfr
-    
+
     Returns:
         list[str]: gdb依赖库相关的配置选项
     """
     lib_option = f"--host={env.host} --disable-shared"
     for lib, prefix in lib_install_dir_list.items():
         env.enter_build_dir(lib)
-        env.configure(lib_option, f"--prefix={prefix}", f"--with-gmp={lib_install_dir_list['gmp']}" if lib == "mpfr" else "")
+        env.configure(
+            lib_option,
+            f"--prefix={prefix}",
+            f"--with-gmp={lib_install_dir_list['gmp']}" if lib == "mpfr" else "",
+        )
         env.make()
         env.install()
 
@@ -67,7 +71,11 @@ def build():
 
     # 编译安装binutils和gdb
     env.enter_build_dir("binutils")
-    env.configure(basic_option, *lib_option, f"--with-system-gdbinit={env.gdbinit_path} --with-python={os.path.join(env.current_dir, 'python_config.sh')} --enable-source-highlight")
+    env.configure(
+        basic_option,
+        *lib_option,
+        f"--with-system-gdbinit={env.gdbinit_path} --with-python={os.path.join(env.current_dir, 'python_config.sh')}",
+    )
     env.make()
     env.install()
 
