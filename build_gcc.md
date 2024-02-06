@@ -591,6 +591,8 @@ export ORIGIN='$$ORIGIN'
 make -j 20
 make install-strip -j 20
 unset ORIGIN
+echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 ### 34编译安装gcc
@@ -613,6 +615,7 @@ make install-target-libstdc++-v3 install-target-libgcc -j 20
 ```shell
 cd ~/$BUILD-native-gcc14
 cp lib64/libstdc++.so.6 $PREFIX/lib64
+cp lib64/libgcc_s.so.1 $PREFIX/lib64
 cp -r share/gcc-14.0.1 $PREFIX/share
 ```
 
@@ -724,6 +727,8 @@ export ORIGIN='$$ORIGIN'
 make -j 20
 make install-strip -j 20
 unset ORIGIN
+echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 ### 45编译安装gcc
@@ -742,6 +747,7 @@ make install-target-libstdc++-v3 install-target-libgcc -j 20
 ```shell
 cd ~/$BUILD-native-gcc14
 cp lib64/libstdc++.so.6 $PREFIX/lib64
+cp lib64/libgcc_s.so.1 $PREFIX/lib64
 cp -r share/gcc-14.0.1 $PREFIX/share
 ```
 
@@ -817,6 +823,281 @@ cp -r share/gcc-14.0.1 $PREFIX/share
 ```
 
 ### 53打包工具链
+
+```shell
+cd ~
+cp ~/toolchains/script/.gdbinit $PREFIX/share
+export PACKAGE=$HOST-host-$TARGET-target-gcc14
+tar -cf $PACKAGE.tar $PACKAGE/
+xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
+```
+
+## 构建到其他x86_64 Linux发行版的交叉工具链
+
+| build            | host             | target                      |
+| :--------------- | :--------------- | :-------------------------- |
+| x86_64-linux-gnu | x86_64-linux-gnu | x86_64-ubuntu2004-linux-gnu |
+
+值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台。为了和本地工具链加以区分，此处修改交叉工具链的vender字段。在vender字段中亦可以添加目标系统的版本以示区分。
+值得注意的是，此处目标系统为ubuntu 20.04，使用的libc为glibc 2.30。交叉工具链的glibc要与目标系统匹配。由于x32已经濒临淘汰，故此处不再编译x32的multilib。
+
+### 54设置环境变量
+
+```shell
+export BUILD=x86_64-linux-gnu
+export HOST=$BUILD
+export TARGET=x86_64-ubuntu2004-linux-gnu
+export PREFIX=~/$HOST-host-$TARGET-target-gcc14
+```
+
+### 55编译binutils和gdb
+
+```shell
+cd ~/binutils/build
+rm -rf *
+export ORIGIN='$$ORIGIN'
+../configure --disable-werror --enable-nls --target=$TARGET --prefix=$PREFIX --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64" --enable-gold
+make -j 20
+make install-strip -j 20
+unset ORIGIN
+echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### 56安装Linux头文件
+
+```shell
+cd ~/linux
+make ARCH=x86 INSTALL_HDR_PATH=$PREFIX/$TARGET headers_install
+```
+
+### 57安装glibc头文件
+
+由于当前的工具链尚不完整，故需要手动设置`libc_cv_forced_unwind=yes`，否则会出现：
+
+```log
+configure: error: forced unwind support is required
+```
+
+glibc头文件安装命令如下：
+
+```shell
+cd ~/glibc
+mkdir build
+cd build
+../configure --host=$TARGET --build=$BUILD --prefix=$PREFIX/$TARGET --disable-werror libc_cv_forced_unwind=yes
+make install-headers
+```
+
+在安装完头文件后，还需要手动新建`include/gnu/stubs.h`文件，若缺少该文件，则无法编译出libgcc。该文件会在安装完整glibc时被覆盖。
+
+```shell
+touch $PREFIX/$TARGET/include/gnu/stubs.h
+```
+
+### 58编译安装gcc和libgcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++ --disable-shared
+make all-gcc all-target-libgcc -j 20
+make install-strip-gcc install-strip-target-libgcc -j 20
+```
+
+### 59编译安装32位glibc
+
+值得注意的是，尽管glibc本身不会使用c++编译器，但构建脚本会使用c++编译器进行链接，故c++编译器也需要设置。
+
+```shell
+cd ~/glibc/build
+rm -rf *
+../configure --host=i686-linux-gnu --build=$BUILD --prefix=$PREFIX/$TARGET --disable-werror CC="$TARGET-gcc -m32" CXX="$TARGET-g++ -m32"
+make -j 20
+make install -j 20
+```
+
+### 60剥离调试符号到单独的符号文件
+
+```shell
+cd $PREFIX/$TARGET/lib
+$TARGET-strip gconv/*.so
+$TARGET-strip audit/*.so
+$TARGET-strip ../libexec/getconf/*
+$TARGET-strip ../sbin/*
+$TARGET-objcopy --only-keep-debug libc-2.30.so libc-2.30.so.debug
+$TARGET-objcopy --add-gnu-debuglink=libc-2.30.so.debug libc-2.30.so
+# 同理剥离出其他需要的符号文件
+$TARGET-strip *.so
+```
+
+### 61修改链接器脚本
+
+此时只有`lib/libc.so`需要修改，该文件的内容如下：
+
+```ldscript
+// lib/libc.so
+/* GNU ld script
+   Use the shared library, but some functions are only in
+   the static library, so try that secondarily.  */
+OUTPUT_FORMAT(elf32-i386)
+GROUP ( /home/luo/x86_64-linux-gnu-host-x86_64-ubuntu2004-linux-gnu-target-gcc14/x86_64-ubuntu2004-linux-gnu/lib/libc.so.6 /home/luo/x86_64-linux-gnu-host-x86_64-ubuntu2004-linux-gnu-target-gcc14/x86_64-ubuntu2004-linux-gnu/lib/libc_nonshared.a  AS_NEEDED ( /home/luo/x86_64-linux-gnu-host-x86_64-ubuntu2004-linux-gnu-target-gcc14/x86_64-ubuntu2004-linux-gnu/lib/ld-linux.so.2 ) )
+```
+
+可以看到其中使用的是绝对地址，这会导致移动安装位置后，无法正确链接。故需要修改为使用相对路径：
+
+```ldscript
+// lib/libc.so
+OUTPUT_FORMAT(elf32-i386)
+GROUP (libc.so.6 libc_nonshared.a AS_NEEDED (ld-linux.so.2))
+```
+
+### 62移动lib目录到lib64
+
+由于在此multilib环境下，交叉编译器编译时lib32目录下存放32位multilib而lib目录下存放64位multilib，故需要调整glibc的位置。而ldscript需要始终存放在lib目录下。
+
+```shell
+mv $PREFIX/$TARGET/lib $PREFIX/$TARGET/lib32
+mkdir $PREFIX/$TARGET/lib
+mv $PREFIX/$TARGET/lib32/ldscripts $PREFIX/$TARGET/lib
+```
+
+### 63编译安装64位glibc
+
+```shell
+cd ~/glibc/build
+rm -rf *
+../configure --host=$TARGET --build=$BUILD --prefix=$PREFIX/$TARGET --disable-werror
+make -j 20
+make install -j 20
+```
+
+### 64剥离调试符号到单独的符号文件
+
+```shell
+cd $PREFIX/$TARGET/lib
+$TARGET-strip gconv/*.so
+$TARGET-strip audit/*.so
+$TARGET-strip ../libexec/getconf/*
+$TARGET-strip ../sbin/*
+$TARGET-objcopy --only-keep-debug libc-2.30.so libc-2.30.so.debug
+$TARGET-objcopy --add-gnu-debuglink=libc-2.30.so.debug libc-2.30.so
+# 同理剥离出其他需要的符号文件
+$TARGET-strip *.so
+```
+
+### 65修改链接器脚本
+
+同理修改`libc.so`，`libm.a`和`libm.so`：
+
+```ldscript
+// libc.so
+OUTPUT_FORMAT(elf64-x86-64)
+GROUP (libc.so.6 libc_nonshared.a AS_NEEDED (ld-linux-x86-64.so.2))
+// libm.a
+OUTPUT_FORMAT(elf64-x86-64)
+GROUP (libm-2.30.a libmvec.a)
+// libm.so
+OUTPUT_FORMAT(elf64-x86-64)
+GROUP (libm.so.6 AS_NEEDED(libmvec_nonshared.a libmvec.so.1))
+```
+
+### 66为multilib建立软链接
+
+```shell
+cd $PREFIX/$TARGET/lib
+ln -s ../lib32 32
+```
+
+### 67修改asan源文件
+
+在`gcc/libsanitizer/asan/asan_linux.cpp`中默认没有包含`linux/limits.h`文件，这会导致编译的时候缺少`PATH_MAX`宏，故将其修改为：
+
+```c++
+// gcc/libsanitizer/asan/asan_linux.cpp
+#  include <dlfcn.h>
+#  include <fcntl.h>
+#  include <limits.h>
+#  include <pthread.h>
+#  include <stdio.h>
+#  include <sys/mman.h>
+#  include <sys/resource.h>
+#  include <sys/syscall.h>
+#  include <sys/time.h>
+#  include <sys/types.h>
+#  include <unistd.h>
+#  include <unwind.h>
+#  include <linux/limits.h> // < 添加linux/limits.h头文件
+```
+
+### 68编译完整gcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++
+make -j 20
+make install-strip -j 20
+# 单独安装带调试符号的库文件
+make install-target-libgcc install-target-libstdc++-v3 install-target-libatomic install-target-libquadmath install-target-libgomp -j 20
+```
+
+### 69剥离调试符号到独立的符号文件
+
+在[第64步](#68编译完整gcc)中我们保留了以下库的调试符号：libgcc libstdc++ libatomic libquadmath libgomp
+
+接下来逐个完成剥离操作：
+
+```shell
+# 生成独立的调试符号文件
+objcopy --only-keep-debug $PREFIX/lib64/libgcc_s.so.1 $PREFIX/lib64/libgcc_so.1.debug
+# 剥离动态库的调试符号
+strip $PREFIX/lib64/libgcc_s.so.1
+# 关联调试符号和动态库
+objcopy --add-gnu-debuglink=$PREFIX/lib64/libgcc_s.so.1.debug $PREFIX/lib64/libgcc_s.so.1
+# 重复上述操作直到处理完所有动态库
+```
+
+### 70移动lib目录下的glibc到lib64目录下
+
+lib32目录下是纯净的glibc文件，故以lib32为参照经行文件复制，建议使用python脚本完成：
+
+```python
+import shutil
+import os
+home_dir = os.environ["HOME"]
+lib_prefix = os.path.join(home_dir, "x86_64-linux-gnu-host-x86_64-ubuntu2004-linux-gnu-gcc14", "x86_64-ubuntu2004-linux-gnu")
+lib_dir = os.path.join(env.lib_prefix, "lib")
+lib32_dir = os.path.join(env.lib_prefix, "lib32")
+lib64_dir = os.path.join(env.lib_prefix, "lib64")
+for file in os.listdir(lib_dir):
+    lib_path = os.path.join(lib_dir, file)
+    lib32_path = os.path.join(lib32_dir, file)
+    lib64_path = os.path.join(lib64_dir, file)
+    if os.path.exists(lib32_path) or file == "ld-linux-x86-64.so.2":
+        shutil.move(lib_path, lib64_path)
+```
+
+### 71移动lib32目录下的glibc到lib目录下
+
+lib32目录下是纯净的glibc文件，直接移动即可：
+
+```shell
+cd $PREFIX/$TARGET
+mov lib32/* lib
+```
+
+### 72从其他工具链中复制所需库
+
+从[x86_64-linux-gnu本地工具链](#构建gcc本地工具链)中复制动态库：
+
+```shell
+cd ~/$BUILD-host-$HOST-target-gcc14/$HOST
+cp lib64/libstdc++.so.6 $PREFIX/lib64
+cp lib64/libgcc_s.so.1 $PREFIX/lib64
+```
+
+### 73打包工具链
 
 ```shell
 cd ~
