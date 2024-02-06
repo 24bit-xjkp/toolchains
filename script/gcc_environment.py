@@ -147,6 +147,8 @@ class environment:
             environment(major_version, target=self.host).register_in_env()
         if self.toolchain_type == "canadian cross":
             environment(major_version, target=self.target).register_in_env()
+        # 将自身注册到环境变量中
+        self.register_in_env()
 
     def update(self) -> None:
         """更新源代码"""
@@ -163,7 +165,7 @@ class environment:
         """
         assert lib in lib_list
         build_dir = self.lib_dir_list[lib]
-        if lib != "python-embed":
+        if lib not in ("python-embed", "linux"):
             build_dir = os.path.join(self.home_dir, lib, "build" if lib != "expat" else "expat/build")
             if os.path.isdir(build_dir):
                 shutil.rmtree(build_dir)
@@ -229,7 +231,6 @@ class environment:
         bashrc_file = io.open(os.path.join(self.home_dir, ".bashrc"), "a")
         bashrc_file.writelines(f"export PATH={self.bin_dir}:$PATH\n")
         bashrc_file.close()
-        self.register_in_env()
 
     def copy_gdbinit(self) -> None:
         """复制.gdbinit文件"""
