@@ -22,7 +22,7 @@
 ### 1安装系统包
 
 ```shell
-sudo apt install bison flex texinfo make automake autoconf libtool git gcc g++ gcc-multilib g++-multilib cmake ninja-build python3 tar xz-utils unzip libgmp-dev libmpfr-dev zlib1g-dev libexpat1-dev
+sudo apt install bison flex texinfo make automake autoconf libtool git gcc g++ gcc-multilib g++-multilib cmake ninja-build python3 tar xz-utils unzip libgmp-dev libmpfr-dev zlib1g-dev libexpat1-dev gawk
 ```
 
 ### 2下载源代码
@@ -562,3 +562,61 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 因此同时将`lib`和`lib32`添加到PATH即可实现根据程序体系结构选择相应的dll。
 如果将`lib`和`lib32`下的dll分别复制到`System32`和`SysWOW64`目录下，则只需要将`bin`文件夹添加到PATH环境变量，但不推荐这么做。
 值得注意的是，.debug文件需要和.dll文件处于同一级目录下，否则调试时需要手动加载符号文件。
+
+## 编译arm独立交叉工具链
+
+| build            | host             | target        |
+| :--------------- | :--------------- | :------------ |
+| x86_64-linux-gnu | x86_64-linux-gnu | arm-none-eabi |
+
+### 32设置环境变量
+
+```shell
+export BUILD=x86_64-linux-gnu
+export HOST=$BUILD
+export TARGET=arm-none-eabi
+export PREFIX=~/$HOST-host-$TARGET-target-gcc14
+```
+
+### 33编译binutils和gdb
+
+```shell
+cd ~/binutils/build
+rm -rf *
+export ORIGIN='$$ORIGIN'
+../configure --disable-werror --enable-nls --target=$TARGET --prefix=$PREFIX --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64" --enable-gold
+make -j 20
+make install-strip -j 20
+```
+
+### 34编译安装gcc
+
+这是一个不使用newlib的完全独立的工具链，故而需要禁用所有依赖宿主系统的库和特性。此时支持的库仅包含libstdc++和libgcc。由于此时禁用了动态库，故不需要再手动剥离调试符号。
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++ --disable-threads --disable-hosted-libstdcxx --disable-libstdcxx-verbose --disable-shared --without-headers --disable-libvtv --disable-libsanitizer --disable-libssp --disable-libquadmath --disable-libgomp
+make -j 20
+make install-strip -j 20
+make install-target-libstdc++-v3 install-target-libgcc -j 20
+```
+
+### 35复制库和pretty-printer
+
+编译出的arm-none-eabi-gdb依赖libstdc++，故需要从x86_64-linux-gnu本地工具链中复制一份。同时独立工具链不会安装pretty-printer，故也需要复制一份。
+
+```shell
+cd ~/x86_64-linux-gnu-native-gcc14
+cp lib64/libstdc++.so.6 $PREFIX/lib64
+cp -r share/gcc-14.0.1 $PREFIX/share
+```
+
+### 36打包工具链
+
+```shell
+cd ~
+export PACKAGE=$HOST-host-$TARGET-target-gcc14
+tar -cf $PACKAGE.tar $PACKAGE/
+xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
+```
