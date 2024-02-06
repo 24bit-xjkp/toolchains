@@ -647,7 +647,7 @@ export PREFIX=~/$HOST-host-$TARGET-target-gcc14
 ```shell
 cd ~/binutils/build
 rm -rf *
-../configure --host=$HOST --target=$TARGET --prefix=$PREFIX --disable-werror --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/python_config.sh CXXFLAGS=-D_WIN32_WINNT=0x0600
+../configure --host=$HOST --target=$TARGET --prefix=$PREFIX --disable-werror --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/python_config.sh  --enable-gold CXXFLAGS=-D_WIN32_WINNT=0x0600
 make -j 20
 make install-strip -j 20
 ```

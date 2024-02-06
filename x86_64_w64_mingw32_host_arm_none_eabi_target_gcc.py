@@ -15,7 +15,7 @@ def build() -> None:
     # env.update()
     basic_option = f"--disable-werror --disable-nls --host={env.host} --target={env.target} --prefix={env.prefix}"
     gcc_option = "--enable-multilib --enable-languages=c,c++"
-    binutils_option = f"--with-system-gdbinit={env.gdbinit_path} --with-python={env.python_config_path} CXXFLAGS=-D_WIN32_WINNT=0x0600"
+    binutils_option = f"--with-system-gdbinit={env.gdbinit_path} --with-python={env.python_config_path} CXXFLAGS=-D_WIN32_WINNT=0x0600 --enable-gold"
 
     # 创建libpython.a
     env.build_libpython()
