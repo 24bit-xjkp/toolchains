@@ -210,7 +210,7 @@ class environment:
     def register_in_bashrc(self) -> None:
         """注册安装路径到用户配置文件"""
         bashrc_file = io.open(os.path.join(self.home_dir, ".bashrc"), "a")
-        bashrc_file.writelines(f"export PATH={self.bin_dir}:$PATH")
+        bashrc_file.writelines(f"export PATH={self.bin_dir}:$PATH\n")
         bashrc_file.close()
         self.register_in_env()
 

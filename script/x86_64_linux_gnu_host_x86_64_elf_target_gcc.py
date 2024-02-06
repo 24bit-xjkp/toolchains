@@ -10,7 +10,7 @@ env = gcc.environment("14", target="x86_64-elf")
 def build() -> None:
     # 更新源代码
     # env.update()
-    
+
     basic_option = f"--disable-werror --enable-nls --target={env.target} --prefix={env.prefix}"
     gcc_option = "--disable-multilib --enable-languages=c,c++"
 
@@ -20,7 +20,7 @@ def build() -> None:
     env.make()
     env.install()
     # 第一次编译时需要注册环境变量，运行完该脚本后可以source ~/.bashrc来加载环境变量
-    env.register_in_bashrc()
+    # env.register_in_bashrc()
 
     # 编译安装gcc
     env.enter_build_dir("gcc")
