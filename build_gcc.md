@@ -106,6 +106,7 @@ export ORIGIN='$$ORIGIN'
 ../configure --prefix=$PREFIX --disable-werror --enable-nls --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64" --enable-gold
 make -j 20
 make install-strip -j 20
+unset ORIGIN
 ```
 
 `--with-system-gdbinit=$PREFIX/share/.gdbinit`选项是用于设置默认的.gdbinit，而我们可以在默认的.gdbinit中配置好pretty-printer模块，
@@ -587,6 +588,7 @@ export ORIGIN='$$ORIGIN'
 ../configure --disable-werror --enable-nls --target=$TARGET --prefix=$PREFIX --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64" --enable-gold
 make -j 20
 make install-strip -j 20
+unset ORIGIN
 ```
 
 ### 34编译安装gcc
@@ -683,6 +685,63 @@ cp -r share/gcc-14.0.1 $PREFIX/share
 ```
 
 ### 42打包工具链
+
+```shell
+cd ~
+export PACKAGE=$HOST-host-$TARGET-target-gcc14
+tar -cf $PACKAGE.tar $PACKAGE/
+xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
+```
+
+## 构建x86_64独立交叉工具链
+
+| build            | host             | target     |
+| :--------------- | :--------------- | :--------- |
+| x86_64-linux-gnu | x86_64-linux-gnu | x86_64-elf |
+
+具体请参阅[构建arm独立交叉工具链](#构建arm独立交叉工具链)。
+
+### 43设置环境变量
+
+```shell
+export BUILD=x86_64-linux-gnu
+export HOST=$BUILD
+export TARGET=x86_64-elf
+export PREFIX=~/$HOST-host-$TARGET-target-gcc14
+```
+
+### 44编译binutils和gdb
+
+```shell
+cd ~/binutils/build
+rm -rf *
+export ORIGIN='$$ORIGIN'
+../configure --disable-werror --enable-nls --target=$TARGET --prefix=$PREFIX --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64" --enable-gold
+make -j 20
+make install-strip -j 20
+unset ORIGIN
+```
+
+### 45编译安装gcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --enable-nls --target=$TARGET --prefix=$PREFIX --disable-multilib --enable-languages=c,c++ --disable-threads --disable-hosted-libstdcxx --disable-libstdcxx-verbose --disable-shared --without-headers --disable-libvtv --disable-libsanitizer --disable-libssp --disable-libquadmath --disable-libgomp
+make -j 20
+make install-strip -j 20
+make install-target-libstdc++-v3 install-target-libgcc -j 20
+```
+
+### 46复制库和pretty-printer
+
+```shell
+cd ~/$BUILD-native-gcc14
+cp lib64/libstdc++.so.6 $PREFIX/lib64
+cp -r share/gcc-14.0.1 $PREFIX/share
+```
+
+### 47打包工具链
 
 ```shell
 cd ~

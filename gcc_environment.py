@@ -282,7 +282,7 @@ class environment:
         self.copy_readme()
         os.chdir(self.home_dir)
         run_command(f"tar -cf {self.name}.tar {self.name}/")
-        memory_MB = psutil.virtual_memory().available // 1048576 + 2048
+        memory_MB = psutil.virtual_memory().available // 1048576 + 3072
         run_command(f"xz -fev9 -T 0 --memlimit={memory_MB}MiB {self.name}.tar")
 
 
