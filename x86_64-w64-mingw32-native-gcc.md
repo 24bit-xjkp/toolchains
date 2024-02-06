@@ -23,6 +23,7 @@
 - Python3.11.6 embed package
 - .gdbinit (位于share下)
 - pexports
+- 调试符号：libgcc libstdc++ libatomic libquadmath
 
 ## 注意事项
 
