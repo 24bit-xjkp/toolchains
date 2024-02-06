@@ -520,7 +520,7 @@ python3 "$current_dir/python_config.py" $@
 交叉编译带python支持的gdb的所有要求都已经满足了，下面开始编译binutils和gdb：
 
 ```shell
-cd ~/binutils/gdb/build
+cd ~/binutils/build
 rm -rf *
 ../configure --host=$HOST --target=$TARGET --prefix=$PREFIX --disable-werror --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/python_config.sh CXXFLAGS=-D_WIN32_WINNT=0x0600
 make -j 20
@@ -563,7 +563,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 如果将`lib`和`lib32`下的dll分别复制到`System32`和`SysWOW64`目录下，则只需要将`bin`文件夹添加到PATH环境变量，但不推荐这么做。
 值得注意的是，.debug文件需要和.dll文件处于同一级目录下，否则调试时需要手动加载符号文件。
 
-## 编译arm独立交叉工具链
+## 构建arm独立交叉工具链
 
 | build            | host             | target        |
 | :--------------- | :--------------- | :------------ |
@@ -604,15 +604,85 @@ make install-target-libstdc++-v3 install-target-libgcc -j 20
 
 ### 35复制库和pretty-printer
 
-编译出的arm-none-eabi-gdb依赖libstdc++，故需要从x86_64-linux-gnu本地工具链中复制一份。同时独立工具链不会安装pretty-printer，故也需要复制一份。
+编译出的arm-none-eabi-gdb依赖libstdc++，故需要从[gcc本地工具链](#构建gcc本地工具链)中复制一份。同时独立工具链不会安装pretty-printer，故也需要复制一份。
 
 ```shell
-cd ~/x86_64-linux-gnu-native-gcc14
+cd ~/$BUILD-native-gcc14
 cp lib64/libstdc++.so.6 $PREFIX/lib64
 cp -r share/gcc-14.0.1 $PREFIX/share
 ```
 
 ### 36打包工具链
+
+```shell
+cd ~
+export PACKAGE=$HOST-host-$TARGET-target-gcc14
+tar -cf $PACKAGE.tar $PACKAGE/
+xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
+```
+
+## 构建arm独立加拿大工具链
+
+| build            | host               | target        |
+| :--------------- | :----------------- | :------------ |
+| x86_64-linux-gnu | x86_64-w64-mingw32 | arm-none-eabi |
+
+### 37设置环境变量
+
+```shell
+export BUILD=x86_64-linux-gnu
+export HOST=x86_64-w64-mingw32
+export TARGET=arm-none-eabi
+export PREFIX=~/$HOST-host-$TARGET-target-gcc14
+```
+
+### 38准备编译gdb所需的库
+
+请参阅前文构建出[libpython.a](#22为python动态库创建归档文件), [libgmp](#23编译安装libgmp), [libexpat](#24编译安装libexpat), [libiconv](#25编译安装libiconv), [libmpfr](#26编译安装libmpfr)。
+
+### 39编译安装binutils和gdb
+
+原理请参阅[x86_64-w64-mingw32本地gdb构建](#27编译安装binutils和gdb)。
+
+```shell
+cd ~/binutils/build
+rm -rf *
+../configure --host=$HOST --target=$TARGET --prefix=$PREFIX --disable-werror --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/python_config.sh CXXFLAGS=-D_WIN32_WINNT=0x0600
+make -j 20
+make install-strip -j 20
+```
+
+### 40编译安装gcc
+
+原理请参阅[x86_64-linux-gnu交叉工具链](#34编译安装gcc)。
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --enable-nls --host=$HOST --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++ --disable-threads --disable-hosted-libstdcxx --disable-libstdcxx-verbose --disable-shared --without-headers --disable-libvtv --disable-libsanitizer --disable-libssp --disable-libquadmath --disable-libgomp
+make -j 20
+make install-strip -j 20
+make install-target-libstdc++-v3 install-target-libgcc -j 20
+```
+
+### 41从其他工具链中复制所需库和pretty-printer
+
+从[mingw交叉工具链](#构建mingw交叉工具链)中复制动态库：
+
+```shell
+cd ~/$BUILD-host-$HOST-target-gcc14/$HOST
+cp lib/libstdc++-6.dll $PREFIX/bin
+cp lib/libgcc_s_seh-1.dll $PREFIX/bin
+```
+
+从[gcc本地工具链](#构建gcc本地工具链)中复制pretty-printer：
+
+```shell
+cd ~/$BUILD-native-gcc14
+cp -r share/gcc-14.0.1 $PREFIX/share
+```
+
+### 42打包工具链
 
 ```shell
 cd ~
