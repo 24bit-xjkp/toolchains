@@ -221,7 +221,7 @@ class environment:
 
     def copy_readme(self) -> None:
         """复制工具链说明文件"""
-        readme_path = os.path.join(self.current_dir, "readme", f"{self.name_without_version}.md")
+        readme_path = os.path.join(self.current_dir, "..", "readme", f"{self.name_without_version}.md")
         target_path = os.path.join(self.prefix, "README.md")
         shutil.copyfile(readme_path, target_path)
 
@@ -281,7 +281,7 @@ class environment:
             self.copy_python_embed_package()
         self.copy_readme()
         os.chdir(self.home_dir)
-        run_command(f"tar -cf {self.name}.tar {self.name}/")
+        run_command(f"tar -cf {self.name}.tar {self.name}")
         memory_MB = psutil.virtual_memory().available // 1048576 + 3072
         run_command(f"xz -fev9 -T 0 --memlimit={memory_MB}MiB {self.name}.tar")
 
