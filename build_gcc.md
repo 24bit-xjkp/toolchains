@@ -202,6 +202,7 @@ objcopy --add-gnu-debuglink=$PREFIX/lib64/libgcc_s.so.1.debug $PREFIX/lib64/libg
 
 ```shell
 cd ~
+cp ~/toolchains/script/.gdbinit $PREFIX/share
 export MEMORY=$(cat /proc/meminfo | awk '/MemTotal/ {printf "%dGiB\n", int($2/1024/1024)}')
 tar -cf x86_64-linux-gnu-native-gcc14.tar x86_64-linux-gnu-native-gcc14/
 xz -ev9 -T 0 --memlimit=$MEMORY x86_64-linux-gnu-native-gcc14.tar
@@ -551,6 +552,7 @@ cp python* $PREFIX/bin
 
 ```shell
 cd ~
+cp ~/toolchains/script/.gdbinit $PREFIX/share
 export PACKAGE=$HOST-native-gcc14
 tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
@@ -618,6 +620,7 @@ cp -r share/gcc-14.0.1 $PREFIX/share
 
 ```shell
 cd ~
+cp ~/toolchains/script/.gdbinit $PREFIX/share
 export PACKAGE=$HOST-host-$TARGET-target-gcc14
 tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
@@ -688,6 +691,7 @@ cp -r share/gcc-14.0.1 $PREFIX/share
 
 ```shell
 cd ~
+cp ~/toolchains/script/.gdbinit $PREFIX/share
 export PACKAGE=$HOST-host-$TARGET-target-gcc14
 tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
@@ -745,6 +749,7 @@ cp -r share/gcc-14.0.1 $PREFIX/share
 
 ```shell
 cd ~
+cp ~/toolchains/script/.gdbinit $PREFIX/share
 export PACKAGE=$HOST-host-$TARGET-target-gcc14
 tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
