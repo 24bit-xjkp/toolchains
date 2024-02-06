@@ -2,9 +2,9 @@
 
 ## 平台
 
-| build            | host             | target        |
-| :--------------- | :--------------- | :------------ |
-| x86_64-linux-gnu | x86_64-linux-gnu | arm-none-eabi |
+| build            | host               | target        |
+| :--------------- | :----------------- | :------------ |
+| x86_64-linux-gnu | x86_64-w64-mingw32 | arm-none-eabi |
 
 ## 版本
 
@@ -18,5 +18,6 @@
 - binutils
 - gold
 - gdb (需要python3.11)
+- Python3.11.6 embed package
 - .gdbinit (位于share下)
 - 调试符号：libgcc libstdc++
