@@ -23,10 +23,7 @@ def build() -> None:
     # 编译binutils
     env.enter_build_dir("binutils")
     os.environ["ORIGIN"] = "$$ORIGIN"
-    env.configure(
-        basic_option,
-        f"--with-system-gdbinit={env.gdbinit_path} LDFLAGS={gcc.rpath_lib} --enable-gold",
-    )
+    env.configure(basic_option, f"--with-system-gdbinit={env.gdbinit_path} LDFLAGS={env.rpath_option} --enable-gold")
     env.make()
     env.install()
     del os.environ["ORIGIN"]

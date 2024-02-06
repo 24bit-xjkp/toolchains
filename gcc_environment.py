@@ -5,6 +5,7 @@ import psutil
 import shutil
 import io
 import sys
+from math import floor
 
 lib_list = (
     "expat",
@@ -39,7 +40,6 @@ dll_name_list_windows = (
     "libatomic-1.dll",
     "libquadmath-0.dll",
 )
-rpath_lib = "\"-Wl,-rpath='$ORIGIN'/../lib64\""
 
 disable_hosted_option = (
     "--disable-threads",
@@ -53,6 +53,9 @@ disable_hosted_option = (
     "--disable-libquadmath",
     "--disable-libgomp",
 )
+
+# 32位架构，其他32位架构需自行添加
+arch_32_bit_list = ("arm", "armeb", "i486", "i686", "risc32", "risc32be")
 
 
 def run_command(command: str) -> None:
@@ -73,13 +76,17 @@ class environment:
     num_cores: int  # < 编译所用线程数
     current_dir: str  # < toolchains项目所在目录
     lib_prefix: str  # < 安装后库目录的前缀
-    bin_dir: str  # <安装后可执行文件所在目录
+    bin_dir: str  # < 安装后可执行文件所在目录
     symlink_list: list[str]  # < 构建过程中创建的软链接表
-    gdbinit_path: str  # <安装后.gdbinit文件所在路径
-    lib_dir_list: dict[str, str]  # <所有库所在目录
-    tool_prefix: str  # <工具的前缀，如x86_64-w64-mingw32-
-    dll_name_list: tuple  # <该平台上需要保留调试符号的dll列表
+    share_dir: str  # < 安装后.share目录
+    gdbinit_path: str  # < 安装后.gdbinit文件所在路径
+    lib_dir_list: dict[str, str]  # < 所有库所在目录
+    tool_prefix: str  # < 工具的前缀，如x86_64-w64-mingw32-
+    dll_name_list: tuple  # < 该平台上需要保留调试符号的dll列表
     python_config_path: str  # < python_config.sh所在路径
+    host_32_bit: bool  # < 宿主环境是否是32位的
+    rpath_option: str  # < 设置rpath的链接选项
+    rpath_dir: str  # < rpath所在目录
 
     def __init__(self, major_version: str, build: str = "x86_64-linux-gnu", host: str = "", target: str = "") -> None:
         self.major_version = major_version
@@ -99,12 +106,13 @@ class environment:
         for lib in lib_list:
             assert os.path.isdir(os.path.join(self.home_dir, lib)), f'Cannot find "{lib}" in directory "{self.home_dir}".'
         self.prefix = os.path.join(self.home_dir, self.name)
-        self.num_cores = psutil.cpu_count() + 4
+        self.num_cores = floor(psutil.cpu_count() * 1.5)
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
         self.lib_prefix = os.path.join(self.prefix, self.target) if self.cross_compiler else self.prefix
         self.bin_dir = os.path.join(self.prefix, "bin")
         self.symlink_list = []
-        self.gdbinit_path = os.path.join(self.prefix, "share", ".gdbinit")
+        self.share_dir = os.path.join(self.prefix, "share")
+        self.gdbinit_path = os.path.join(self.share_dir, ".gdbinit")
         self.lib_dir_list = {}
         for lib in lib_list:
             lib_dir = os.path.join(self.home_dir, lib)
@@ -117,6 +125,11 @@ class environment:
         elif self.target.endswith("w64-mingw32"):
             self.dll_name_list = dll_name_list_windows
         self.python_config_path = os.path.join(self.current_dir, "python_config.sh")
+        self.host_32_bit = host.startswith(arch_32_bit_list)
+        self.rpath_option = f'"-Wl,-rpath=\'$ORIGIN\'/../lib{"32" if self.host_32_bit else "64"}"'
+        lib_name = f'lib{"32" if self.host_32_bit else "64"}'
+        self.rpath_option = "-Wl,-rpath=" + os.path.join("'$ORIGIN'", "..", lib_name)
+        self.rpath_dir = os.path.join(self.prefix, lib_name)
 
     def update(self) -> None:
         """更新源代码"""
@@ -263,7 +276,7 @@ class environment:
         self.copy_readme()
         os.chdir(self.home_dir)
         run_command(f"tar -cf {self.name}.tar {self.name}/")
-        memory_MB = psutil.virtual_memory().available // 1048576
+        memory_MB = psutil.virtual_memory().available // 1048576 + 2048
         run_command(f"xz -fev9 -T 0 --memlimit={memory_MB}MiB {self.name}.tar")
 
 
