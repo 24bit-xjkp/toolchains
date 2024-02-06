@@ -11,7 +11,7 @@ for lib in ("gmp", "expat", "iconv", "mpfr"):
     lib_install_dir_list[lib] = os.path.join(env.home_dir, lib, "install")
 
 
-def build_gdb_requirements() -> list[str]:
+def build_gdb_requirements(env: gcc.environment = env) -> list[str]:
     """编译安装libgmp, libexpat, libiconv, libmpfr
 
     Returns:
@@ -42,6 +42,8 @@ def build():
 
     basic_option = f"--disable-werror --prefix={env.prefix} --host={env.host} --target={env.target}"
     gcc_option = "--enable-multilib --enable-languages=c,c++ --disable-sjlj-exceptions --enable-threads=win32"
+    binutils_option = f"--with-system-gdbinit={env.gdbinit_path} --with-python={env.python_config_path} CXXFLAGS=-D_WIN32_WINNT=0x0600"
+
     # 编译安装完整gcc
     env.enter_build_dir("gcc")
     env.configure(basic_option, gcc_option)
@@ -72,11 +74,7 @@ def build():
 
     # 编译安装binutils和gdb
     env.enter_build_dir("binutils")
-    env.configure(
-        basic_option,
-        *lib_option,
-        f"--with-system-gdbinit={env.gdbinit_path} --with-python={os.path.join(env.current_dir, 'python_config.sh')} CXXFLAGS=-D_WIN32_WINNT=0x0600",
-    )
+    env.configure(basic_option, *lib_option, binutils_option)
     env.make()
     env.install()
 

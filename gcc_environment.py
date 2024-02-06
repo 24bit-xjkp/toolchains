@@ -41,6 +41,19 @@ dll_name_list_windows = (
 )
 rpath_lib = "\"-Wl,-rpath='$ORIGIN'/../lib64\""
 
+disable_hosted_option = (
+    "--disable-threads",
+    "--disable-hosted-libstdcxx",
+    "--disable-libstdcxx-verbose",
+    "--disable-shared",
+    "--without-headers",
+    "--disable-libvtv",
+    "--disable-libsanitizer",
+    "--disable-libssp",
+    "--disable-libquadmath",
+    "--disable-libgomp",
+)
+
 
 def run_command(command: str) -> None:
     print(command)
@@ -66,6 +79,7 @@ class environment:
     lib_dir_list: dict[str, str]  # <所有库所在目录
     tool_prefix: str  # <工具的前缀，如x86_64-w64-mingw32-
     dll_name_list: tuple  # <该平台上需要保留调试符号的dll列表
+    python_config_path: str  # < python_config.sh所在路径
 
     def __init__(self, major_version: str, build: str = "x86_64-linux-gnu", host: str = "", target: str = "") -> None:
         self.major_version = major_version
@@ -73,9 +87,7 @@ class environment:
         self.host = host if host != "" else build
         self.target = target if target != "" else self.host
         self.cross_compiler = self.host != self.target
-        self.name_without_version = (
-            f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native"
-        ) + "-gcc"
+        self.name_without_version = (f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native") + "-gcc"
         self.name = self.name_without_version + major_version
         self.home_dir = ""
         for option in sys.argv:
@@ -96,7 +108,7 @@ class environment:
         self.lib_dir_list = {}
         for lib in lib_list:
             lib_dir = os.path.join(self.home_dir, lib)
-            assert os.path.exists(lib_dir),f'Cannot find lib "{lib}" in directory "{lib_dir}"'
+            assert os.path.exists(lib_dir), f'Cannot find lib "{lib}" in directory "{lib_dir}"'
             self.lib_dir_list[lib] = lib_dir
         self.tool_prefix = f"{self.target}-" if self.cross_compiler else ""
         # NOTE：添加平台后需要在此处注册dll_name_list
@@ -104,6 +116,7 @@ class environment:
             self.dll_name_list = dll_name_list_linux
         elif self.target.endswith("w64-mingw32"):
             self.dll_name_list = dll_name_list_windows
+        self.python_config_path = os.path.join(self.current_dir, "python_config.sh")
 
     def update(self) -> None:
         """更新源代码"""
