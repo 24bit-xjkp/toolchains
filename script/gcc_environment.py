@@ -68,6 +68,7 @@ class environment:
     build: str  # < build平台
     host: str  # < host平台
     target: str  # < target平台
+    toolchain_type: str  # < 工具链类别
     cross_compiler: bool  # < 是否是交叉编译器
     name_without_version: str  # < 不带版本号的工具链名
     name: str  # < 工具链名
@@ -93,6 +94,15 @@ class environment:
         self.build = build
         self.host = host if host != "" else build
         self.target = target if target != "" else self.host
+        # 鉴别工具链类别
+        if self.build == self.host == self.target:
+            self.toolchain_type = "native"
+        elif self.build == self.host != self.target:
+            self.toolchain_type = "cross"
+        elif self.build != self.host == self.target:
+            self.toolchain_type = "canadian"
+        else:
+            self.toolchain_type = "canadian cross"
         self.cross_compiler = self.host != self.target
         self.name_without_version = (f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native") + "-gcc"
         self.name = self.name_without_version + major_version
@@ -130,13 +140,13 @@ class environment:
         lib_name = f'lib{"32" if self.host_32_bit else "64"}'
         self.rpath_option = "-Wl,-rpath=" + os.path.join("'$ORIGIN'", "..", lib_name)
         self.rpath_dir = os.path.join(self.prefix, lib_name)
-        # 加载其他工具链
-        if not self.build == self.host == self.target:
-            environment(major_version, target=self.build).register_in_env()
-            if self.host != self.build:
-                environment(major_version, target=self.host).register_in_env()
-                if self.target != self.build:
-                    environment(major_version, target=self.target).register_in_env()
+        # 加载工具链
+        if self.toolchain_type in ("cross", "canadian", "canadian cross"):
+            environment(major_version).register_in_env()
+        if self.toolchain_type in ("canadian", "canadian cross"):
+            environment(major_version, target=self.host).register_in_env()
+        if self.toolchain_type == "canadian cross":
+            environment(major_version, target=self.target).register_in_env()
 
     def update(self) -> None:
         """更新源代码"""
