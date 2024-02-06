@@ -215,7 +215,7 @@ class environment:
 
     def copy_readme(self) -> None:
         """复制工具链说明文件"""
-        readme_path = os.path.join(self.current_dir, f"{self.name_without_version}.md")
+        readme_path = os.path.join(self.current_dir, "readme", f"{self.name_without_version}.md")
         target_path = os.path.join(self.prefix, "README.md")
         shutil.copyfile(readme_path, target_path)
 
