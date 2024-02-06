@@ -659,7 +659,7 @@ make install-strip -j 20
 
 ### 40编译安装gcc
 
-原理请参阅[x86_64-linux-gnu交叉工具链](#34编译安装gcc)。
+原理请参阅[arm独立交叉工具链](#34编译安装gcc)。
 
 ```shell
 cd ~/gcc/build
@@ -746,6 +746,77 @@ cp -r share/gcc-14.0.1 $PREFIX/share
 ```
 
 ### 47打包工具链
+
+```shell
+cd ~
+cp ~/toolchains/script/.gdbinit $PREFIX/share
+export PACKAGE=$HOST-host-$TARGET-target-gcc14
+tar -cf $PACKAGE.tar $PACKAGE/
+xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
+```
+
+## 构建x86_64独立加拿大工具链
+
+| build            | host               | target     |
+| :--------------- | :----------------- | :--------- |
+| x86_64-linux-gnu | x86_64-w64-mingw32 | x86_64-elf |
+
+### 48设置环境变量
+
+```shell
+export BUILD=x86_64-linux-gnu
+export HOST=x86_64-w64-mingw32
+export TARGET=x86_64-elf
+export PREFIX=~/$HOST-host-$TARGET-target-gcc14
+```
+
+### 49准备编译gdb所需的库
+
+请参阅前文构建出[libpython.a](#22为python动态库创建归档文件), [libgmp](#23编译安装libgmp), [libexpat](#24编译安装libexpat), [libiconv](#25编译安装libiconv), [libmpfr](#26编译安装libmpfr)。
+
+### 50编译安装binutils和gdb
+
+原理请参阅[x86_64-w64-mingw32本地gdb构建](#27编译安装binutils和gdb)。
+
+```shell
+cd ~/binutils/build
+rm -rf *
+../configure --host=$HOST --target=$TARGET --prefix=$PREFIX --disable-werror --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/script/python_config.sh  --enable-gold CXXFLAGS=-D_WIN32_WINNT=0x0600
+make -j 20
+make install-strip -j 20
+```
+
+### 51编译安装gcc
+
+原理请参阅[arm独立交叉工具链](#34编译安装gcc)。
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --enable-nls --host=$HOST --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++ --disable-threads --disable-hosted-libstdcxx --disable-libstdcxx-verbose --disable-shared --without-headers --disable-libvtv --disable-libsanitizer --disable-libssp --disable-libquadmath --disable-libgomp
+make -j 20
+make install-strip -j 20
+make install-target-libstdc++-v3 install-target-libgcc -j 20
+```
+
+### 52从其他工具链中复制所需库和pretty-printer
+
+从[mingw交叉工具链](#构建mingw交叉工具链)中复制动态库：
+
+```shell
+cd ~/$BUILD-host-$HOST-target-gcc14/$HOST
+cp lib/libstdc++-6.dll $PREFIX/bin
+cp lib/libgcc_s_seh-1.dll $PREFIX/bin
+```
+
+从[gcc本地工具链](#构建gcc本地工具链)中复制pretty-printer：
+
+```shell
+cd ~/$BUILD-native-gcc14
+cp -r share/gcc-14.0.1 $PREFIX/share
+```
+
+### 53打包工具链
 
 ```shell
 cd ~
