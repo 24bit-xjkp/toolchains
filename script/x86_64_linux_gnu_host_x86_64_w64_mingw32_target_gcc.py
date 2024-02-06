@@ -12,7 +12,7 @@ def build() -> None:
 
     basic_option = f"--disable-werror --enable-nls --target={env.target} --prefix={env.prefix}"
     gcc_option = "--enable-multilib --enable-languages=c,c++ --disable-sjlj-exceptions --enable-threads=win32"
-    mingw_option = f"--host={env.target} --prefix={os.path.join(env.prefix, env.target)} --with-default-msvcrt=ucrt"
+    mingw_option = f"--host={env.target} --prefix={env.lib_prefix} --with-default-msvcrt=ucrt"
     # 编译binutils
     env.enter_build_dir("binutils")
     env.configure(basic_option, "--disable-gdb")
