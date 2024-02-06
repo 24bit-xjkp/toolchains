@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 import gcc_environment as gcc
-import x86_64_linux_gnu_host_x86_64_w64_mingw32_target_gcc as cross_gcc
+from x86_64_linux_gnu_host_x86_64_w64_mingw32_target_gcc import env as cross_env
 import os
 import shutil
 
@@ -58,7 +58,7 @@ def build():
             os.remove(file)
     # 从交叉工具链复制文件
     for dir in ("include", "lib", "lib32"):
-        cross_dir = os.path.join(cross_gcc.env.lib_prefix, dir)
+        cross_dir = os.path.join(cross_env.lib_prefix, dir)
         current_dir = os.path.join(env.lib_prefix, dir)
         for item in os.listdir(cross_dir):
             dst_path = os.path.join(current_dir, item)

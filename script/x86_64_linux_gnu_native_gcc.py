@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 import gcc_environment as gcc
-import os
 
 env = gcc.environment("14")
 
