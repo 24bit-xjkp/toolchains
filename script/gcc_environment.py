@@ -130,6 +130,13 @@ class environment:
         lib_name = f'lib{"32" if self.host_32_bit else "64"}'
         self.rpath_option = "-Wl,-rpath=" + os.path.join("'$ORIGIN'", "..", lib_name)
         self.rpath_dir = os.path.join(self.prefix, lib_name)
+        # 加载其他工具链
+        if not self.build == self.host == self.target:
+            environment(major_version, target=self.build).register_in_env()
+            if self.host != self.build:
+                environment(major_version, target=self.host).register_in_env()
+                if self.target != self.build:
+                    environment(major_version, target=self.target).register_in_env()
 
     def update(self) -> None:
         """更新源代码"""
