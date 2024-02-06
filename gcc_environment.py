@@ -152,6 +152,9 @@ class environment:
                 shutil.rmtree(build_dir)
             os.mkdir(build_dir)
         os.chdir(build_dir)
+        # 添加构建gdb所需的环境变量
+        if lib == "binutils":
+            os.environ["ORIGIN"] = "$$ORIGIN"
 
     def configure(self, *option: str) -> None:
         """自动对库进行配置
@@ -185,6 +188,9 @@ class environment:
         else:
             targets = "install-strip"
         run_command(f"make {targets} -j {self.num_cores}")
+        # 移除编译gdb所需环境变量
+        if "ORIGIN" in os.environ:
+            del os.environ["ORIGIN"]
 
     def strip_debug_symbol(self) -> None:
         """剥离动态库的调试符号到独立的符号文件"""
