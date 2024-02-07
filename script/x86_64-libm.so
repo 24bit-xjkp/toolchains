@@ -1,0 +1,2 @@
+OUTPUT_FORMAT(elf64-x86-64)
+GROUP (libm.so.6 AS_NEEDED (libmvec_nonshared.a libmvec.so.1))

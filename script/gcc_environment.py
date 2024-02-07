@@ -7,18 +7,7 @@ import io
 import sys
 from math import floor
 
-lib_list = (
-    "expat",
-    "gcc",
-    "binutils",
-    "gmp",
-    "mpfr",
-    "linux",
-    "mingw",
-    "pexports",
-    "iconv",
-    "python-embed",
-)
+lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports", "iconv", "python-embed", "glibc")
 dll_target_list = (
     "install-target-libgcc",
     "install-target-libstdc++-v3",
@@ -136,10 +125,10 @@ class environment:
             self.dll_name_list = dll_name_list_windows
         self.python_config_path = os.path.join(self.current_dir, "python_config.sh")
         self.host_32_bit = host.startswith(arch_32_bit_list)
-        self.rpath_option = f'"-Wl,-rpath=\'$ORIGIN\'/../lib{"32" if self.host_32_bit else "64"}"'
         lib_name = f'lib{"32" if self.host_32_bit else "64"}'
-        self.rpath_option = "-Wl,-rpath=" + os.path.join("'$ORIGIN'", "..", lib_name)
         self.rpath_dir = os.path.join(self.prefix, lib_name)
+        lib_name = os.path.join("'$ORIGIN'", "..", lib_name)
+        self.rpath_option = f'"-Wl,-rpath={lib_name}"'
         # 加载工具链
         if self.toolchain_type in ("cross", "canadian", "canadian cross"):
             environment(major_version).register_in_env()
@@ -207,9 +196,6 @@ class environment:
         else:
             targets = "install-strip"
         run_command(f"make {targets} -j {self.num_cores}")
-        # 移除编译gdb所需环境变量
-        if "ORIGIN" in os.environ:
-            del os.environ["ORIGIN"]
 
     def strip_debug_symbol(self) -> None:
         """剥离动态库的调试符号到独立的符号文件"""
@@ -228,9 +214,8 @@ class environment:
 
     def register_in_bashrc(self) -> None:
         """注册安装路径到用户配置文件"""
-        bashrc_file = io.open(os.path.join(self.home_dir, ".bashrc"), "a")
-        bashrc_file.writelines(f"export PATH={self.bin_dir}:$PATH\n")
-        bashrc_file.close()
+        with open(os.path.join(self.home_dir, ".bashrc"), "a") as bashrc_file:
+            bashrc_file.write(f"export PATH={self.bin_dir}:$PATH\n")
 
     def copy_gdbinit(self) -> None:
         """复制.gdbinit文件"""
@@ -269,7 +254,7 @@ class environment:
         """为编译带有multilib支持的交叉编译器创建软链接，如将lib/32链接到lib32"""
         multilib_list = {}
         for multilib in os.listdir(self.lib_prefix):
-            if multilib != "lib" and multilib.startswith("lib") and os.path.isdir(os.path.join(self.lib_prefix, multilib)):
+            if multilib != "lib" and multilib.startswith("lib") and multilib[3:].isdigit():
                 multilib_list[multilib] = multilib[3:]
         lib_path = os.path.join(self.lib_prefix, "lib")
         cwd = os.getcwd()
