@@ -883,7 +883,17 @@ cd ~/linux
 make ARCH=x86 INSTALL_HDR_PATH=$PREFIX/$TARGET headers_install
 ```
 
-### 58.安装glibc头文件
+### 58.编译安装gcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++ --disable-shared
+make all-gcc -j 20
+make install-strip-gcc -j 20
+```
+
+### 59.安装glibc头文件
 
 由于当前的工具链尚不完整，故需要手动设置`libc_cv_forced_unwind=yes`，否则会出现：
 
@@ -907,17 +917,17 @@ make install-headers
 touch $PREFIX/$TARGET/include/gnu/stubs.h
 ```
 
-### 59.编译安装gcc和libgcc
+### 60.编译安装libgcc
 
 ```shell
 cd ~/gcc/build
 rm -rf *
 ../configure --disable-werror --disable-bootstrap --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++ --disable-shared
-make all-gcc all-target-libgcc -j 20
-make install-strip-gcc install-strip-target-libgcc -j 20
+make all-target-libgcc -j 20
+make install-strip-target-gcc -j 20
 ```
 
-### 60.编译安装32位glibc
+### 61.编译安装32位glibc
 
 值得注意的是，尽管glibc本身不会使用c++编译器，但构建脚本会使用c++编译器进行链接，故c++编译器也需要设置。
 
@@ -929,7 +939,7 @@ make -j 20
 make install -j 20
 ```
 
-### 61.剥离调试符号到单独的符号文件
+### 62.剥离调试符号到单独的符号文件
 
 ```shell
 cd $PREFIX/$TARGET/lib
@@ -943,7 +953,7 @@ $TARGET-objcopy --add-gnu-debuglink=libc-2.30.so.debug libc-2.30.so
 $TARGET-strip *.so
 ```
 
-### 62.修改链接器脚本
+### 63.修改链接器脚本
 
 此时只有`lib/libc.so`需要修改，该文件的内容如下：
 
@@ -964,7 +974,7 @@ OUTPUT_FORMAT(elf32-i386)
 GROUP (libc.so.6 libc_nonshared.a AS_NEEDED (ld-linux.so.2))
 ```
 
-### 63.移动lib目录到lib64
+### 64.移动lib目录到lib64
 
 由于在此multilib环境下，交叉编译器编译时lib32目录下存放32位multilib而lib目录下存放64位multilib，故需要调整glibc的位置。而ldscript需要始终存放在lib目录下。
 
@@ -974,7 +984,7 @@ mkdir $PREFIX/$TARGET/lib
 mv $PREFIX/$TARGET/lib32/ldscripts $PREFIX/$TARGET/lib
 ```
 
-### 64.编译安装64位glibc
+### 65.编译安装64位glibc
 
 ```shell
 cd ~/glibc/build
@@ -984,7 +994,7 @@ make -j 20
 make install -j 20
 ```
 
-### 65.剥离调试符号到单独的符号文件
+### 66.剥离调试符号到单独的符号文件
 
 ```shell
 cd $PREFIX/$TARGET/lib
@@ -998,7 +1008,7 @@ $TARGET-objcopy --add-gnu-debuglink=libc-2.30.so.debug libc-2.30.so
 $TARGET-strip *.so
 ```
 
-### 66.修改链接器脚本
+### 67.修改链接器脚本
 
 同理修改`libc.so`，`libm.a`和`libm.so`：
 
@@ -1014,14 +1024,14 @@ OUTPUT_FORMAT(elf64-x86-64)
 GROUP (libm.so.6 AS_NEEDED(libmvec_nonshared.a libmvec.so.1))
 ```
 
-### 67.为multilib建立软链接
+### 68.为multilib建立软链接
 
 ```shell
 cd $PREFIX/$TARGET/lib
 ln -s ../lib32 32
 ```
 
-### 68.修改asan源文件
+### 69.修改asan源文件
 
 在`gcc/libsanitizer/asan/asan_linux.cpp`中默认没有包含`linux/limits.h`文件，这会导致编译的时候缺少`PATH_MAX`宏，故将其修改为：
 
@@ -1042,7 +1052,7 @@ ln -s ../lib32 32
 #  include <linux/limits.h> // < 添加linux/limits.h头文件
 ```
 
-### 69.编译完整gcc
+### 70.编译完整gcc
 
 ```shell
 cd ~/gcc/build
@@ -1054,9 +1064,9 @@ make install-strip -j 20
 make install-target-libgcc install-target-libstdc++-v3 install-target-libatomic install-target-libquadmath install-target-libgomp -j 20
 ```
 
-### 70.剥离调试符号到独立的符号文件
+### 71.剥离调试符号到独立的符号文件
 
-在[第69步](#69编译完整gcc)中我们保留了以下库的调试符号：libgcc libstdc++ libatomic libquadmath libgomp
+在[第70步](#70编译完整gcc)中我们保留了以下库的调试符号：libgcc libstdc++ libatomic libquadmath libgomp
 
 接下来逐个完成剥离操作：
 
@@ -1070,7 +1080,7 @@ objcopy --add-gnu-debuglink=$PREFIX/lib64/libgcc_s.so.1.debug $PREFIX/lib64/libg
 # 重复上述操作直到处理完所有动态库
 ```
 
-### 71.移动lib目录下的glibc到lib64目录下
+### 72.移动lib目录下的glibc到lib64目录下
 
 lib32目录下是纯净的glibc文件，故以lib32为参照经行文件复制，建议使用python脚本完成：
 
@@ -1090,7 +1100,7 @@ for file in os.listdir(lib_dir):
         shutil.move(lib_path, lib64_path)
 ```
 
-### 72.移动lib32目录下的glibc到lib目录下
+### 73.移动lib32目录下的glibc到lib目录下
 
 lib32目录下是纯净的glibc文件，直接移动即可：
 
@@ -1099,7 +1109,7 @@ cd $PREFIX/$TARGET
 mov lib32/* lib
 ```
 
-### 73.从其他工具链中复制所需库
+### 74.从其他工具链中复制所需库
 
 从[x86_64-linux-gnu本地工具链](#构建gcc本地工具链)中复制动态库：
 
@@ -1109,7 +1119,7 @@ cp lib64/libstdc++.so.6 $PREFIX/lib64
 cp lib64/libgcc_s.so.1 $PREFIX/lib64
 ```
 
-### 74.打包工具链
+### 75.打包工具链
 
 ```shell
 cd ~
