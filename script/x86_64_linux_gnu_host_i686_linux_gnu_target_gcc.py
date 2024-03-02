@@ -45,12 +45,6 @@ def build() -> None:
     strip = f"{env.tool_prefix}strip"
     lib_dir = os.path.join(env.lib_prefix, "lib")
     os.system(f"{strip} {os.path.join(lib_dir, '*.so')}")
-    # 剥离其他文件符号
-    for dir in (os.path.join("libexec", "getconf"), "sbin"):
-        os.system(f"{strip} {os.path.join(env.lib_prefix, dir, '*')}")
-    # 剥离其他动态库的符号
-    for dir in ("audit", "gconv"):
-        os.system(f"{strip} {os.path.join(lib_dir, dir, '*.so')}")
     dst_file = os.path.join(lib_dir, "libc.so")
     src_file = os.path.join(env.current_dir, f"i686-libc.so")
     os.remove(dst_file)

@@ -286,5 +286,19 @@ class environment:
         memory_MB = psutil.virtual_memory().available // 1048576 + 3072
         run_command(f"xz -fev9 -T 0 --memlimit={memory_MB}MiB {self.name}.tar")
 
+    def remove_unused_glibc_file(self) -> None:
+        """移除不需要的glibc文件
+        """
+        for dir in (
+            "etc",
+            "libexec",
+            "sbin",
+            "share",
+            "var",
+            os.path.join(self.lib_prefix, "lib", "gconv"),
+            os.path.join(self.lib_prefix, "lib", "audit"),
+        ):
+            shutil.rmtree(os.path.join(self.lib_prefix, dir))
+
 
 assert __name__ != "__main__", "Import this file instead of running it directly."

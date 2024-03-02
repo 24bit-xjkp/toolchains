@@ -14,12 +14,7 @@ def adjust_glibc(env: gcc.environment = env, is_32bit: bool = False) -> None:
     lib_dir = os.path.join(env.lib_prefix, "lib")
     strip = f"{env.tool_prefix}strip"
     objcopy = f"{env.tool_prefix}objcopy"
-    # 剥离其他文件符号
-    for dir in (os.path.join("libexec", "getconf"), "sbin"):
-        gcc.run_command(f"{strip} {os.path.join(env.lib_prefix, dir, '*')}")
-    # 剥离其他动态库的符号
-    for dir in ("audit", "gconv"):
-        gcc.run_command(f"{strip} {os.path.join(lib_dir, dir, '*.so')}")
+    env.remove_unused_glibc_file()
     # 所有的动态库
     dll_list: list[str] = []
     for dll in ("libSegFault.so", "libmemusage.so", "libpcprofile.so"):
