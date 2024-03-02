@@ -5,6 +5,7 @@ import psutil
 import shutil
 import sys
 from math import floor
+from importlib import import_module
 
 
 def run_command(command: str) -> None:
@@ -18,11 +19,11 @@ dylib_option_list = {
     "LLVM_BUILD_LLVM_DYLIB": "ON",
     "CLANG_LINK_CLANG_DYLIB": "ON",
 }
-option_list = {
+llvm_option_list = {
     "CMAKE_BUILD_TYPE": "Release",
     "LLVM_TARGETS_TO_BUILD": '"X86;AArch64;WebAssembly;RISCV;ARM;LoongArch"',
     "LLVM_ENABLE_PROJECTS": '"clang;clang-tools-extra;lld;compiler-rt"',
-    "LLVM_ENABLE_RUNTIMES": '"libcxx;libcxxabi;libunwind"',
+    # "LLVM_ENABLE_RUNTIMES": '"libcxx;libcxxabi;libunwind"',
     "LLVM_ENABLE_WARNINGS": "OFF",
     "LLVM_INCLUDE_TESTS": "OFF",
     "LLVM_ENABLE_LTO": "Thin",
@@ -37,20 +38,40 @@ option_list = {
     "LIBCXX_CXX_ABI": "libcxxabi",
     "LIBCXX_INCLUDE_BENCHMARKS": "OFF",
 }
+target_list = (
+    "x86_64-linux-gnu",
+    "i386-linux-gnu",
+    "aarch64-linux-gnu",
+    "riscv64-linux-gnu",
+    "loongarch64-linux-gnu",
+    "x86_64-w64-mingw32",
+    "i386-w64-mingw32",
+)
+llvm_lib_list = ("compiler-rt", "libunwind", "libcxxabi", "libcxx")
+subproject_list = llvm_lib_list + ("llvm",)
 
 
-def get_compiler(target: str) -> str:
-    compiler_list = ("CMAKE_C_COMPILER", "CMAKE_CXX_COMPILER", "CMAKE_ASM_COMPILER")
-    command = ""
-    for compiler in compiler_list:
-        command += f"-D{compiler}={'clang++' if 'CXX' in compiler else 'clang'} --target={target}"
-    return command
+def get_cmake_option(**kwargs) -> list[str]:
+    option_list: list[str] = []
+    for key, value in kwargs.items():
+        option_list.append(f"-D{key}={value}")
+    return option_list
+
+
+def gnu_to_llvm(target: str) -> str:
+    if target.count("-") == 2:
+        index = target.find("-")
+        result = target[:index]
+        result += "-unknown"
+        result += target[index:]
+        return result
+    else:
+        return target
 
 
 class environment:
     major_version: str  # < LLVM的主版本号
     host: str  # < host平台
-    target: str  # < target平台
     name_without_version: str  # < 不带版本号的工具链名
     name: str  # < 工具链名
     home_dir: str  # < 源代码所在的目录，默认为$HOME
@@ -59,11 +80,9 @@ class environment:
     current_dir: str  # < toolchains项目所在目录
     lib_dir_list: dict[str, str]  # < 所有库所在目录
     bin_dir: str  # < 安装后可执行文件所在目录
-    toolchain_file: str  # < cmake toolchain file
-    llvm_dir: str  # < llvm子项目所在路径
-    llvm_build_dir: str  # < 构建目录
-    basic_config_command: str  # < 基础配置选项
-    basic_build_command: str  # < 基础编译选项
+    llvm_dir: str  # < llvm所在目录
+    subproject_dir: dict[str, str]  # < 子项目目录
+    build_dir: dict[str, str]  # < 构建目录
 
     def __init__(self, major_version: str, host: str) -> None:
         self.major_version = major_version
@@ -82,8 +101,13 @@ class environment:
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
         self.toolchain_file = os.path.join(self.current_dir, f"{self.name_without_version}.cmake")
         self.bin_dir = os.path.join(self.prefix, "bin")
-        self.llvm_dir = os.path.join(self.home_dir, "llvm", "llvm")
-        self.llvm_build_dir = os.path.join(self.llvm_dir, "build")
+        self.llvm_dir = os.path.join(self.home_dir, "llvm")
+        self.subproject_dir = {}
+        for lib in subproject_list:
+            self.subproject_dir[lib] = os.path.join(self.llvm_dir, lib)
+        self.build_dir = {}
+        for lib, dir in self.subproject_dir.items():
+            self.build_dir[lib] = os.path.join(dir, "build")
         self.lib_dir_list = {}
         for lib in lib_list:
             lib_dir = os.path.join(self.home_dir, lib)
@@ -91,10 +115,6 @@ class environment:
             self.lib_dir_list[lib] = lib_dir
         # 将自身注册到环境变量中
         self.register_in_env()
-        self.basic_config_command = f"cmake -G Ninja --install-prefix {self.prefix} -B {self.llvm_build_dir} -S {self.llvm_dir} "
-        for key, value in option_list.items():
-            self.basic_config_command += f"-D{key}={value} "
-        self.basic_build_command = f"ninja -C {self.llvm_build_dir} -j{self.num_cores} "
 
     def register_in_env(self) -> None:
         """注册安装路径到环境变量"""
@@ -105,11 +125,33 @@ class environment:
         with open(os.path.join(self.home_dir, ".bashrc"), "a") as bashrc_file:
             bashrc_file.write(f"export PATH={self.bin_dir}:$PATH\n")
 
-    def build(self) -> None:
-        run_command(self.basic_build_command)
+    def get_compiler(self, target: str) -> list[str]:
+        assert target in target_list
+        compiler_list = ("CMAKE_C", "CMAKE_CXX", "CMAKE_ASM")
+        sysroot = ""
+        if target != self.host:
+            gcc = import_module(f"x86_64_linux_gnu_host_{target.replace('-', '_')}_target_gcc")
+            sysroot = f"--sysroot={gcc.env.prefix}"
+        command_list: list[str] = []
+        for compiler in compiler_list:
+            command_list.append(f"-D{compiler}_COMPILER={'clang++' if 'CXX' in compiler else 'clang'}")
+            command_list.append(f'-D{compiler}_FLAGS="--target={target} {sysroot}"')
+        return command_list
 
-    def install(self) -> None:
-        run_command(self.basic_build_command + "install/strip")
+    def config(self, subproject: str, target: str, *command_list, **cmake_option_list) -> None:
+        assert subproject in subproject_list, f'"{subproject}" is not in subproject_list'
+        command = f"cmake -G Ninja --install-prefix {self.prefix} -B {self.build_dir[subproject]} -S {self.subproject_dir[subproject]} "
+        command += " ".join(self.get_compiler(target) + get_cmake_option(**cmake_option_list)) + " "
+        match subproject:
+            case "llvm":
+                command += " ".join(get_cmake_option(**llvm_option_list))
+        run_command(command)
+
+    def build(self, subproject: str) -> None:
+        run_command(f"ninja -C {self.build_dir[subproject]} -j{self.num_cores}")
+
+    def install(self, subproject: str) -> None:
+        run_command(f"ninja -C {self.build_dir[subproject]} install/strip -j{self.num_cores}")
 
     def copy_readme(self) -> None:
         """复制工具链说明文件"""
