@@ -19,13 +19,13 @@
 
 ## 准备工作
 
-### 1安装系统包
+### 1.安装系统包
 
 ```shell
 sudo apt install bison flex texinfo make automake autoconf libtool git gcc g++ gcc-multilib g++-multilib cmake ninja-build python3 tar xz-utils unzip libgmp-dev libmpfr-dev zlib1g-dev libexpat1-dev gawk
 ```
 
-### 2下载源代码
+### 2.下载源代码
 
 ```shell
 git clone https://github.com/gcc-mirror/gcc.git --depth=1 gcc
@@ -63,7 +63,7 @@ rm iconv.tar.gz
 mv libiconv-1.17/ iconv
 ```
 
-### 3安装依赖库
+### 3.安装依赖库
 
 ```shell
 cd ~/gcc
@@ -78,7 +78,7 @@ cd ~
 | :--------------- | :--------------- | :--------------- |
 | x86_64-linux-gnu | x86_64-linux-gnu | x86_64-linux-gnu |
 
-### 4编译安装gcc
+### 4.编译安装gcc
 
 ```shell
 export PREFIX=~/x86_64-linux-gnu-native-gcc14
@@ -96,7 +96,7 @@ source ~/.bashrc
 
 参阅[gcc配置选项](https://gcc.gnu.org/install/configure.html)。
 
-### 5编译安装binutils和gdb
+### 5.编译安装binutils和gdb
 
 ```shell
 cd ~/binutils
@@ -115,7 +115,7 @@ unset ORIGIN
 `export ORIGIN='$$ORIGIN'`和`LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64"`选项是用于设置gdb的rpath。由于编译时使用的gcc版本比系统自带的更高，故链接的libstdc++版本也更高。
 因而需要将rpath设置到编译出来的libstdc++所在的目录。
 
-### 6创建.gdbinit
+### 6.创建.gdbinit
 
 由`libstdc++.so.6.0.33-gdb.py`配置pretty-printer：
 
@@ -159,7 +159,7 @@ else:
 end
 ```
 
-### 7修改libstdc++的python支持
+### 7.修改libstdc++的python支持
 
 ```python
 # lib64/libstdc++.so.6.0.33-gdb.py
@@ -180,7 +180,7 @@ register_libstdcxx_printers(gdb.current_objfile())
 
 同理，修改`lib32/libstdc++.so.6.0.33-gdb.py`，尽管在默认配置中该文件不会被加载。
 
-### 8剥离调试符号到独立符号文件
+### 8.剥离调试符号到独立符号文件
 
 通过`make install-target`命令可以安装未strip的运行库，但这样的运行库体积过大，不利于部署。因此需要剥离调试符号到独立的符号文件中。
 
@@ -198,7 +198,7 @@ objcopy --add-gnu-debuglink=$PREFIX/lib64/libgcc_s.so.1.debug $PREFIX/lib64/libg
 # 重复上述操作直到处理完所有动态库
 ```
 
-### 9打包工具链
+### 9.打包工具链
 
 ```shell
 cd ~
@@ -214,7 +214,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY x86_64-linux-gnu-native-gcc14.tar
 | :--------------- | :--------------- | :----------------- |
 | x86_64-linux-gnu | x86_64-linux-gnu | x86_64-w64-mingw32 |
 
-### 10设置环境变量
+### 10.设置环境变量
 
 ```shell
 export TARGET=x86_64-w64-mingw32
@@ -222,7 +222,7 @@ export HOST=x86_64-linux-gnu
 export PREFIX=~/$HOST-host-$TARGET-target-gcc14
 ```
 
-### 11编译安装binutils
+### 11.编译安装binutils
 
 ```shell
 cd binutils/build
@@ -235,7 +235,7 @@ echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### 12安装mingw-w64头文件
+### 12.安装mingw-w64头文件
 
 ```shell
 cd ~/mingw
@@ -246,7 +246,7 @@ cd build
 make install
 ```
 
-### 13编译安装gcc和libgcc
+### 13.编译安装gcc和libgcc
 
 ```shell
 cd ~/gcc/build
@@ -281,7 +281,7 @@ make all-gcc all-target-libgcc -j 20
 make install-strip-gcc install-strip-target-libgcc -j 20
 ```
 
-### 14编译安装完整mingw-w64
+### 14.编译安装完整mingw-w64
 
 ```shell
 cd ~/mingw/build
@@ -294,7 +294,7 @@ cd $PREFIX/$TARGET/lib
 ln -s ../lib32 32
 ```
 
-### 15编译安装完整gcc
+### 15.编译安装完整gcc
 
 ```shell
 cd ~/gcc/build
@@ -306,7 +306,7 @@ make install-strip -j 20
 make install-target-libgcc install-target-libstdc++-v3 install-target-libatomic install-target-libquadmath -j 20
 ```
 
-### 16剥离调试符号到独立符号文件
+### 16.剥离调试符号到独立符号文件
 
 在[第15步](#15编译安装完整gcc)中我们保留了以下库的调试符号：libgcc libstdc++ libatomic libquadmath。但需要注意的是，x86_64下libgcc名为`libgcc_s_seh-1.dll`，而i386下libgcc名为`libgcc_s_dw2-1.dll`。
 
@@ -322,7 +322,7 @@ $TARGET-objcopy --add-gnu-debuglink=$PREFIX/$TARGET/lib/libgcc_s_seh-1.dll.debug
 # 重复上述操作直到处理完所有动态库
 ```
 
-### 17编译安装pexports
+### 17.编译安装pexports
 
 ```shell
 cd ~/pexports
@@ -335,7 +335,7 @@ make install-strip -j 20
 mv $PREFIX/bin/pexports $PREFIX/bin/$TARGET-pexports
 ```
 
-### 18打包工具链
+### 18.打包工具链
 
 ```shell
 cd ~
@@ -350,7 +350,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 | :--------------- | :----------------- | :----------------- |
 | x86_64-linux-gnu | x86_64-w64-mingw32 | x86_64-w64-mingw32 |
 
-### 19设置环境变量
+### 19.设置环境变量
 
 ```shell
 export BUILD=x86_64-linux-gnu
@@ -359,7 +359,7 @@ export TARGET=$HOST
 export PREFIX=~/$HOST-native-gcc14
 ```
 
-### 20编译安装gcc
+### 20.编译安装gcc
 
 ```shell
 cd ~/gcc/build
@@ -389,7 +389,7 @@ libstdc++-6.dll:   PE32 executable (DLL) (console) Intel 80386 (stripped to exte
 同时，我们会发现`lib`和`lib32`目录下没有这些dll，这是因为gcc的安装脚本默认将它们安装到了bin目录下。综上所述，dll的安装是完全错误的。
 还可以发现，`include`、`lib`和`lib32`目录下都没有libc和sdk文件。故我们需要手动从先前安装的[交叉工具链](#构建mingw交叉工具链)中复制这些文件。
 
-### 21从交叉工具链中复制所需的库和头文件
+### 21.从交叉工具链中复制所需的库和头文件
 
 这样不但不需要再次编译mingw-w64，而且可以直接复制[编译交叉工具链](#16剥离调试符号到独立符号文件)时生成的调试符号文件，不需要再次剥离调试符号。
 
@@ -402,7 +402,7 @@ cp -n lib32/* $PREFIX/lib32
 cp -nr include/* $PREFIX/include
 ```
 
-### 22为python动态库创建归档文件
+### 22.为python动态库创建归档文件
 
 在接下来的5步中，我们将构建编译gdb所需的依赖项。具体说明请参见[构建gdb的要求](https://sourceware.org/gdb/current/onlinedocs/gdb.html/Requirements.html#Requirements)。
 
@@ -412,7 +412,7 @@ $TARGET-pexports python311.dll > libpython.def
 $TARGET-dlltool -D python311.dll -d libpython.def -l libpython.a
 ```
 
-### 23编译安装libgmp
+### 23.编译安装libgmp
 
 ```shell
 cd ~/gmp
@@ -425,7 +425,7 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 24编译安装libexpat
+### 24.编译安装libexpat
 
 ```shell
 cd ~/expat/expat
@@ -438,7 +438,7 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 25编译安装libiconv
+### 25.编译安装libiconv
 
 ```shell
 cd ~/iconv
@@ -451,7 +451,7 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 26编译安装libmpfr
+### 26.编译安装libmpfr
 
 ```shell
 cd ~/mpfr
@@ -464,7 +464,7 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 27编译安装binutils和gdb
+### 27.编译安装binutils和gdb
 
 要编译带有python支持的gdb就必须在编译gdb时传入python安装信息，但在交叉环境中提供这些信息是困难的。因此我们需要手动将这些信息传递给`configure`脚本。
 具体说明请参见[使用交叉编译器编译带有python支持的gdb](https://sourceware.org/gdb/wiki/CrossCompilingWithPythonSupport)。
@@ -529,7 +529,7 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 28编译安装pexports
+### 28.编译安装pexports
 
 我们在Window下也提供pexports实用工具，下面开始编译pexports：
 
@@ -541,14 +541,14 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 29复制python embed package
+### 29.复制python embed package
 
 ```shell
 cp ~/python-embed
 cp python* $PREFIX/bin
 ```
 
-### 30打包工具链
+### 30.打包工具链
 
 ```shell
 cd ~
@@ -558,7 +558,7 @@ tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 ```
 
-### 31使用工具链
+### 31.使用工具链
 
 在开启multilib后，`lib`和`lib32`目录下会各有一份dll，这也就是为什么不能将dll文件复制到`bin`目录下。
 因而在使用时需要将`bin`，`lib`和`lib32`文件夹都添加到PATH环境变量。程序在加载dll时Windows会顺序搜索PATH中的目录，直到找到一个dll可以被加载。
@@ -572,7 +572,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 | :--------------- | :--------------- | :------------ |
 | x86_64-linux-gnu | x86_64-linux-gnu | arm-none-eabi |
 
-### 32设置环境变量
+### 32.设置环境变量
 
 ```shell
 export BUILD=x86_64-linux-gnu
@@ -581,7 +581,7 @@ export TARGET=arm-none-eabi
 export PREFIX=~/$HOST-host-$TARGET-target-gcc14
 ```
 
-### 33编译binutils和gdb
+### 33.编译binutils和gdb
 
 ```shell
 cd ~/binutils/build
@@ -595,7 +595,7 @@ echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### 34编译安装gcc
+### 34.编译安装gcc
 
 这是一个不使用newlib的完全独立的工具链，故而需要禁用所有依赖宿主系统的库和特性。此时支持的库仅包含libstdc++和libgcc。由于此时禁用了动态库，故不需要再手动剥离调试符号。
 
@@ -608,7 +608,7 @@ make install-strip -j 20
 make install-target-libstdc++-v3 install-target-libgcc -j 20
 ```
 
-### 35复制库和pretty-printer
+### 35.复制库和pretty-printer
 
 编译出的arm-none-eabi-gdb依赖libstdc++，故需要从[gcc本地工具链](#构建gcc本地工具链)中复制一份。同时独立工具链不会安装pretty-printer，故也需要复制一份。
 
@@ -619,7 +619,7 @@ cp lib64/libgcc_s.so.1 $PREFIX/lib64
 cp -r share/gcc-14.0.1 $PREFIX/share
 ```
 
-### 36打包工具链
+### 36.打包工具链
 
 ```shell
 cd ~
@@ -635,7 +635,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 | :--------------- | :----------------- | :------------ |
 | x86_64-linux-gnu | x86_64-w64-mingw32 | arm-none-eabi |
 
-### 37设置环境变量
+### 37.设置环境变量
 
 ```shell
 export BUILD=x86_64-linux-gnu
@@ -644,11 +644,11 @@ export TARGET=arm-none-eabi
 export PREFIX=~/$HOST-host-$TARGET-target-gcc14
 ```
 
-### 38准备编译gdb所需的库
+### 38.准备编译gdb所需的库
 
 请参阅前文构建出[libpython.a](#22为python动态库创建归档文件), [libgmp](#23编译安装libgmp), [libexpat](#24编译安装libexpat), [libiconv](#25编译安装libiconv), [libmpfr](#26编译安装libmpfr)。
 
-### 39编译安装binutils和gdb
+### 39.编译安装binutils和gdb
 
 原理请参阅[x86_64-w64-mingw32本地gdb构建](#27编译安装binutils和gdb)。
 
@@ -660,7 +660,7 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 40编译安装gcc
+### 40.编译安装gcc
 
 原理请参阅[arm独立交叉工具链](#34编译安装gcc)。
 
@@ -673,7 +673,7 @@ make install-strip -j 20
 make install-target-libstdc++-v3 install-target-libgcc -j 20
 ```
 
-### 41从其他工具链中复制所需库和pretty-printer
+### 41.从其他工具链中复制所需库和pretty-printer
 
 从[mingw交叉工具链](#构建mingw交叉工具链)中复制动态库：
 
@@ -690,7 +690,7 @@ cd ~/$BUILD-native-gcc14
 cp -r share/gcc-14.0.1 $PREFIX/share
 ```
 
-### 42打包工具链
+### 42.打包工具链
 
 ```shell
 cd ~
@@ -708,7 +708,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 
 具体请参阅[构建arm独立交叉工具链](#构建arm独立交叉工具链)。
 
-### 43设置环境变量
+### 43.设置环境变量
 
 ```shell
 export BUILD=x86_64-linux-gnu
@@ -717,7 +717,7 @@ export TARGET=x86_64-elf
 export PREFIX=~/$HOST-host-$TARGET-target-gcc14
 ```
 
-### 44编译binutils和gdb
+### 44.编译binutils和gdb
 
 ```shell
 cd ~/binutils/build
@@ -731,7 +731,7 @@ echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### 45编译安装gcc
+### 45.编译安装gcc
 
 ```shell
 cd ~/gcc/build
@@ -742,7 +742,7 @@ make install-strip -j 20
 make install-target-libstdc++-v3 install-target-libgcc -j 20
 ```
 
-### 46复制库和pretty-printer
+### 46.复制库和pretty-printer
 
 ```shell
 cd ~/$BUILD-native-gcc14
@@ -751,7 +751,7 @@ cp lib64/libgcc_s.so.1 $PREFIX/lib64
 cp -r share/gcc-14.0.1 $PREFIX/share
 ```
 
-### 47打包工具链
+### 47.打包工具链
 
 ```shell
 cd ~
@@ -767,7 +767,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 | :--------------- | :----------------- | :--------- |
 | x86_64-linux-gnu | x86_64-w64-mingw32 | x86_64-elf |
 
-### 48设置环境变量
+### 48.设置环境变量
 
 ```shell
 export BUILD=x86_64-linux-gnu
@@ -776,11 +776,11 @@ export TARGET=x86_64-elf
 export PREFIX=~/$HOST-host-$TARGET-target-gcc14
 ```
 
-### 49准备编译gdb所需的库
+### 49.准备编译gdb所需的库
 
 请参阅前文构建出[libpython.a](#22为python动态库创建归档文件), [libgmp](#23编译安装libgmp), [libexpat](#24编译安装libexpat), [libiconv](#25编译安装libiconv), [libmpfr](#26编译安装libmpfr)。
 
-### 50编译安装binutils和gdb
+### 50.编译安装binutils和gdb
 
 原理请参阅[x86_64-w64-mingw32本地gdb构建](#27编译安装binutils和gdb)。
 
@@ -792,7 +792,7 @@ make -j 20
 make install-strip -j 20
 ```
 
-### 51编译安装gcc
+### 51.编译安装gcc
 
 原理请参阅[arm独立交叉工具链](#34编译安装gcc)。
 
@@ -805,7 +805,7 @@ make install-strip -j 20
 make install-target-libstdc++-v3 install-target-libgcc -j 20
 ```
 
-### 52从其他工具链中复制所需库和pretty-printer
+### 52.从其他工具链中复制所需库和pretty-printer
 
 从[mingw交叉工具链](#构建mingw交叉工具链)中复制动态库：
 
@@ -822,7 +822,7 @@ cd ~/$BUILD-native-gcc14
 cp -r share/gcc-14.0.1 $PREFIX/share
 ```
 
-### 53打包工具链
+### 53.打包工具链
 
 ```shell
 cd ~
@@ -841,7 +841,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台。为了和本地工具链加以区分，此处修改交叉工具链的vender字段。在vender字段中亦可以添加目标系统的版本以示区分。
 值得注意的是，此处目标系统为ubuntu 20.04，使用的libc为glibc 2.30。交叉工具链的glibc要与目标系统匹配。由于x32已经濒临淘汰，故此处不再编译x32的multilib。
 
-### 54设置环境变量
+### 54.设置环境变量
 
 ```shell
 export BUILD=x86_64-linux-gnu
@@ -850,7 +850,7 @@ export TARGET=x86_64-ubuntu2004-linux-gnu
 export PREFIX=~/$HOST-host-$TARGET-target-gcc14
 ```
 
-### 55编译gdb
+### 55.编译gdb
 
 ```shell
 cd ~/binutils/build
@@ -862,7 +862,7 @@ make install-strip -j 20
 unset ORIGIN
 ```
 
-### 56编译binutils
+### 56.编译binutils
 
 值得注意的是，binutils的一部分会安装到`$PREFIX/$TARGET`目录下，而此目录下的lib64存放的是目标平台的glibc,故不能设置`rpath`。
 
@@ -876,14 +876,14 @@ echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### 57安装Linux头文件
+### 57.安装Linux头文件
 
 ```shell
 cd ~/linux
 make ARCH=x86 INSTALL_HDR_PATH=$PREFIX/$TARGET headers_install
 ```
 
-### 58安装glibc头文件
+### 58.安装glibc头文件
 
 由于当前的工具链尚不完整，故需要手动设置`libc_cv_forced_unwind=yes`，否则会出现：
 
@@ -907,7 +907,7 @@ make install-headers
 touch $PREFIX/$TARGET/include/gnu/stubs.h
 ```
 
-### 59编译安装gcc和libgcc
+### 59.编译安装gcc和libgcc
 
 ```shell
 cd ~/gcc/build
@@ -917,7 +917,7 @@ make all-gcc all-target-libgcc -j 20
 make install-strip-gcc install-strip-target-libgcc -j 20
 ```
 
-### 60编译安装32位glibc
+### 60.编译安装32位glibc
 
 值得注意的是，尽管glibc本身不会使用c++编译器，但构建脚本会使用c++编译器进行链接，故c++编译器也需要设置。
 
@@ -929,7 +929,7 @@ make -j 20
 make install -j 20
 ```
 
-### 61剥离调试符号到单独的符号文件
+### 61.剥离调试符号到单独的符号文件
 
 ```shell
 cd $PREFIX/$TARGET/lib
@@ -943,7 +943,7 @@ $TARGET-objcopy --add-gnu-debuglink=libc-2.30.so.debug libc-2.30.so
 $TARGET-strip *.so
 ```
 
-### 62修改链接器脚本
+### 62.修改链接器脚本
 
 此时只有`lib/libc.so`需要修改，该文件的内容如下：
 
@@ -964,7 +964,7 @@ OUTPUT_FORMAT(elf32-i386)
 GROUP (libc.so.6 libc_nonshared.a AS_NEEDED (ld-linux.so.2))
 ```
 
-### 63移动lib目录到lib64
+### 63.移动lib目录到lib64
 
 由于在此multilib环境下，交叉编译器编译时lib32目录下存放32位multilib而lib目录下存放64位multilib，故需要调整glibc的位置。而ldscript需要始终存放在lib目录下。
 
@@ -974,7 +974,7 @@ mkdir $PREFIX/$TARGET/lib
 mv $PREFIX/$TARGET/lib32/ldscripts $PREFIX/$TARGET/lib
 ```
 
-### 64编译安装64位glibc
+### 64.编译安装64位glibc
 
 ```shell
 cd ~/glibc/build
@@ -984,7 +984,7 @@ make -j 20
 make install -j 20
 ```
 
-### 65剥离调试符号到单独的符号文件
+### 65.剥离调试符号到单独的符号文件
 
 ```shell
 cd $PREFIX/$TARGET/lib
@@ -998,7 +998,7 @@ $TARGET-objcopy --add-gnu-debuglink=libc-2.30.so.debug libc-2.30.so
 $TARGET-strip *.so
 ```
 
-### 66修改链接器脚本
+### 66.修改链接器脚本
 
 同理修改`libc.so`，`libm.a`和`libm.so`：
 
@@ -1014,14 +1014,14 @@ OUTPUT_FORMAT(elf64-x86-64)
 GROUP (libm.so.6 AS_NEEDED(libmvec_nonshared.a libmvec.so.1))
 ```
 
-### 67为multilib建立软链接
+### 67.为multilib建立软链接
 
 ```shell
 cd $PREFIX/$TARGET/lib
 ln -s ../lib32 32
 ```
 
-### 68修改asan源文件
+### 68.修改asan源文件
 
 在`gcc/libsanitizer/asan/asan_linux.cpp`中默认没有包含`linux/limits.h`文件，这会导致编译的时候缺少`PATH_MAX`宏，故将其修改为：
 
@@ -1042,7 +1042,7 @@ ln -s ../lib32 32
 #  include <linux/limits.h> // < 添加linux/limits.h头文件
 ```
 
-### 69编译完整gcc
+### 69.编译完整gcc
 
 ```shell
 cd ~/gcc/build
@@ -1054,7 +1054,7 @@ make install-strip -j 20
 make install-target-libgcc install-target-libstdc++-v3 install-target-libatomic install-target-libquadmath install-target-libgomp -j 20
 ```
 
-### 70剥离调试符号到独立的符号文件
+### 70.剥离调试符号到独立的符号文件
 
 在[第69步](#69编译完整gcc)中我们保留了以下库的调试符号：libgcc libstdc++ libatomic libquadmath libgomp
 
@@ -1070,7 +1070,7 @@ objcopy --add-gnu-debuglink=$PREFIX/lib64/libgcc_s.so.1.debug $PREFIX/lib64/libg
 # 重复上述操作直到处理完所有动态库
 ```
 
-### 71移动lib目录下的glibc到lib64目录下
+### 71.移动lib目录下的glibc到lib64目录下
 
 lib32目录下是纯净的glibc文件，故以lib32为参照经行文件复制，建议使用python脚本完成：
 
@@ -1090,7 +1090,7 @@ for file in os.listdir(lib_dir):
         shutil.move(lib_path, lib64_path)
 ```
 
-### 72移动lib32目录下的glibc到lib目录下
+### 72.移动lib32目录下的glibc到lib目录下
 
 lib32目录下是纯净的glibc文件，直接移动即可：
 
@@ -1099,7 +1099,7 @@ cd $PREFIX/$TARGET
 mov lib32/* lib
 ```
 
-### 73从其他工具链中复制所需库
+### 73.从其他工具链中复制所需库
 
 从[x86_64-linux-gnu本地工具链](#构建gcc本地工具链)中复制动态库：
 
@@ -1109,7 +1109,7 @@ cp lib64/libstdc++.so.6 $PREFIX/lib64
 cp lib64/libgcc_s.so.1 $PREFIX/lib64
 ```
 
-### 74打包工具链
+### 74.打包工具链
 
 ```shell
 cd ~
