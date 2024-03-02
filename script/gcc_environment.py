@@ -3,7 +3,6 @@
 import os
 import psutil
 import shutil
-import io
 import sys
 from math import floor
 
@@ -102,8 +101,6 @@ class environment:
                 break
         if self.home_dir == "":
             self.home_dir = os.environ["HOME"]
-        for lib in lib_list:
-            assert os.path.isdir(os.path.join(self.home_dir, lib)), f'Cannot find "{lib}" in directory "{self.home_dir}".'
         self.prefix = os.path.join(self.home_dir, self.name)
         self.num_cores = floor(psutil.cpu_count() * 1.5)
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
@@ -146,7 +143,7 @@ class environment:
             os.chdir(path)
             run_command("git pull")
 
-    def enter_build_dir(self, lib: str) -> None:
+    def enter_build_dir(self, lib: str, remove_files: bool = True) -> None:
         """进入构建目录
 
         Args:
@@ -156,7 +153,7 @@ class environment:
         build_dir = self.lib_dir_list[lib]
         if lib not in ("python-embed", "linux"):
             build_dir = os.path.join(self.home_dir, lib, "build" if lib != "expat" else "expat/build")
-            if os.path.isdir(build_dir):
+            if os.path.isdir(build_dir) and remove_files:
                 shutil.rmtree(build_dir)
             os.mkdir(build_dir)
         os.chdir(build_dir)
