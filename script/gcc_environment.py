@@ -155,7 +155,8 @@ class environment:
             build_dir = os.path.join(self.home_dir, lib, "build" if lib != "expat" else "expat/build")
             if os.path.isdir(build_dir) and remove_files:
                 shutil.rmtree(build_dir)
-            os.mkdir(build_dir)
+            if not os.path.isdir(build_dir):
+                os.mkdir(build_dir)
         os.chdir(build_dir)
         # 添加构建gdb所需的环境变量
         if lib == "binutils":
