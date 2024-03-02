@@ -32,8 +32,19 @@ option_list = {
     "CLANG_DEFAULT_UNWINDLIB": "libunwind",
     "CLANG_INCLUDE_TESTS": "OFF",
     "BENCHMARK_INSTALL_DOCS": "OFF",
-    "LLVM_ENABLE_LLD" : "ON"
+    "LLVM_ENABLE_LLD": "ON",
+    "LLVM_INCLUDE_BENCHMARKS": "OFF",
+    "LIBCXX_CXX_ABI": "libcxxabi",
+    "LIBCXX_INCLUDE_BENCHMARKS": "OFF",
 }
+
+
+def get_compiler(target: str) -> str:
+    compiler_list = ("CMAKE_C_COMPILER", "CMAKE_CXX_COMPILER", "CMAKE_ASM_COMPILER")
+    command = ""
+    for compiler in compiler_list:
+        command += f"-D{compiler}={'clang++' if 'CXX' in compiler else 'clang'} --target={target}"
+    return command
 
 
 class environment:
@@ -51,6 +62,8 @@ class environment:
     toolchain_file: str  # < cmake toolchain file
     llvm_dir: str  # < llvm子项目所在路径
     llvm_build_dir: str  # < 构建目录
+    basic_config_command: str  # < 基础配置选项
+    basic_build_command: str  # < 基础编译选项
 
     def __init__(self, major_version: str, host: str) -> None:
         self.major_version = major_version
@@ -78,6 +91,10 @@ class environment:
             self.lib_dir_list[lib] = lib_dir
         # 将自身注册到环境变量中
         self.register_in_env()
+        self.basic_config_command = f"cmake -G Ninja --install-prefix {self.prefix} -B {self.llvm_build_dir} -S {self.llvm_dir} "
+        for key, value in option_list.items():
+            self.basic_config_command += f"-D{key}={value} "
+        self.basic_build_command = f"ninja -C {self.llvm_build_dir} -j{self.num_cores} "
 
     def register_in_env(self) -> None:
         """注册安装路径到环境变量"""
@@ -88,13 +105,19 @@ class environment:
         with open(os.path.join(self.home_dir, ".bashrc"), "a") as bashrc_file:
             bashrc_file.write(f"export PATH={self.bin_dir}:$PATH\n")
 
+    def build(self) -> None:
+        run_command(self.basic_build_command)
+
+    def install(self) -> None:
+        run_command(self.basic_build_command + "install/strip")
+
     def copy_readme(self) -> None:
         """复制工具链说明文件"""
         readme_path = os.path.join(self.current_dir, "..", "readme", f"{self.name_without_version}.md")
         target_path = os.path.join(self.prefix, "README.md")
         shutil.copyfile(readme_path, target_path)
 
-    def package(self, need_gdbinit: bool = True, need_python_embed_package: bool = False) -> None:
+    def package(self) -> None:
         """打包工具链"""
         self.copy_readme()
         os.chdir(self.home_dir)
