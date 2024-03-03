@@ -1,8 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 import gcc_environment as gcc
-import shutil
-import os
 
 env = gcc.environment("14", host="x86_64-w64-mingw32", target="x86_64-linux-gnu")
 
