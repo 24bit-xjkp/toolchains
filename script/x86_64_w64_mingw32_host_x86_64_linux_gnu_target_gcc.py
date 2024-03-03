@@ -15,7 +15,7 @@ def build() -> None:
     gcc_option = "--disable-multilib --enable-languages=c,c++"
 
     # 编译安装完整gcc
-    """ env.enter_build_dir("gcc")
+    env.enter_build_dir("gcc")
     env.configure(basic_option, gcc_option)
     env.make()
     env.install("install-strip")
@@ -35,7 +35,7 @@ def build() -> None:
     env.configure(f"--disable-werror --host={env.target} --prefix={env.lib_prefix} --build={env.build}")
     env.make()
     env.install("install")
-    env.adjust_glibc() """
+    env.adjust_glibc()
 
     # 打包工具链
     env.package(False)
