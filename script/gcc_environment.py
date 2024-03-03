@@ -310,9 +310,9 @@ class environment:
         arch = arch if arch != "" else self.target[: self.target.find("-")]
         dst_dir = os.path.join(self.lib_prefix, "lib")
         for file in filter(lambda file: file.startswith(f"{arch}-lib"), os.listdir(self.current_dir)):
-            dst_path = os.path.join(dst_dir, file)
+            dst_path = os.path.join(dst_dir, file[len(f"{arch}-"):])
             src_path = os.path.join(self.current_dir, file)
-            os.remove(dst_dir)
+            os.remove(dst_path)
             shutil.copyfile(src_path, dst_path)
 
     def adjust_glibc(self, arch: str = ""):
