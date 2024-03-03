@@ -287,8 +287,7 @@ class environment:
         run_command(f"xz -fev9 -T 0 --memlimit={memory_MB}MiB {self.name}.tar")
 
     def remove_unused_glibc_file(self) -> None:
-        """移除不需要的glibc文件
-        """
+        """移除不需要的glibc文件"""
         for dir in (
             "etc",
             "libexec",
@@ -299,6 +298,28 @@ class environment:
             os.path.join(self.lib_prefix, "lib", "audit"),
         ):
             shutil.rmtree(os.path.join(self.lib_prefix, dir))
+
+    def strip_glibc_file(self) -> None:
+        """剥离调试符号"""
+        strip = f"{self.tool_prefix}strip"
+        lib_dir = os.path.join(self.lib_prefix, "lib")
+        os.system(f"{strip} {os.path.join(lib_dir, '*.so')}")
+
+    def change_glibc_ldscript(self, arch: str = "") -> None:
+        """替换带有绝对路径的链接器脚本"""
+        arch = arch if arch != "" else self.target[: self.target.find("-")]
+        dst_dir = os.path.join(self.lib_prefix, "lib")
+        for file in filter(lambda file: file.startswith(f"{arch}-lib"), os.listdir(self.current_dir)):
+            dst_path = os.path.join(dst_dir, file)
+            src_path = os.path.join(self.current_dir, file)
+            os.remove(dst_dir)
+            shutil.copyfile(src_path, dst_path)
+
+    def adjust_glibc(self, arch: str = ""):
+        """调整glibc"""
+        self.remove_unused_glibc_file()
+        self.strip_glibc_file()
+        self.change_glibc_ldscript(arch)
 
 
 assert __name__ != "__main__", "Import this file instead of running it directly."

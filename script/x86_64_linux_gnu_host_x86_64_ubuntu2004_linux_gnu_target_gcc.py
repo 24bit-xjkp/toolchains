@@ -31,14 +31,8 @@ def adjust_glibc(env: gcc.environment = env, is_32bit: bool = False) -> None:
         gcc.run_command(f"{objcopy} --only-keep-debug {dll} {debug}")
         gcc.run_command(f"{strip} {dll}")
         gcc.run_command(f"{objcopy} --add-gnu-debuglink={debug} {dll}")
-    ldscript_list = ("libc.so",) if is_32bit else ("libc.so", "libm.a", "libm.so")
-    ldscript_prefix = "i686-" if is_32bit else "x86_64-"
     # 替换链接器脚本
-    for ldscript in ldscript_list:
-        dst_file = os.path.join(lib_dir, ldscript)
-        src_file = os.path.join(env.current_dir, f"{ldscript_prefix}{ldscript}")
-        os.remove(dst_file)
-        shutil.copyfile(src_file, dst_file)
+    env.change_glibc_ldscript("i686" if is_32bit else "x86_64")
 
 
 def move_glibc32(env: gcc.environment = env) -> None:
