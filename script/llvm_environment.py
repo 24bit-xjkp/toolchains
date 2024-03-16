@@ -14,11 +14,11 @@ def run_command(command: str) -> None:
 
 lib_list = ("libxml2", "zlib")
 system_list: dict[str, str] = {
-    # "x86_64-linux-gnu": "Linux",
-    # "i686-linux-gnu": "Linux",
-    # "aarch64-linux-gnu": "Linux",
-    # "riscv64-linux-gnu": "Linux",
-    # "loongarch64-linux-gnu": "Linux",
+    "x86_64-linux-gnu": "Linux",
+    "i686-linux-gnu": "Linux",
+    "aarch64-linux-gnu": "Linux",
+    "riscv64-linux-gnu": "Linux",
+    "loongarch64-linux-gnu": "Linux",
     "x86_64-w64-mingw32": "Windows",
     "i686-w64-mingw32": "Windows",
 }
@@ -104,10 +104,6 @@ class environment:
         "LIBCXX_CXX_ABI": "libsupc++",
     }
     llvm_option_list_w32_1: dict[str, str] = {**llvm_option_list_w64_1}
-    llvm_option_list_la_1: dict[str, str] = {
-        **llvm_option_list_1,
-        "LLVM_ENABLE_LLD": "OFF",
-    }
     llvm_option_list_2: dict[str, str] = {
         **llvm_option_list_1,
         "LLVM_ENABLE_PROJECTS": '"clang;clang-tools-extra;lld;compiler-rt"',
@@ -119,10 +115,6 @@ class environment:
     }
     llvm_option_list_w64_2: dict[str, str] = {}
     llvm_option_list_w32_2: dict[str, str] = {}
-    llvm_option_list_la_2: dict[str, str] = {
-        **llvm_option_list_2,
-        "LLVM_ENABLE_LLD": "OFF",
-    }
     compiler_rt_dir: str  # < compiler-rt所在路径
 
     def __init__(self, major_version: str, build: str, host: str = "") -> None:

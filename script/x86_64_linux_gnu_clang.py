@@ -18,8 +18,6 @@ def build(stage: int = env.stage) -> None:
                     option = env.llvm_option_list_w64_1
                 case "i686-w64-mingw32":
                     option = env.llvm_option_list_w32_1
-                case "loongarch64-linux-gnu":
-                    option = env.llvm_option_list_la_1
                 case _:
                     option = env.llvm_option_list_1
             env.config("runtimes", target, **option)
