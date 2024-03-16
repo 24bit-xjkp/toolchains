@@ -8,6 +8,7 @@ from math import floor
 
 
 def run_command(command: str) -> None:
+    """运行程序，并在失败时退出脚本"""
     print(command)
     assert os.system(command) == 0, f'Command "{command}" failed.'
 
@@ -26,6 +27,11 @@ subproject_list = ("llvm", "runtimes")
 
 
 def get_cmake_option(**kwargs) -> list[str]:
+    """将字典转化为cmake选项列表
+
+    Returns:
+        list[str]: cmake选项列表
+    """
     option_list: list[str] = []
     for key, value in kwargs.items():
         option_list.append(f"-D{key}={value}")
@@ -33,6 +39,14 @@ def get_cmake_option(**kwargs) -> list[str]:
 
 
 def gnu_to_llvm(target: str) -> str:
+    """将gnu风格triplet转化为llvm风格
+
+    Args:
+        target (str): 目标平台
+
+    Returns:
+        str: llvm风格triplet
+    """
     if target.count("-") == 2:
         index = target.find("-")
         result = target[:index]
@@ -44,6 +58,13 @@ def gnu_to_llvm(target: str) -> str:
 
 
 def overwrite_copy(src: str, dst: str, is_dir: bool = False):
+    """复制文件或目录，会覆盖已存在项
+
+    Args:
+        src (str): 源路径
+        dst (str): 目标路径
+        is_dir (bool, optional): 目标是否为目录. 默认为否（文件）
+    """
     if is_dir:
         if os.path.exists(dst):
             shutil.rmtree(dst)
@@ -71,13 +92,14 @@ class environment:
     stage: int = 1  # < 自举阶段
     compiler_list = ("C", "CXX", "ASM")  # < 编译器列表
     sysroot_dir: str  # < sysroot所在路径
-    dylib_option_list: dict[str, str] = {
+    dylib_option_list: dict[str, str] = {  # < llvm动态链接选项
         "LLVM_LINK_LLVM_DYLIB": "ON",
         "LLVM_BUILD_LLVM_DYLIB": "ON",
         "CLANG_LINK_CLANG_DYLIB": "ON",
     }
-    dylib_option_list_windows: dict[str, str] = {"BUILD_SHARED_LIBS": "ON"}
-    llvm_option_list_1: dict[str, str] = {
+    # 如果符号过多则Windows下需要该用该选项
+    # dylib_option_list_windows: dict[str, str] = {"BUILD_SHARED_LIBS": "ON"}
+    llvm_option_list_1: dict[str, str] = {  # < 第1阶段编译选项，同时构建工具链和运行库
         "CMAKE_BUILD_TYPE": "Release",
         "LLVM_BUILD_DOCS": "OFF",
         "LLVM_BUILD_EXAMPLES": "OFF",
@@ -102,13 +124,13 @@ class environment:
         "COMPILER_RT_BUILD_BUILTINS": "ON",
         "COMPILER_RT_USE_LIBCXX": "ON",
     }
-    llvm_option_list_w64_1: dict[str, str] = {
+    llvm_option_list_w64_1: dict[str, str] = {  # < win64运行时第1阶段编译选项
         **llvm_option_list_1,
         "LLVM_ENABLE_RUNTIMES": '"libcxx;libunwind;compiler-rt"',
         "LIBCXX_CXX_ABI": "libsupc++",
     }
-    llvm_option_list_w32_1: dict[str, str] = {**llvm_option_list_w64_1}
-    llvm_option_list_2: dict[str, str] = {
+    llvm_option_list_w32_1: dict[str, str] = {**llvm_option_list_w64_1}  # < win32运行时第1阶段编译选项
+    llvm_option_list_2: dict[str, str] = {  # < 第2阶段编译选项，该阶段不编译运行库
         **llvm_option_list_1,
         "LLVM_ENABLE_PROJECTS": '"clang;clang-tools-extra;lld"',
         "LLVM_ENABLE_LTO": "Thin",
@@ -116,10 +138,10 @@ class environment:
         "CLANG_DEFAULT_RTLIB": "compiler-rt",
         "CLANG_DEFAULT_UNWINDLIB": "libunwind",
     }
-    llvm_option_list_3: dict[str, str] = {**llvm_option_list_2}
-    llvm_option_list_w64_3: dict[str, str] = {}
-    llvm_option_list_w32_3: dict[str, str] = {}
-    lib_option: dict[str, str] = {
+    llvm_option_list_3: dict[str, str] = {**llvm_option_list_2}  # < 第3阶段编译选项，编译运行库
+    llvm_option_list_w64_3: dict[str, str] = {}  # < win64运行时第3阶段编译选项
+    llvm_option_list_w32_3: dict[str, str] = {}  # < win32运行时第3阶段编译选项
+    lib_option: dict[str, str] = {  # < llvm依赖库编译选项
         "BUILD_SHARED_LIBS": "ON",
         "LIBXML2_WITH_ICONV": "OFF",
         "LIBXML2_WITH_LZMA": "OFF",
@@ -130,8 +152,14 @@ class environment:
         "CMAKE_RC_COMPILER": "llvm-windres",
         "CMAKE_BUILD_WITH_INSTALL_RPATH": "ON",
     }
-    llvm_cross_option: dict[str, str] = {}
+    llvm_cross_option: dict[str, str] = {}  # < llvm交叉编译选项
     compiler_rt_dir: str  # < compiler-rt所在路径
+
+    def _set_prefix(self) -> None:
+        """设置安装路径"""
+        self.prefix["llvm"] = os.path.join(self.home_dir, self.name) if self.stage == 1 else os.path.join(self.home_dir, f"{self.name}-new")
+        self.prefix["runtimes"] = os.path.join(self.prefix["llvm"], "install")
+        self.compiler_rt_dir = os.path.join(self.prefix["llvm"], "lib", "clang", self.major_version, "lib")
 
     def __init__(self, major_version: str, build: str, host: str = "") -> None:
         self.major_version = major_version
@@ -150,21 +178,24 @@ class environment:
                 assert 1 <= self.stage <= 4, "Stage should range from 1 to 4"
         if self.home_dir == "":
             self.home_dir = os.environ["HOME"]
-        self.prefix["llvm"] = os.path.join(self.home_dir, self.name) if self.stage == 1 else os.path.join(self.home_dir, f"{self.name}-new")
-        self.prefix["runtimes"] = os.path.join(self.prefix["llvm"], "install")
+        # 设置prefix
+        self._set_prefix()
         for lib in lib_list:
             self.prefix[lib] = os.path.join(self.home_dir, lib, "install")
+        # 设置并发数
         self.num_cores = floor(psutil.cpu_count() * 1.5)
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
-        self.toolchain_file = os.path.join(self.current_dir, f"{self.name_without_version}.cmake")
         self.bin_dir = os.path.join(os.path.join(self.home_dir, self.name), "bin")
+        # 设置源目录和构建目录
         for project in subproject_list:
             self.source_dir[project] = os.path.join(self.home_dir, "llvm", project)
-            self.build_dir[project] = os.path.join(self.source_dir[project], f"build-{self.host}")
+            self.build_dir[project] = os.path.join(self.home_dir, "llvm", f"build-{self.host}-{project}")
         for lib in lib_list:
             self.source_dir[lib] = os.path.join(self.home_dir, lib)
             self.build_dir[lib] = os.path.join(self.source_dir[lib], "build")
+        # 设置sysroot目录
         self.sysroot_dir = os.path.join(self.home_dir, "sysroot")
+        # 配置Windows运行库编译选项
         include_dir = os.path.join(self.sysroot_dir, "x86_64-w64-mingw32/include/c++")
         for dir in os.listdir(include_dir):
             if dir[0:2].isdigit():
@@ -175,11 +206,12 @@ class environment:
             if dir[0:2].isdigit():
                 include_dir = os.path.join(include_dir, dir)
         self.llvm_option_list_w32_1["LIBCXX_CXX_ABI_INCLUDE_PATHS"] = include_dir
+        # 第2阶段不编译运行库
         if "LLVM_ENABLE_RUNTIMES" in self.llvm_option_list_2:
             del self.llvm_option_list_2["LLVM_ENABLE_RUNTIMES"]
         self.llvm_option_list_w64_3 = {**self.llvm_option_list_3, **self.llvm_option_list_w64_1}
         self.llvm_option_list_w32_3 = {**self.llvm_option_list_3, **self.llvm_option_list_w32_1}
-        self.compiler_rt_dir = os.path.join(self.prefix["llvm"], "lib", "clang", self.major_version, "lib")
+        # 设置llvm依赖库编译选项
         zlib = f'"{os.path.join(self.prefix["zlib"], "lib", "libzlibstatic.a")}"'
         self.llvm_cross_option = {
             "LIBXML2_INCLUDE_DIR": f'"{os.path.join(self.prefix["libxml2"], "include", "libxml2")}"',
@@ -188,10 +220,15 @@ class environment:
             "ZLIB_INCLUDE_DIR": f'"{os.path.join(self.prefix["zlib"], "include")}"',
             "ZLIB_LIBRARY": zlib,
             "ZLIB_LIBRARY_RELEASE": zlib,
-            "LLVM_NATIVE_TOOL_DIR": f'"{os.path.join(self.source_dir["llvm"], f"build-{self.build}", "bin")}"',
+            "LLVM_NATIVE_TOOL_DIR": f'"{os.path.join(self.source_dir["llvm"], f"build-{self.build}-llvm", "bin")}"',
         }
         # 将自身注册到环境变量中
         self.register_in_env()
+
+    def next_stage(self) -> None:
+        """进入下一阶段"""
+        self.stage += 1
+        self._set_prefix()
 
     def register_in_env(self) -> None:
         """注册安装路径到环境变量"""
@@ -203,6 +240,14 @@ class environment:
             bashrc_file.write(f"export PATH={self.bin_dir}:$PATH\n")
 
     def get_compiler(self, target: str, *command_list_in) -> list[str]:
+        """获取编译器选项
+
+        Args:
+            target (str): 目标平台
+
+        Returns:
+            list[str]: 编译选项
+        """
         assert target in system_list
         gcc = f"--gcc-toolchain={os.path.join(self.home_dir, 'sysroot')}"
         command_list: list[str] = []
@@ -225,35 +270,64 @@ class environment:
         return command_list
 
     def config(self, project: str, target: str, *command_list, **cmake_option_list) -> None:
+        """配置项目
+
+        Args:
+            project (str): 子项目
+            target (str): 目标平台
+            command_list: 附加编译选项
+            cmake_option_list: 附加cmake配置选项
+        """
         assert project in (*subproject_list, *lib_list)
         command = f"cmake -G Ninja --install-prefix {self.prefix[project]} -B {self.build_dir[project]} -S {self.source_dir[project]} "
         command += " ".join(self.get_compiler(target, *command_list) + get_cmake_option(**cmake_option_list))
         run_command(command)
 
-    def make(self, target: str) -> None:
-        assert target in (*subproject_list, *lib_list)
-        run_command(f"ninja -C {self.build_dir[target]} -j{self.num_cores}")
+    def make(self, project: str) -> None:
+        """构建项目
 
-    def install(self, target: str) -> None:
-        assert target in (*subproject_list, *lib_list)
-        run_command(f"ninja -C {self.build_dir[target]} install/strip -j{self.num_cores}")
+        Args:
+            project (str): 目标项目
+        """
+        assert project in (*subproject_list, *lib_list)
+        run_command(f"ninja -C {self.build_dir[project]} -j{self.num_cores}")
 
-    def remove_build_dir(self, target: str) -> None:
-        assert target in subproject_list
-        dir = self.build_dir[target]
+    def install(self, project: str) -> None:
+        """安装项目
+
+        Args:
+            project (str): 目标项目
+        """
+        assert project in (*subproject_list, *lib_list)
+        run_command(f"ninja -C {self.build_dir[project]} install/strip -j{self.num_cores}")
+
+    def remove_build_dir(self, project: str) -> None:
+        """移除构建目录
+
+        Args:
+            project (str): 目标项目
+        """
+        assert project in subproject_list
+        dir = self.build_dir[project]
         if os.path.exists(dir):
             shutil.rmtree(dir)
-        if target == "runtimes":
-            dir = self.prefix[target]
+        if project == "runtimes":
+            dir = self.prefix[project]
             if os.path.exists(dir):
                 shutil.rmtree(dir)
 
     def build_sysroot(self, target: str) -> None:
+        """构建sysroot
+
+        Args:
+            target (str): 目标平台
+        """
         prefix = self.prefix["runtimes"]
         for dir in os.listdir(prefix):
             src_dir = os.path.join(prefix, dir)
             match dir:
                 case "bin":
+                    # 复制dll
                     dst_dir = os.path.join(self.sysroot_dir, target, "lib")
                     for file in os.listdir(src_dir):
                         if file.endswith("dll"):
@@ -263,6 +337,7 @@ class environment:
                     if not os.path.exists(self.compiler_rt_dir):
                         os.mkdir(self.compiler_rt_dir)
                     for item in os.listdir(src_dir):
+                        # 复制compiler-rt
                         if item == system_list[target].lower():
                             item = item.lower()
                             rt_dir = os.path.join(self.compiler_rt_dir, item)
@@ -271,19 +346,24 @@ class environment:
                             for file in os.listdir(os.path.join(src_dir, item)):
                                 overwrite_copy(os.path.join(src_dir, item, file), os.path.join(rt_dir, file))
                             continue
+                        # 复制其他库
                         overwrite_copy(os.path.join(src_dir, item), os.path.join(dst_dir, item))
                 case "include":
+                    # 复制__config_site
                     dst_dir = os.path.join(self.sysroot_dir, target, "include")
                     overwrite_copy(os.path.join(src_dir, "c++", "v1", "__config_site"), os.path.join(dst_dir, "__config_site"))
 
     def copy_llvm_libs(self) -> None:
+        """复制工具链所需库"""
         src_dir = os.path.join(self.sysroot_dir, self.host, "lib")
         dst_dir = os.path.join(self.prefix["llvm"], "lib")
         native_dir = os.path.join(self.home_dir, f"{self.build}-clang{self.major_version}")
         native_bin_dir = os.path.join(native_dir, "bin")
         native_compiler_rt_dir = os.path.join(native_dir, "lib", "clang", self.major_version, "lib")
+        # 复制libc++和libunwind运行库
         for file in filter(lambda file: file.startswith(("libc++", "libunwind")) and not file.endswith(".a"), os.listdir(src_dir)):
             overwrite_copy(os.path.join(src_dir, file), os.path.join(dst_dir, file))
+        # 复制公用libc++头文件
         src_dir = os.path.join(native_bin_dir, "..", "include", "c++", "v1")
         dst_dir = os.path.join(self.prefix["llvm"], "include", "c++")
         if not os.path.exists(dst_dir):
@@ -291,9 +371,12 @@ class environment:
         dst_dir = os.path.join(dst_dir, "v1")
         overwrite_copy(src_dir, dst_dir, True)
         if self.build != self.host:
+            # 从build下的本地工具链复制compiler-rt
+            # 其他库在sysroot中，无需复制
             src_dir = native_compiler_rt_dir
             dst_dir = self.compiler_rt_dir
             overwrite_copy(src_dir, dst_dir, True)
+            # 复制libxml2
             src_path = os.path.join(self.prefix["libxml2"], "bin", "libxml2.dll")
             dst_path = os.path.join(self.prefix["llvm"], "lib", "libxml2.dll")
             overwrite_copy(src_path, dst_path)
@@ -305,7 +388,10 @@ class environment:
         shutil.copyfile(readme_path, target_path)
 
     def change_name(self) -> None:
+        """修改多阶段自举时的安装目录名"""
         name = os.path.join(self.home_dir, self.name)
+        # clang->clang-old
+        # clang-new->clang
         if not os.path.exists(f"{name}-old"):
             os.rename(name, f"{name}-old")
             os.rename(self.prefix["llvm"], name)
