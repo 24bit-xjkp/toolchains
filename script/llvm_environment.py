@@ -12,7 +12,7 @@ def run_command(command: str) -> None:
     assert os.system(command) == 0, f'Command "{command}" failed.'
 
 
-lib_list = ("libxml2", "zlib")
+lib_list = ("zlib", "libxml2")
 system_list: dict[str, str] = {
     "x86_64-linux-gnu": "Linux",
     "i686-linux-gnu": "Linux",
@@ -43,10 +43,15 @@ def gnu_to_llvm(target: str) -> str:
         return target
 
 
-def overwrite_copy(src: str, dst: str):
-    if os.path.exists(dst):
-        os.remove(dst)
-    shutil.copyfile(src, dst, follow_symlinks=False)
+def overwrite_copy(src: str, dst: str, is_dir: bool = False):
+    if is_dir:
+        if os.path.exists(dst):
+            shutil.rmtree(dst)
+        shutil.copytree(src, dst)
+    else:
+        if os.path.exists(dst):
+            os.remove(dst)
+        shutil.copyfile(src, dst, follow_symlinks=False)
 
 
 class environment:
@@ -114,6 +119,18 @@ class environment:
     llvm_option_list_3: dict[str, str] = {**llvm_option_list_2}
     llvm_option_list_w64_3: dict[str, str] = {}
     llvm_option_list_w32_3: dict[str, str] = {}
+    lib_option: dict[str, str] = {
+        "BUILD_SHARED_LIBS": "ON",
+        "LIBXML2_WITH_ICONV": "OFF",
+        "LIBXML2_WITH_LZMA": "OFF",
+        "LIBXML2_WITH_PYTHON": "OFF",
+        "LIBXML2_WITH_ZLIB": "OFF",
+        "LIBXML2_WITH_THREADS": "OFF",
+        "LIBXML2_WITH_CATALOG": "OFF",
+        "CMAKE_RC_COMPILER": "llvm-windres",
+        "CMAKE_BUILD_WITH_INSTALL_RPATH": "ON",
+    }
+    llvm_cross_option: dict[str, str] = {}
     compiler_rt_dir: str  # < compiler-rt所在路径
 
     def __init__(self, major_version: str, build: str, host: str = "") -> None:
@@ -135,6 +152,8 @@ class environment:
             self.home_dir = os.environ["HOME"]
         self.prefix["llvm"] = os.path.join(self.home_dir, self.name) if self.stage == 1 else os.path.join(self.home_dir, f"{self.name}-new")
         self.prefix["runtimes"] = os.path.join(self.prefix["llvm"], "install")
+        for lib in lib_list:
+            self.prefix[lib] = os.path.join(self.home_dir, lib, "install")
         self.num_cores = floor(psutil.cpu_count() * 1.5)
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
         self.toolchain_file = os.path.join(self.current_dir, f"{self.name_without_version}.cmake")
@@ -142,6 +161,9 @@ class environment:
         for project in subproject_list:
             self.source_dir[project] = os.path.join(self.home_dir, "llvm", project)
             self.build_dir[project] = os.path.join(self.source_dir[project], f"build-{self.host}")
+        for lib in lib_list:
+            self.source_dir[lib] = os.path.join(self.home_dir, lib)
+            self.build_dir[lib] = os.path.join(self.source_dir[lib], "build")
         self.sysroot_dir = os.path.join(self.home_dir, "sysroot")
         include_dir = os.path.join(self.sysroot_dir, "x86_64-w64-mingw32/include/c++")
         for dir in os.listdir(include_dir):
@@ -153,10 +175,21 @@ class environment:
             if dir[0:2].isdigit():
                 include_dir = os.path.join(include_dir, dir)
         self.llvm_option_list_w32_1["LIBCXX_CXX_ABI_INCLUDE_PATHS"] = include_dir
-        del self.llvm_option_list_2["LLVM_ENABLE_RUNTIMES"]
+        if "LLVM_ENABLE_RUNTIMES" in self.llvm_option_list_2:
+            del self.llvm_option_list_2["LLVM_ENABLE_RUNTIMES"]
         self.llvm_option_list_w64_3 = {**self.llvm_option_list_3, **self.llvm_option_list_w64_1}
         self.llvm_option_list_w32_3 = {**self.llvm_option_list_3, **self.llvm_option_list_w32_1}
         self.compiler_rt_dir = os.path.join(self.prefix["llvm"], "lib", "clang", self.major_version, "lib")
+        zlib = f'"{os.path.join(self.prefix["zlib"], "lib", "libzlibstatic.a")}"'
+        self.llvm_cross_option = {
+            "LIBXML2_INCLUDE_DIR": f'"{os.path.join(self.prefix["libxml2"], "include", "libxml2")}"',
+            "LIBXML2_LIBRARY": f'"{os.path.join(self.prefix["libxml2"], "lib", "libxml2.dll.a")}"',
+            "CLANG_ENABLE_LIBXML2": "ON",
+            "ZLIB_INCLUDE_DIR": f'"{os.path.join(self.prefix["zlib"], "include")}"',
+            "ZLIB_LIBRARY": zlib,
+            "ZLIB_LIBRARY_RELEASE": zlib,
+            "LLVM_NATIVE_TOOL_DIR": f'"{os.path.join(self.source_dir["llvm"], f"build-{self.build}", "bin")}"',
+        }
         # 将自身注册到环境变量中
         self.register_in_env()
 
@@ -177,8 +210,6 @@ class environment:
         no_warning = "-Wno-unused-command-line-argument"
         for compiler in self.compiler_list:
             command_list.append(f'-DCMAKE_{compiler}_COMPILER="{compiler_path[compiler]}"')
-            if target != self.build:
-                command_list.append("-DCMAKE_CROSSCOMPILING=TRUE")
             command_list.append(f"-DCMAKE_{compiler}_COMPILER_TARGET={target}")
             command_list.append(f'-DCMAKE_{compiler}_FLAGS="{no_warning} {gcc} {" ".join(command_list_in)}"')
             command_list.append(f"-DCMAKE_{compiler}_COMPILER_WORKS=ON")
@@ -186,23 +217,25 @@ class environment:
             command_list.append(f"-DCMAKE_SYSTEM_NAME={system_list[target]}")
             command_list.append(f"-DCMAKE_SYSTEM_PROCESSOR={target[: target.find('-')]}")
             command_list.append(f'-DCMAKE_SYSROOT="{self.sysroot_dir}"')
+            command_list.append("-DCMAKE_CROSSCOMPILING=TRUE")
         command_list.append(f"-DLLVM_RUNTIMES_TARGET={target}")
-        command_list.append(f"-DLLVM_DEFAULT_TARGET_TRIPLE={target}")
+        command_list.append(f"-DLLVM_DEFAULT_TARGET_TRIPLE={gnu_to_llvm(target)}")
         command_list.append(f"-DLLVM_HOST_TRIPLE={gnu_to_llvm(self.host)}")
-        command_list.append(f'"-DCMAKE_LINK_FLAGS={" ".join(command_list_in)}"')
+        command_list.append(f'-DCMAKE_LINK_FLAGS="{" ".join(command_list_in)}"')
         return command_list
 
     def config(self, project: str, target: str, *command_list, **cmake_option_list) -> None:
-        assert project in subproject_list
-        prefix = self.prefix[project]
-        command = f"cmake -G Ninja --install-prefix {prefix} -B {self.build_dir[project]} -S {self.source_dir[project]} "
+        assert project in (*subproject_list, *lib_list)
+        command = f"cmake -G Ninja --install-prefix {self.prefix[project]} -B {self.build_dir[project]} -S {self.source_dir[project]} "
         command += " ".join(self.get_compiler(target, *command_list) + get_cmake_option(**cmake_option_list))
         run_command(command)
 
     def make(self, target: str) -> None:
+        assert target in (*subproject_list, *lib_list)
         run_command(f"ninja -C {self.build_dir[target]} -j{self.num_cores}")
 
     def install(self, target: str) -> None:
+        assert target in (*subproject_list, *lib_list)
         run_command(f"ninja -C {self.build_dir[target]} install/strip -j{self.num_cores}")
 
     def remove_build_dir(self, target: str) -> None:
@@ -246,16 +279,24 @@ class environment:
     def copy_llvm_libs(self) -> None:
         src_dir = os.path.join(self.sysroot_dir, self.host, "lib")
         dst_dir = os.path.join(self.prefix["llvm"], "lib")
-        for file in filter(lambda file: file.startswith(("libc++", "libunwind")), os.listdir(src_dir)):
+        native_dir = os.path.join(self.home_dir, f"{self.build}-clang{self.major_version}")
+        native_bin_dir = os.path.join(native_dir, "bin")
+        native_compiler_rt_dir = os.path.join(native_dir, "lib", "clang", self.major_version, "lib")
+        for file in filter(lambda file: file.startswith(("libc++", "libunwind")) and not file.endswith(".a"), os.listdir(src_dir)):
             overwrite_copy(os.path.join(src_dir, file), os.path.join(dst_dir, file))
-        src_dir = os.path.join(self.bin_dir, "..", "include", "c++", "v1")
+        src_dir = os.path.join(native_bin_dir, "..", "include", "c++", "v1")
         dst_dir = os.path.join(self.prefix["llvm"], "include", "c++")
         if not os.path.exists(dst_dir):
             os.mkdir(dst_dir)
         dst_dir = os.path.join(dst_dir, "v1")
-        if os.path.exists(dst_dir):
-            os.rmdir(dst_dir)
-        shutil.copytree(src_dir, dst_dir)
+        overwrite_copy(src_dir, dst_dir, True)
+        if self.build != self.host:
+            src_dir = native_compiler_rt_dir
+            dst_dir = self.compiler_rt_dir
+            overwrite_copy(src_dir, dst_dir, True)
+            src_path = os.path.join(self.prefix["libxml2"], "bin", "libxml2.dll")
+            dst_path = os.path.join(self.prefix["llvm"], "lib", "libxml2.dll")
+            overwrite_copy(src_path, dst_path)
 
     def copy_readme(self) -> None:
         """复制工具链说明文件"""
