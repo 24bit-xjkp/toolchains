@@ -260,18 +260,19 @@ class environment:
     def copy_readme(self) -> None:
         """复制工具链说明文件"""
         readme_path = os.path.join(self.current_dir, "..", "readme", f"{self.name_without_version}.md")
-        target_path = os.path.join(self.prefix["llvm"], "README.md")
+        target_path = os.path.join(os.path.join(self.home_dir, self.name), "README.md")
         shutil.copyfile(readme_path, target_path)
 
     def change_name(self) -> None:
         name = os.path.join(self.home_dir, self.name)
-        os.rename(name, f"{name}-old")
-        os.rename(self.prefix["llvm"], name)
+        if not os.path.exists(f"{name}-old"):
+            os.rename(name, f"{name}-old")
+            os.rename(self.prefix["llvm"], name)
 
     def package(self) -> None:
         """打包工具链"""
         self.copy_readme()
         os.chdir(self.home_dir)
         run_command(f"tar -cf {self.name}.tar {self.name}")
-        memory_MB = psutil.virtual_memory().available // 1048576 + 3072
+        memory_MB = psutil.virtual_memory().total // 1048576
         run_command(f"xz -fev9 -T 0 --memlimit={memory_MB}MiB {self.name}.tar")

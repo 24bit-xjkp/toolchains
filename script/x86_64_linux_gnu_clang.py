@@ -55,6 +55,7 @@ def build(stage: int = env.stage) -> None:
 
     if env.stage == 4:
         env.change_name()
+        env.package()
 
 
 
