@@ -46,7 +46,7 @@ def gnu_to_llvm(target: str) -> str:
 def overwrite_copy(src: str, dst: str):
     if os.path.exists(dst):
         os.remove(dst)
-    shutil.copyfile(src, dst)
+    shutil.copyfile(src, dst, follow_symlinks=False)
 
 
 class environment:
@@ -90,7 +90,6 @@ class environment:
         "CLANG_DEFAULT_LINKER": "lld",
         "LLVM_ENABLE_LLD": "ON",
         "CMAKE_BUILD_WITH_INSTALL_RPATH": "ON",
-        "LLVM_INSTALL_TOOLCHAIN_ONLY": "ON",
         "LIBCXX_INCLUDE_BENCHMARKS": "OFF",
         "LIBCXX_USE_COMPILER_RT": "ON",
         "LIBCXX_CXX_ABI": "libcxxabi",
@@ -106,15 +105,15 @@ class environment:
     llvm_option_list_w32_1: dict[str, str] = {**llvm_option_list_w64_1}
     llvm_option_list_2: dict[str, str] = {
         **llvm_option_list_1,
-        "LLVM_ENABLE_PROJECTS": '"clang;clang-tools-extra;lld;compiler-rt"',
+        "LLVM_ENABLE_PROJECTS": '"clang;clang-tools-extra;lld"',
         "LLVM_ENABLE_LTO": "Thin",
         "CLANG_DEFAULT_CXX_STDLIB": "libc++",
         "CLANG_DEFAULT_RTLIB": "compiler-rt",
         "CLANG_DEFAULT_UNWINDLIB": "libunwind",
-        "LIBUNWIND_USE_COMPILER_RT": "ON",
     }
-    llvm_option_list_w64_2: dict[str, str] = {}
-    llvm_option_list_w32_2: dict[str, str] = {}
+    llvm_option_list_3: dict[str, str] = {**llvm_option_list_2}
+    llvm_option_list_w64_3: dict[str, str] = {}
+    llvm_option_list_w32_3: dict[str, str] = {}
     compiler_rt_dir: str  # < compiler-rt所在路径
 
     def __init__(self, major_version: str, build: str, host: str = "") -> None:
@@ -131,45 +130,35 @@ class environment:
                 value = option[8:]
                 assert value.isdigit(), 'Option "--stage=" needs an integer'
                 self.stage = int(value)
-                assert 1 <= self.stage <= 2, "Stage should be 1 or 2"
+                assert 1 <= self.stage <= 4, "Stage should range from 1 to 4"
         if self.home_dir == "":
             self.home_dir = os.environ["HOME"]
-        self.prefix["llvm"] = os.path.join(self.home_dir, self.name)
+        self.prefix["llvm"] = os.path.join(self.home_dir, self.name) if self.stage == 1 else os.path.join(self.home_dir, f"{self.name}-new")
         self.prefix["runtimes"] = os.path.join(self.prefix["llvm"], "install")
         self.num_cores = floor(psutil.cpu_count() * 1.5)
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
         self.toolchain_file = os.path.join(self.current_dir, f"{self.name_without_version}.cmake")
-        self.bin_dir = os.path.join(self.prefix["llvm"], "bin")
+        self.bin_dir = os.path.join(os.path.join(self.home_dir, self.name), "bin")
         for project in subproject_list:
             self.source_dir[project] = os.path.join(self.home_dir, "llvm", project)
             self.build_dir[project] = os.path.join(self.source_dir[project], f"build-{self.host}")
         self.sysroot_dir = os.path.join(self.home_dir, "sysroot")
         include_dir = os.path.join(self.sysroot_dir, "x86_64-w64-mingw32/include/c++")
-        include_dir = os.path.join(include_dir, os.listdir(include_dir)[0])
+        for dir in os.listdir(include_dir):
+            if dir[0:2].isdigit():
+                include_dir = os.path.join(include_dir, dir)
         self.llvm_option_list_w64_1["LIBCXX_CXX_ABI_INCLUDE_PATHS"] = include_dir
         include_dir = os.path.join(self.sysroot_dir, "i686-w64-mingw32/include/c++")
-        include_dir = os.path.join(include_dir, os.listdir(include_dir)[0])
+        for dir in os.listdir(include_dir):
+            if dir[0:2].isdigit():
+                include_dir = os.path.join(include_dir, dir)
         self.llvm_option_list_w32_1["LIBCXX_CXX_ABI_INCLUDE_PATHS"] = include_dir
-        self.llvm_option_list_w64_2 = {**self.llvm_option_list_2, **self.llvm_option_list_w64_1}
-        self.llvm_option_list_w32_2 = {**self.llvm_option_list_2, **self.llvm_option_list_w32_1}
+        del self.llvm_option_list_2["LLVM_ENABLE_RUNTIMES"]
+        self.llvm_option_list_w64_3 = {**self.llvm_option_list_3, **self.llvm_option_list_w64_1}
+        self.llvm_option_list_w32_3 = {**self.llvm_option_list_3, **self.llvm_option_list_w32_1}
         self.compiler_rt_dir = os.path.join(self.prefix["llvm"], "lib", "clang", self.major_version, "lib")
         # 将自身注册到环境变量中
         self.register_in_env()
-
-    def get_compiler_path(self) -> dict[str, str]:
-        """获取编译器路径
-
-        Returns:
-            dict[str,str]: 编译器路径表
-        """
-        if self.stage == 1:
-            return {"C": "clang", "CXX": "clang++", "ASM": "clang"}
-        else:
-            return {
-                "C": f'{os.path.join(self.bin_dir, "clang")}',
-                "CXX": f'{os.path.join(self.bin_dir, "clang++")}',
-                "ASM": f'{os.path.join(self.bin_dir, "clang")}',
-            }
 
     def register_in_env(self) -> None:
         """注册安装路径到环境变量"""
@@ -184,22 +173,23 @@ class environment:
         assert target in system_list
         gcc = f"--gcc-toolchain={os.path.join(self.home_dir, 'sysroot')}"
         command_list: list[str] = []
-        compiler_path = self.get_compiler_path()
+        compiler_path = {"C": "clang", "CXX": "clang++", "ASM": "clang"}
         no_warning = "-Wno-unused-command-line-argument"
         for compiler in self.compiler_list:
             command_list.append(f'-DCMAKE_{compiler}_COMPILER="{compiler_path[compiler]}"')
             if target != self.build:
                 command_list.append("-DCMAKE_CROSSCOMPILING=TRUE")
             command_list.append(f"-DCMAKE_{compiler}_COMPILER_TARGET={target}")
-            command_list.append(f'-D{compiler}_FLAGS="{no_warning} {gcc} {" ".join(command_list_in)}"')
+            command_list.append(f'-DCMAKE_{compiler}_FLAGS="{no_warning} {gcc} {" ".join(command_list_in)}"')
             command_list.append(f"-DCMAKE_{compiler}_COMPILER_WORKS=ON")
         if target != self.build:
             command_list.append(f"-DCMAKE_SYSTEM_NAME={system_list[target]}")
             command_list.append(f"-DCMAKE_SYSTEM_PROCESSOR={target[: target.find('-')]}")
-            command_list.append(f"-DCMAKE_SYSROOT='{self.sysroot_dir}'")
+            command_list.append(f'-DCMAKE_SYSROOT="{self.sysroot_dir}"')
         command_list.append(f"-DLLVM_RUNTIMES_TARGET={target}")
         command_list.append(f"-DLLVM_DEFAULT_TARGET_TRIPLE={target}")
         command_list.append(f"-DLLVM_HOST_TRIPLE={gnu_to_llvm(self.host)}")
+        command_list.append(f'"-DCMAKE_LINK_FLAGS={" ".join(command_list_in)}"')
         return command_list
 
     def config(self, project: str, target: str, *command_list, **cmake_option_list) -> None:
@@ -237,6 +227,8 @@ class environment:
                             overwrite_copy(os.path.join(src_dir, file), os.path.join(dst_dir, file))
                 case "lib":
                     dst_dir = os.path.join(self.sysroot_dir, target, "lib")
+                    if not os.path.exists(self.compiler_rt_dir):
+                        os.mkdir(self.compiler_rt_dir)
                     for item in os.listdir(src_dir):
                         if item == system_list[target].lower():
                             item = item.lower()
@@ -251,11 +243,30 @@ class environment:
                     dst_dir = os.path.join(self.sysroot_dir, target, "include")
                     overwrite_copy(os.path.join(src_dir, "c++", "v1", "__config_site"), os.path.join(dst_dir, "__config_site"))
 
+    def copy_llvm_libs(self) -> None:
+        src_dir = os.path.join(self.sysroot_dir, self.host, "lib")
+        dst_dir = os.path.join(self.prefix["llvm"], "lib")
+        for file in filter(lambda file: file.startswith(("libc++", "libunwind")), os.listdir(src_dir)):
+            overwrite_copy(os.path.join(src_dir, file), os.path.join(dst_dir, file))
+        src_dir = os.path.join(self.bin_dir, "..", "include", "c++", "v1")
+        dst_dir = os.path.join(self.prefix["llvm"], "include", "c++")
+        if not os.path.exists(dst_dir):
+            os.mkdir(dst_dir)
+        dst_dir = os.path.join(dst_dir, "v1")
+        if os.path.exists(dst_dir):
+            os.rmdir(dst_dir)
+        shutil.copytree(src_dir, dst_dir)
+
     def copy_readme(self) -> None:
         """复制工具链说明文件"""
         readme_path = os.path.join(self.current_dir, "..", "readme", f"{self.name_without_version}.md")
         target_path = os.path.join(self.prefix["llvm"], "README.md")
         shutil.copyfile(readme_path, target_path)
+
+    def change_name(self) -> None:
+        name = os.path.join(self.home_dir, self.name)
+        os.rename(name, f"{name}-old")
+        os.rename(self.prefix["llvm"], name)
 
     def package(self) -> None:
         """打包工具链"""
