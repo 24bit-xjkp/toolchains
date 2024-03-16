@@ -14,11 +14,11 @@ def run_command(command: str) -> None:
 
 lib_list = ("libxml2", "zlib")
 system_list: dict[str, str] = {
-    "x86_64-linux-gnu": "Linux",
-    "i686-linux-gnu": "Linux",
-    "aarch64-linux-gnu": "Linux",
-    "riscv64-linux-gnu": "Linux",
-    "loongarch64-linux-gnu": "Linux",
+    # "x86_64-linux-gnu": "Linux",
+    # "i686-linux-gnu": "Linux",
+    # "aarch64-linux-gnu": "Linux",
+    # "riscv64-linux-gnu": "Linux",
+    # "loongarch64-linux-gnu": "Linux",
     "x86_64-w64-mingw32": "Windows",
     "i686-w64-mingw32": "Windows",
 }
@@ -44,8 +44,8 @@ def gnu_to_llvm(target: str) -> str:
 
 
 def overwrite_copy(src: str, dst: str):
-    if os.path.exists(src):
-        os.remove(src)
+    if os.path.exists(dst):
+        os.remove(dst)
     shutil.copyfile(src, dst)
 
 
@@ -80,7 +80,7 @@ class environment:
         "LLVM_INCLUDE_EXAMPLES": "OFF",
         "LLVM_INCLUDE_TESTS": "OFF",
         "LLVM_TARGETS_TO_BUILD": '"X86;AArch64;WebAssembly;RISCV;ARM;LoongArch"',
-        "LLVM_ENABLE_PROJECTS": '"clang;lld;compiler-rt"',
+        "LLVM_ENABLE_PROJECTS": '"clang;lld"',
         "LLVM_ENABLE_RUNTIMES": '"libcxx;libcxxabi;libunwind;compiler-rt"',
         "LLVM_ENABLE_WARNINGS": "OFF",
         "LLVM_INCLUDE_TESTS": "OFF",
@@ -103,7 +103,7 @@ class environment:
         "LLVM_ENABLE_RUNTIMES": '"libcxx;libunwind;compiler-rt"',
         "LIBCXX_CXX_ABI": "libsupc++",
     }
-    llvm_option_list_w32_1: dict[str, str] = llvm_option_list_w64_1.copy()
+    llvm_option_list_w32_1: dict[str, str] = {**llvm_option_list_w64_1}
     llvm_option_list_la_1: dict[str, str] = {
         **llvm_option_list_1,
         "LLVM_ENABLE_LLD": "OFF",
@@ -204,6 +204,7 @@ class environment:
         if target != self.build:
             command_list.append(f"-DCMAKE_SYSTEM_NAME={system_list[target]}")
             command_list.append(f"-DCMAKE_SYSTEM_PROCESSOR={target[: target.find('-')]}")
+            command_list.append(f"-DCMAKE_SYSROOT='{self.sysroot_dir}'")
         command_list.append(f"-DLLVM_RUNTIMES_TARGET={target}")
         command_list.append(f"-DLLVM_DEFAULT_TARGET_TRIPLE={target}")
         command_list.append(f"-DLLVM_HOST_TRIPLE={gnu_to_llvm(self.host)}")
@@ -213,8 +214,7 @@ class environment:
         assert project in subproject_list
         prefix = self.prefix[project]
         command = f"cmake -G Ninja --install-prefix {prefix} -B {self.build_dir[project]} -S {self.source_dir[project]} "
-        command += " ".join(self.get_compiler(target, *command_list) + get_cmake_option(**cmake_option_list)) + " "
-        command += " ".join(get_cmake_option(**self.llvm_option_list_1))
+        command += " ".join(self.get_compiler(target, *command_list) + get_cmake_option(**cmake_option_list))
         run_command(command)
 
     def make(self, target: str) -> None:
@@ -247,11 +247,13 @@ class environment:
                     dst_dir = os.path.join(self.sysroot_dir, target, "lib")
                     for item in os.listdir(src_dir):
                         if item == system_list[target].lower():
+                            item = item.lower()
                             rt_dir = os.path.join(self.compiler_rt_dir, item)
                             if not os.path.exists(rt_dir):
                                 os.mkdir(rt_dir)
                             for file in os.listdir(os.path.join(src_dir, item)):
                                 overwrite_copy(os.path.join(src_dir, item, file), os.path.join(rt_dir, file))
+                            continue
                         overwrite_copy(os.path.join(src_dir, item), os.path.join(dst_dir, item))
                 case "include":
                     dst_dir = os.path.join(self.sysroot_dir, target, "include")

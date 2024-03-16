@@ -12,9 +12,7 @@ def build(stage: int = env.stage) -> None:
         env.make("llvm")
         env.install("llvm")
         env.remove_build_dir("llvm")
-        for target, _ in llvm.system_list:
-            if target == env.host:
-                continue
+        for target in llvm.system_list.keys():
             match target:
                 case "x86_64-w64-mingw32":
                     option = env.llvm_option_list_w64_1
@@ -24,7 +22,7 @@ def build(stage: int = env.stage) -> None:
                     option = env.llvm_option_list_la_1
                 case _:
                     option = env.llvm_option_list_1
-            env.config("runtimes", env.host, **option)
+            env.config("runtimes", target, **option)
             env.make("runtimes")
             env.install("runtimes")
             env.build_sysroot(target)
