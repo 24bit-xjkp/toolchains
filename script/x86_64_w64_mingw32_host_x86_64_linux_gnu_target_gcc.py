@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import gcc_environment as gcc
 
-env = gcc.environment("14", host="x86_64-w64-mingw32", target="x86_64-linux-gnu")
+env = gcc.environment(host="x86_64-w64-mingw32", target="x86_64-linux-gnu")
 
 
 def build() -> None:

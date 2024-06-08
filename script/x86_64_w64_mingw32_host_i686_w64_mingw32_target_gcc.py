@@ -5,7 +5,7 @@ from x86_64_linux_gnu_host_i686_w64_mingw32_target_gcc import env as cross_env
 import shutil
 import os
 
-env = gcc.environment("14", host="x86_64-w64-mingw32", target="i686-w64-mingw32")
+env = gcc.environment(host="x86_64-w64-mingw32", target="i686-w64-mingw32")
 
 
 def build() -> None:

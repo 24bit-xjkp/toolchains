@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import gcc_environment as gcc
 
-env = gcc.environment("14")
+env = gcc.environment()
 
 
 def build() -> None:

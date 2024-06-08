@@ -5,7 +5,7 @@ import x86_64_linux_gnu_native_gcc as native_gcc
 import os
 import shutil
 
-env = gcc.environment("14", target="arm-none-eabi")
+env = gcc.environment(target="arm-none-eabi")
 
 
 def copy_lib(env: gcc.environment = env) -> None:

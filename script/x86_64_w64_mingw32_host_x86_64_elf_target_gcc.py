@@ -5,7 +5,7 @@ from x86_64_w64_mingw32_host_arm_none_eabi_target_gcc import copy_lib
 from x86_64_w64_mingw32_native_gcc import build_gdb_requirements
 from x86_64_linux_gnu_host_arm_none_eabi_target_gcc import copy_pretty_printer
 
-env = gcc.environment("14", host="x86_64-w64-mingw32", target="x86_64-elf")
+env = gcc.environment(host="x86_64-w64-mingw32", target="x86_64-elf")
 
 
 def build() -> None:

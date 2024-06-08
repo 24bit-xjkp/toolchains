@@ -5,7 +5,7 @@ from x86_64_linux_gnu_host_x86_64_w64_mingw32_target_gcc import env as cross_env
 import os
 import shutil
 
-env = gcc.environment("14", host="x86_64-w64-mingw32")
+env = gcc.environment(host="x86_64-w64-mingw32")
 lib_install_dir_list: dict[str, str] = {}
 for lib in ("gmp", "expat", "iconv", "mpfr"):
     lib_install_dir_list[lib] = os.path.join(env.home_dir, lib, "install")

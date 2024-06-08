@@ -4,7 +4,7 @@ import gcc_environment as gcc
 from x86_64_linux_gnu_host_arm_none_eabi_target_gcc import copy_lib
 from x86_64_linux_gnu_host_arm_none_eabi_target_gcc import copy_pretty_printer
 
-env = gcc.environment("14", target="x86_64-elf")
+env = gcc.environment(target="x86_64-elf")
 
 
 def build() -> None:

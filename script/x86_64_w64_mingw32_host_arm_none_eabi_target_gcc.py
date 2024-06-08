@@ -7,7 +7,7 @@ from x86_64_w64_mingw32_native_gcc import build_gdb_requirements
 import shutil
 import os
 
-env = gcc.environment("14", host="x86_64-w64-mingw32", target="arm-none-eabi")
+env = gcc.environment(host="x86_64-w64-mingw32", target="arm-none-eabi")
 
 
 def copy_lib(env: gcc.environment = env) -> None:

@@ -77,8 +77,8 @@ class environment:
     rpath_option: str  # < 设置rpath的链接选项
     rpath_dir: str  # < rpath所在目录
 
-    def __init__(self, major_version: str, build: str = "x86_64-linux-gnu", host: str = "", target: str = "") -> None:
-        self.major_version = major_version
+    def __init__(self, build: str = "x86_64-linux-gnu", host: str = "", target: str = "") -> None:
+        self.major_version = "15"
         self.build = build
         self.host = host if host != "" else build
         self.target = target if target != "" else self.host
@@ -93,7 +93,7 @@ class environment:
             self.toolchain_type = "canadian cross"
         self.cross_compiler = self.host != self.target
         self.name_without_version = (f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native") + "-gcc"
-        self.name = self.name_without_version + major_version
+        self.name = self.name_without_version + self.major_version
         self.home_dir = ""
         for option in sys.argv:
             if option.startswith("--home="):
@@ -128,11 +128,11 @@ class environment:
         self.rpath_option = f'"-Wl,-rpath={lib_name}"'
         # 加载工具链
         if self.toolchain_type in ("cross", "canadian", "canadian cross"):
-            environment(major_version).register_in_env()
+            environment().register_in_env()
         if self.toolchain_type in ("canadian", "canadian cross"):
-            environment(major_version, target=self.host).register_in_env()
+            environment(target=self.host).register_in_env()
         if self.toolchain_type == "canadian cross":
-            environment(major_version, target=self.target).register_in_env()
+            environment(target=self.target).register_in_env()
         # 将自身注册到环境变量中
         self.register_in_env()
 

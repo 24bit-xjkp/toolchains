@@ -6,7 +6,7 @@ from x86_64_w64_mingw32_native_gcc import build_gdb_requirements
 import os
 import shutil
 
-env = gcc.environment("14", target="x86_64-ubuntu2004-linux-gnu")
+env = gcc.environment(target="x86_64-ubuntu2004-linux-gnu")
 
 
 def adjust_glibc(env: gcc.environment = env, is_32bit: bool = False) -> None:

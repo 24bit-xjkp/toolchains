@@ -3,7 +3,7 @@
 import gcc_environment as gcc
 import os
 
-env = gcc.environment("14", target="i686-linux-gnu")
+env = gcc.environment(target="i686-linux-gnu")
 
 
 def build() -> None:
