@@ -18,7 +18,7 @@
 - g++
 - binutils
 - gold
-- gdb (需要python3.11)
-- Python3.11.6 embed package
+- gdb (需要python3.12.3)
+- Python3.12.3 embed package
 - .gdbinit (位于share下)
 - 调试符号：libgcc libstdc++

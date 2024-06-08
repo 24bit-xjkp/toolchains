@@ -18,6 +18,6 @@
 - gcc
 - g++
 - binutils
-- gdb(需要python3.11)
+- gdb(需要python3.12.3)
 - glibc
 - linux header

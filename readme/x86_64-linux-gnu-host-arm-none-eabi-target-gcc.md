@@ -18,6 +18,6 @@
 - g++
 - binutils
 - gold
-- gdb (需要python3.11)
+- gdb (需要python3.12.3)
 - .gdbinit (位于share下)
 - 调试符号：libgcc libstdc++
