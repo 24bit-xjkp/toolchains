@@ -9,7 +9,7 @@
 ## 版本
 
 - GCC：15.0.0
-- GDB：15.0.50
+- GDB：16.0.50
 - Binutils：2.42.50
 - Mingw-w64：10.0.0
 - PExports：0.47
