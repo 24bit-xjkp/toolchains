@@ -323,11 +323,18 @@ class environment:
             os.remove(dst_path)
             shutil.copyfile(src_path, dst_path)
 
-    def adjust_glibc(self, arch: str = ""):
+    def adjust_glibc(self, arch: str = "") -> None:
         """调整glibc"""
         self.remove_unused_glibc_file()
         self.strip_glibc_file()
         self.change_glibc_ldscript(arch)
+
+    def solve_libgcc_limits(self) -> None:
+        """解决libgcc的limits.h中提供错误MB_LEN_MAX的问题"""
+        libgcc_prefix = os.path.join(self.prefix, "lib", "gcc", self.target)
+        include_dir = os.path.join(libgcc_prefix, os.listdir(libgcc_prefix)[0], "include")
+        with open(os.path.join(include_dir, "limits.h"), "a") as file:
+            file.writelines(("#undef MB_LEN_MAX\n", "#define MB_LEN_MAX 16\n"))
 
 
 assert __name__ != "__main__", "Import this file instead of running it directly."

@@ -117,7 +117,7 @@ unset ORIGIN
 
 ### 6.创建.gdbinit
 
-由`libstdc++.so.6.0.33-gdb.py`配置pretty-printer：
+由`libstdc++.so.6.0.33-gdb.py`配置pretty-printer，完成后转至[第7步](#7修改libstdc的python支持)：
 
 ```python
 # share/.gdbinit
@@ -132,7 +132,7 @@ gdb.execute(f"source {scriptPath}")
 end
 ```
 
-由`share/.gdbinit`直接配置pretty-printer，完成后直接跳转至[第9步](#9打包工具链)：
+由`share/.gdbinit`直接配置pretty-printer，完成后直接跳转至[第8步](#8剥离调试符号到独立符号文件)：
 
 ```python
 # share/.gdbinit
@@ -1120,6 +1120,118 @@ cp lib64/libgcc_s.so.1 $PREFIX/lib64
 ```
 
 ### 75.打包工具链
+
+```shell
+cd ~
+cp ~/toolchains/script/.gdbinit $PREFIX/share
+export PACKAGE=$HOST-host-$TARGET-target-gcc15
+tar -cf $PACKAGE.tar $PACKAGE/
+xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
+```
+
+## 构建到loongarch64-linux-gnu的交叉工具链
+
+| build            | host             | target                      |
+| :--------------- | :--------------- | :-------------------------- |
+| x86_64-linux-gnu | x86_64-linux-gnu | loongarch64-linux-gnu |
+
+值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台。为了和本地工具链加以区分，此处修改交叉工具链的vender字段。在vender字段中亦可以添加目标系统的版本以示区分。
+值得注意的是，此处目标系统为ubuntu 20.04，使用的libc为glibc 2.30。交叉工具链的glibc要与目标系统匹配。由于x32已经濒临淘汰，故此处不再编译x32的multilib。
+
+### 76.设置环境变量
+
+```shell
+export BUILD=x86_64-linux-gnu
+export HOST=$BUILD
+export TARGET=loongarch64-linux-gnu
+export PREFIX=~/$HOST-host-$TARGET-target-gcc15
+```
+
+### 77.编译binutils和gdb
+
+```shell
+cd ~/binutils/build
+rm -rf *
+export ORIGIN='$$ORIGIN'
+../configure --disable-werror --enable-nls --target=$TARGET --prefix=$PREFIX --disable-gdbserver--with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64"
+make -j 20
+make install-strip -j 20
+unset ORIGIN
+echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### 78.安装Linux头文件
+
+```shell
+cd ~/linux
+make ARCH=loongarch INSTALL_HDR_PATH=$PREFIX/$TARGET headers_install
+```
+
+### 79.编译安装gcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++ --disable-shared
+make all-gcc -j 20
+make install-strip-gcc -j 20
+```
+
+### 80.安装glibc头文件
+
+```shell
+cd ~/glibc
+mkdir build
+cd build
+../configure --host=$TARGET --build=$BUILD --prefix=$PREFIX/$TARGET --disable-werror libc_cv_forced_unwind=yes
+make install-headers
+touch $PREFIX/$TARGET/include/gnu/stubs.h
+```
+
+### 81.编译安装libgcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++ --disable-shared
+make all-target-libgcc -j 20
+make install-strip-target-gcc -j 20
+```
+
+### 82.修改链接器脚本
+
+需要修改`lib/libc.so`为使用相对路径：
+
+```ldscript
+// lib/libc.so
+OUTPUT_FORMAT(elf64-loongarch)
+GROUP (libc.so.6 libc_nonshared.a AS_NEEDED(ld-linux-loongarch-lp64d.so.1))
+```
+
+### 83.编译完整gcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++
+make -j 20
+make install-strip -j 20
+# 单独安装带调试符号的库文件
+make install-target-libgcc install-target-libstdc++-v3 install-target-libatomic install-target-libquadmath install-target-libgomp -j 20
+```
+
+### 84.从其他工具链中复制所需库
+
+从[x86_64-linux-gnu本地工具链](#构建gcc本地工具链)中复制动态库：
+
+```shell
+cd ~/$BUILD-host-$HOST-target-gcc15/$HOST
+cp lib64/libstdc++.so.6 $PREFIX/lib64
+cp lib64/libgcc_s.so.1 $PREFIX/lib64
+```
+
+### 85.打包工具链
 
 ```shell
 cd ~
