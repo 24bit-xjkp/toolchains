@@ -4,11 +4,11 @@
 
 | 项目      | 版本         |
 | :-------- | :----------- |
-| OS        | Ubuntu 23.10 |
-| GCC       | 14.0.1       |
+| OS        | Ubuntu 24.04 |
+| GCC       | 15.0.0       |
 | GDB       | 15.0.50      |
 | Binutils  | 2.42.50      |
-| Python    | 3.11.6       |
+| Python    | 3.12.3       |
 | Glibc     | 2.38         |
 | Mingw-w64 | 10.0.0       |
 | PExports  | 0.47         |
@@ -40,20 +40,20 @@ cd ~/pexports
 autoreconf -if
 cd ~
 # 编译Windows下带有Python支持的gdb需要嵌入式Python3环境
-wget https://www.python.org/ftp/python/3.11.6/python-3.11.6-embed-amd64.zip -O python-embed.zip
+wget https://www.python.org/ftp/python/3.12.3/python-3.12.3-embed-amd64.zip -O python-embed.zip
 unzip -o python-embed.zip  python3*.dll python3*.zip *._pth -d python-embed -x python3.dll
 rm python-embed.zip
 # 下载Python源代码以提取include目录
-wget https://www.python.org/ftp/python/3.11.6/Python-3.11.6.tar.xz -O Python.tar.xz
+wget https://www.python.org/ftp/python/3.12.3/Python-3.12.3.tar.xz -O Python.tar.xz
 tar -xaf Python.tar.xz
 rm Python.tar.xz
-cd Python-3.11.6/Include
+cd Python-3.12.3/Include
 mkdir ~/python-embed/include
 cp -r * ~/python-embed/include
 cd ../PC
 cp pyconfig.h ~/python-embed/include
 cd ~
-rm -rf Python-3.11.6
+rm -rf Python-3.12.3
 wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.17.tar.gz -O iconv.tar.gz
 tar -axf iconv.tar.gz
 rm iconv.tar.gz
@@ -78,7 +78,7 @@ cd ~
 ### 4.编译安装gcc
 
 ```shell
-export PREFIX=~/x86_64-linux-gnu-native-gcc14
+export PREFIX=~/x86_64-linux-gnu-native-gcc15
 cd ~/gcc
 mkdir build
 cd build
@@ -165,9 +165,9 @@ import gdb
 import os
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-# pretty-printer所需的python脚本位于share/gcc-14.0.1/python下
+# pretty-printer所需的python脚本位于share/gcc-15.0.0/python下
 # 故使用哪个libstdc++.so.6.0.33-gdb.py都不影响结果，此处选择lib64下的
-python_dir  = os.path.normpath(os.path.join(current_dir, "../share/gcc-14.0.1/python"))
+python_dir  = os.path.normpath(os.path.join(current_dir, "../share/gcc-15.0.0/python"))
 if not python_dir in sys.path:
     sys.path.insert(0, python_dir)
 # 注册pretty-printer
@@ -201,8 +201,8 @@ objcopy --add-gnu-debuglink=$PREFIX/lib64/libgcc_s.so.1.debug $PREFIX/lib64/libg
 cd ~
 cp ~/toolchains/script/.gdbinit $PREFIX/share
 export MEMORY=$(cat /proc/meminfo | awk '/MemTotal/ {printf "%dGiB\n", int($2/1024/1024)}')
-tar -cf x86_64-linux-gnu-native-gcc14.tar x86_64-linux-gnu-native-gcc14/
-xz -ev9 -T 0 --memlimit=$MEMORY x86_64-linux-gnu-native-gcc14.tar
+tar -cf x86_64-linux-gnu-native-gcc15.tar x86_64-linux-gnu-native-gcc15/
+xz -ev9 -T 0 --memlimit=$MEMORY x86_64-linux-gnu-native-gcc15.tar
 ```
 
 ## 构建mingw[交叉工具链](https://en.wikipedia.org/wiki/Cross_compiler)
@@ -216,7 +216,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY x86_64-linux-gnu-native-gcc14.tar
 ```shell
 export TARGET=x86_64-w64-mingw32
 export HOST=x86_64-linux-gnu
-export PREFIX=~/$HOST-host-$TARGET-target-gcc14
+export PREFIX=~/$HOST-host-$TARGET-target-gcc15
 ```
 
 ### 11.编译安装binutils
@@ -256,16 +256,16 @@ make install-strip-gcc install-strip-target-libgcc -j 20
 遇到如下情况：
 
 ```log
-/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 dllcrt2.o: 没有那个文件或目录
-/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -lmingwthrd: 没有那个文件或目录
-/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -lmingw32: 没有那个文件或目录
-/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -lmingwex: 没有那个文件或目录
-/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -lmoldname: 没有那个文件或目录
-/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -lmsvcrt: 没有那个文件或目录
-/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -ladvapi32: 没有那个文件或目录
-/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -lshell32: 没有那个文件或目录
-/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -luser32: 没有那个文件或目录
-/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc14/x86_64-w64-mingw32/bin/ld: 找不到 -lkernel32: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc15/x86_64-w64-mingw32/bin/ld: 找不到 dllcrt2.o: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc15/x86_64-w64-mingw32/bin/ld: 找不到 -lmingwthrd: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc15/x86_64-w64-mingw32/bin/ld: 找不到 -lmingw32: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc15/x86_64-w64-mingw32/bin/ld: 找不到 -lmingwex: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc15/x86_64-w64-mingw32/bin/ld: 找不到 -lmoldname: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc15/x86_64-w64-mingw32/bin/ld: 找不到 -lmsvcrt: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc15/x86_64-w64-mingw32/bin/ld: 找不到 -ladvapi32: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc15/x86_64-w64-mingw32/bin/ld: 找不到 -lshell32: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc15/x86_64-w64-mingw32/bin/ld: 找不到 -luser32: 没有那个文件或目录
+/home/luo/x86_64-linux-gnu-host-x86_64-w64-mingw32-cross-gcc15/x86_64-w64-mingw32/bin/ld: 找不到 -lkernel32: 没有那个文件或目录
 ```
 
 尝试禁用动态库编译出gcc和libgcc
@@ -336,7 +336,7 @@ mv $PREFIX/bin/pexports $PREFIX/bin/$TARGET-pexports
 
 ```shell
 cd ~
-export PACKAGE=$HOST-host-$TARGET-target-gcc14
+export PACKAGE=$HOST-host-$TARGET-target-gcc15
 tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 ```
@@ -353,7 +353,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 export BUILD=x86_64-linux-gnu
 export HOST=x86_64-w64-mingw32
 export TARGET=$HOST
-export PREFIX=~/$HOST-native-gcc14
+export PREFIX=~/$HOST-native-gcc15
 ```
 
 ### 20.编译安装gcc
@@ -392,7 +392,7 @@ libstdc++-6.dll:   PE32 executable (DLL) (console) Intel 80386 (stripped to exte
 
 ```shell
 rm *.dll
-cd ~/$BUILD-host-$TARGET-target-gcc14/$TARGET
+cd ~/$BUILD-host-$TARGET-target-gcc15/$TARGET
 # ldscripts会在后续安装binutils时安装
 cp -n lib/* $PREFIX/lib
 cp -n lib32/* $PREFIX/lib32
@@ -550,7 +550,7 @@ cp python* $PREFIX/bin
 ```shell
 cd ~
 cp ~/toolchains/script/.gdbinit $PREFIX/share
-export PACKAGE=$HOST-native-gcc14
+export PACKAGE=$HOST-native-gcc15
 tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 ```
@@ -575,7 +575,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 export BUILD=x86_64-linux-gnu
 export HOST=$BUILD
 export TARGET=arm-none-eabi
-export PREFIX=~/$HOST-host-$TARGET-target-gcc14
+export PREFIX=~/$HOST-host-$TARGET-target-gcc15
 ```
 
 ### 33.编译binutils和gdb
@@ -610,10 +610,10 @@ make install-target-libstdc++-v3 install-target-libgcc -j 20
 编译出的arm-none-eabi-gdb依赖libstdc++，故需要从[gcc本地工具链](#构建gcc本地工具链)中复制一份。同时独立工具链不会安装pretty-printer，故也需要复制一份。
 
 ```shell
-cd ~/$BUILD-native-gcc14
+cd ~/$BUILD-native-gcc15
 cp lib64/libstdc++.so.6 $PREFIX/lib64
 cp lib64/libgcc_s.so.1 $PREFIX/lib64
-cp -r share/gcc-14.0.1 $PREFIX/share
+cp -r share/gcc-15.0.0 $PREFIX/share
 ```
 
 ### 36.打包工具链
@@ -621,7 +621,7 @@ cp -r share/gcc-14.0.1 $PREFIX/share
 ```shell
 cd ~
 cp ~/toolchains/script/.gdbinit $PREFIX/share
-export PACKAGE=$HOST-host-$TARGET-target-gcc14
+export PACKAGE=$HOST-host-$TARGET-target-gcc15
 tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 ```
@@ -638,7 +638,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 export BUILD=x86_64-linux-gnu
 export HOST=x86_64-w64-mingw32
 export TARGET=arm-none-eabi
-export PREFIX=~/$HOST-host-$TARGET-target-gcc14
+export PREFIX=~/$HOST-host-$TARGET-target-gcc15
 ```
 
 ### 38.准备编译gdb所需的库
@@ -675,7 +675,7 @@ make install-target-libstdc++-v3 install-target-libgcc -j 20
 从[mingw交叉工具链](#构建mingw交叉工具链)中复制动态库：
 
 ```shell
-cd ~/$BUILD-host-$HOST-target-gcc14/$HOST
+cd ~/$BUILD-host-$HOST-target-gcc15/$HOST
 cp lib/libstdc++-6.dll $PREFIX/bin
 cp lib/libgcc_s_seh-1.dll $PREFIX/bin
 ```
@@ -683,8 +683,8 @@ cp lib/libgcc_s_seh-1.dll $PREFIX/bin
 从[gcc本地工具链](#构建gcc本地工具链)中复制pretty-printer：
 
 ```shell
-cd ~/$BUILD-native-gcc14
-cp -r share/gcc-14.0.1 $PREFIX/share
+cd ~/$BUILD-native-gcc15
+cp -r share/gcc-15.0.0 $PREFIX/share
 ```
 
 ### 42.打包工具链
@@ -692,7 +692,7 @@ cp -r share/gcc-14.0.1 $PREFIX/share
 ```shell
 cd ~
 cp ~/toolchains/script/.gdbinit $PREFIX/share
-export PACKAGE=$HOST-host-$TARGET-target-gcc14
+export PACKAGE=$HOST-host-$TARGET-target-gcc15
 tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 ```
@@ -711,7 +711,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 export BUILD=x86_64-linux-gnu
 export HOST=$BUILD
 export TARGET=x86_64-elf
-export PREFIX=~/$HOST-host-$TARGET-target-gcc14
+export PREFIX=~/$HOST-host-$TARGET-target-gcc15
 ```
 
 ### 44.编译binutils和gdb
@@ -742,10 +742,10 @@ make install-target-libstdc++-v3 install-target-libgcc -j 20
 ### 46.复制库和pretty-printer
 
 ```shell
-cd ~/$BUILD-native-gcc14
+cd ~/$BUILD-native-gcc15
 cp lib64/libstdc++.so.6 $PREFIX/lib64
 cp lib64/libgcc_s.so.1 $PREFIX/lib64
-cp -r share/gcc-14.0.1 $PREFIX/share
+cp -r share/gcc-15.0.0 $PREFIX/share
 ```
 
 ### 47.打包工具链
@@ -753,7 +753,7 @@ cp -r share/gcc-14.0.1 $PREFIX/share
 ```shell
 cd ~
 cp ~/toolchains/script/.gdbinit $PREFIX/share
-export PACKAGE=$HOST-host-$TARGET-target-gcc14
+export PACKAGE=$HOST-host-$TARGET-target-gcc15
 tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 ```
@@ -770,7 +770,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 export BUILD=x86_64-linux-gnu
 export HOST=x86_64-w64-mingw32
 export TARGET=x86_64-elf
-export PREFIX=~/$HOST-host-$TARGET-target-gcc14
+export PREFIX=~/$HOST-host-$TARGET-target-gcc15
 ```
 
 ### 49.准备编译gdb所需的库
@@ -807,7 +807,7 @@ make install-target-libstdc++-v3 install-target-libgcc -j 20
 从[mingw交叉工具链](#构建mingw交叉工具链)中复制动态库：
 
 ```shell
-cd ~/$BUILD-host-$HOST-target-gcc14/$HOST
+cd ~/$BUILD-host-$HOST-target-gcc15/$HOST
 cp lib/libstdc++-6.dll $PREFIX/bin
 cp lib/libgcc_s_seh-1.dll $PREFIX/bin
 ```
@@ -815,8 +815,8 @@ cp lib/libgcc_s_seh-1.dll $PREFIX/bin
 从[gcc本地工具链](#构建gcc本地工具链)中复制pretty-printer：
 
 ```shell
-cd ~/$BUILD-native-gcc14
-cp -r share/gcc-14.0.1 $PREFIX/share
+cd ~/$BUILD-native-gcc15
+cp -r share/gcc-15.0.0 $PREFIX/share
 ```
 
 ### 53.打包工具链
@@ -824,7 +824,7 @@ cp -r share/gcc-14.0.1 $PREFIX/share
 ```shell
 cd ~
 cp ~/toolchains/script/.gdbinit $PREFIX/share
-export PACKAGE=$HOST-host-$TARGET-target-gcc14
+export PACKAGE=$HOST-host-$TARGET-target-gcc15
 tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 ```
@@ -844,7 +844,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 export BUILD=x86_64-linux-gnu
 export HOST=$BUILD
 export TARGET=x86_64-ubuntu2004-linux-gnu
-export PREFIX=~/$HOST-host-$TARGET-target-gcc14
+export PREFIX=~/$HOST-host-$TARGET-target-gcc15
 ```
 
 ### 55.编译gdb
@@ -960,7 +960,7 @@ $TARGET-strip *.so
    Use the shared library, but some functions are only in
    the static library, so try that secondarily.  */
 OUTPUT_FORMAT(elf32-i386)
-GROUP ( /home/luo/x86_64-linux-gnu-host-x86_64-ubuntu2004-linux-gnu-target-gcc14/x86_64-ubuntu2004-linux-gnu/lib/libc.so.6 /home/luo/x86_64-linux-gnu-host-x86_64-ubuntu2004-linux-gnu-target-gcc14/x86_64-ubuntu2004-linux-gnu/lib/libc_nonshared.a  AS_NEEDED ( /home/luo/x86_64-linux-gnu-host-x86_64-ubuntu2004-linux-gnu-target-gcc14/x86_64-ubuntu2004-linux-gnu/lib/ld-linux.so.2 ) )
+GROUP ( /home/luo/x86_64-linux-gnu-host-x86_64-ubuntu2004-linux-gnu-target-gcc15/x86_64-ubuntu2004-linux-gnu/lib/libc.so.6 /home/luo/x86_64-linux-gnu-host-x86_64-ubuntu2004-linux-gnu-target-gcc15/x86_64-ubuntu2004-linux-gnu/lib/libc_nonshared.a  AS_NEEDED ( /home/luo/x86_64-linux-gnu-host-x86_64-ubuntu2004-linux-gnu-target-gcc15/x86_64-ubuntu2004-linux-gnu/lib/ld-linux.so.2 ) )
 ```
 
 可以看到其中使用的是绝对地址，这会导致移动安装位置后，无法正确链接。故需要修改为使用相对路径：
@@ -1085,7 +1085,7 @@ lib32目录下是纯净的glibc文件，故以lib32为参照经行文件复制�
 import shutil
 import os
 home_dir = os.environ["HOME"]
-lib_prefix = os.path.join(home_dir, "x86_64-linux-gnu-host-x86_64-ubuntu2004-linux-gnu-gcc14", "x86_64-ubuntu2004-linux-gnu")
+lib_prefix = os.path.join(home_dir, "x86_64-linux-gnu-host-x86_64-ubuntu2004-linux-gnu-gcc15", "x86_64-ubuntu2004-linux-gnu")
 lib_dir = os.path.join(env.lib_prefix, "lib")
 lib32_dir = os.path.join(env.lib_prefix, "lib32")
 lib64_dir = os.path.join(env.lib_prefix, "lib64")
@@ -1111,7 +1111,7 @@ mov lib32/* lib
 从[x86_64-linux-gnu本地工具链](#构建gcc本地工具链)中复制动态库：
 
 ```shell
-cd ~/$BUILD-host-$HOST-target-gcc14/$HOST
+cd ~/$BUILD-host-$HOST-target-gcc15/$HOST
 cp lib64/libstdc++.so.6 $PREFIX/lib64
 cp lib64/libgcc_s.so.1 $PREFIX/lib64
 ```
@@ -1121,7 +1121,7 @@ cp lib64/libgcc_s.so.1 $PREFIX/lib64
 ```shell
 cd ~
 cp ~/toolchains/script/.gdbinit $PREFIX/share
-export PACKAGE=$HOST-host-$TARGET-target-gcc14
+export PACKAGE=$HOST-host-$TARGET-target-gcc15
 tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 ```
