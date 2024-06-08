@@ -62,7 +62,7 @@ def build() -> None:
     env.enter_build_dir("binutils")
     env.configure(basic_option, f"--disable-gdb --host={env.target} --enable-gdbserver --disable-binutils")
     env.make()
-    env.install("install-strip-gdbserver install-strip-gdbsupport")
+    env.install("install-strip-gdbserver")
 
     # 复制gdb所需运行库
     copy_lib(env)
