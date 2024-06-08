@@ -1131,12 +1131,11 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 
 ## 构建到loongarch64-linux-gnu的交叉工具链
 
-| build            | host             | target                      |
-| :--------------- | :--------------- | :-------------------------- |
+| build            | host             | target                |
+| :--------------- | :--------------- | :-------------------- |
 | x86_64-linux-gnu | x86_64-linux-gnu | loongarch64-linux-gnu |
 
-值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台。为了和本地工具链加以区分，此处修改交叉工具链的vender字段。在vender字段中亦可以添加目标系统的版本以示区分。
-值得注意的是，此处目标系统为ubuntu 20.04，使用的libc为glibc 2.30。交叉工具链的glibc要与目标系统匹配。由于x32已经濒临淘汰，故此处不再编译x32的multilib。
+值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台，此处目标系统使用的libc为glibc 2.38。交叉工具链的glibc要与目标系统匹配。
 
 ### 76.设置环境变量
 
@@ -1248,12 +1247,99 @@ cp lib64/libgcc_s.so.1 $PREFIX/lib64
 cd ~/binutils/build
 rm -rf *
 ../configure --prefix=$PREFIX --host=$TARGET --target=$TARGET --disable-werror --disable-binutils --disable-gdb --enable-gdbserver --enable-nls
-make -j 24
+make -j 20
 # 其他工具的体系结构与host不同，覆盖host工具会导致错误，故只安装gdbserver
-make install-strip-gdbserver -j 24
+make install-strip-gdbserver -j 20
 ```
 
 ### 87.打包工具链
+
+```shell
+cd ~
+cp ~/toolchains/script/.gdbinit $PREFIX/share
+export PACKAGE=$HOST-host-$TARGET-target-gcc15
+tar -cf $PACKAGE.tar $PACKAGE/
+xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
+```
+
+## 构建mingw到loongarch64-linux-gnu的加拿大工具链
+
+| build            | host               | target                |
+| :--------------- | :----------------- | :-------------------- |
+| x86_64-linux-gnu | x86_64-w32-mingw64 | loongarch64-linux-gnu |
+
+值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台，此处目标系统使用的libc为glibc 2.38。交叉工具链的glibc要与目标系统匹配。
+
+### 88.设置环境变量
+
+```shell
+export BUILD=x86_64-linux-gnu
+export HOST=x86_64-w32-mingw64
+export TARGET=loongarch64-linux-gnu
+export PREFIX=~/$HOST-host-$TARGET-target-gcc15
+```
+
+### 89.编译binutils和gdb
+
+```shell
+cd ~/binutils/build
+rm -rf *
+export ORIGIN='$$ORIGIN'
+../configure --disable-werror --disable-nls --target=$TARGET --prefix=$PREFIX --disable-gdbserver --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/script/python_config.sh CXXFLAGS=-D_WIN32_WINNT=0x0600
+make -j 20
+make install-strip -j 20
+```
+
+### 90.安装Linux头文件
+
+```shell
+cd ~/linux
+make ARCH=loongarch INSTALL_HDR_PATH=$PREFIX/$TARGET headers_install
+```
+
+### 91.编译安装gcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --disable-nls --host=$HOST --target=$TARGET --prefix=$PREFIX --disbale-multilib --enable-languages=c,c++
+make -j 20
+make install-strip -j 20
+```
+
+### 92.安装glibc头文件
+
+```shell
+cd ~/glibc
+mkdir build
+cd build
+../configure --host=$TARGET --build=$BUILD --prefix=$PREFIX/$TARGET --disable-werror
+make -j 20
+make install -j 20
+```
+
+### 93.修改链接器脚本
+
+需要修改`lib/libc.so`为使用相对路径：
+
+```ldscript
+// lib/libc.so
+OUTPUT_FORMAT(elf64-loongarch)
+GROUP (libc.so.6 libc_nonshared.a AS_NEEDED(ld-linux-loongarch-lp64d.so.1))
+```
+
+### 94.编译gdbserver
+
+```shell
+cd ~/binutils/build
+rm -rf *
+../configure --prefix=$PREFIX --host=$TARGET --target=$TARGET --disable-werror --disable-binutils --disable-gdb --enable-gdbserver --enable-nls
+make -j 20
+# 其他工具的体系结构与host不同，覆盖host工具会导致错误，故只安装gdbserver
+make install-strip-gdbserver -j 20
+```
+
+### 95.打包工具链
 
 ```shell
 cd ~
