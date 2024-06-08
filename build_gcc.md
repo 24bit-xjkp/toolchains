@@ -1231,7 +1231,29 @@ cp lib64/libstdc++.so.6 $PREFIX/lib64
 cp lib64/libgcc_s.so.1 $PREFIX/lib64
 ```
 
-### 85.打包工具链
+### 85.修复libgcc的limits.h中MB_LEN_MAX定义不准确问题
+
+对limits.h文件末尾的修改如下：
+
+```c++
+// lib/gcc/loongarch64-linux-gnu/15.0.0/include/limits.h
+#endif /* _LIMITS_H___ */
+#undef MB_LEN_MAX
+#define MB_LEN_MAX 16
+```
+
+### 86.编译gdbserver
+
+```shell
+cd ~/binutils/build
+rm -rf *
+../configure --prefix=$PREFIX --host=$TARGET --target=$TARGET --disable-werror --disable-binutils --disable-gdb --enable-gdbserver --enable-nls
+make -j 24
+# 其他工具的体系结构与host不同，覆盖host工具会导致错误，故只安装gdbserver
+make install-strip-gdbserver -j 24
+```
+
+### 87.打包工具链
 
 ```shell
 cd ~
