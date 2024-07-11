@@ -22,7 +22,7 @@
 ### 1.安装系统包
 
 ```shell
-sudo apt install bison flex texinfo make automake autoconf libtool git gcc g++ gcc-multilib g++-multilib cmake ninja-build python3 tar xz-utils unzip libgmp-dev libmpfr-dev zlib1g-dev libexpat1-dev gawk
+sudo apt install bison flex texinfo make automake autoconf libtool git gcc g++ gcc-multilib g++-multilib cmake ninja-build python3 tar xz-utils unzip libgmp-dev libmpfr-dev zlib1g-dev libexpat1-dev gawk bzip2
 ```
 
 ### 2.下载源代码
@@ -32,7 +32,7 @@ git clone https://github.com/gcc-mirror/gcc.git --depth=1 gcc
 git clone https://github.com/bminor/binutils-gdb.git --depth=1 binutils
 git clone https://github.com/mirror/mingw-w64.git --depth=1 mingw
 git clone https://github.com/libexpat/libexpat.git --depth=1 expat
-cd  ~/expat
+cd  ~/expat/expat
 ./buildconf.sh
 cd ~
 git clone https://github.com/torvalds/linux.git --depth=1 linux
