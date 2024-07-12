@@ -1,0 +1,2 @@
+OUTPUT_FORMAT(elf64-littleaarch64)
+GROUP (libm.so.6 AS_NEEDED (libmvec.so.1 ))
