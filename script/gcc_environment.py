@@ -269,13 +269,6 @@ class environment:
         for symlink in self.symlink_list:
             os.unlink(symlink)
 
-    def make_sysroot_link(self) -> None:
-        """设置sysroot"""
-        path = os.path.join(self.lib_prefix, "lib", "gcc")
-        if not os.path.exists(path):
-            os.chdir(self.lib_prefix)
-            os.symlink("../../lib/gcc", path)
-
     def package(self, need_gdbinit: bool = True, need_python_embed_package: bool = False) -> None:
         """打包工具链
 
@@ -288,7 +281,6 @@ class environment:
         if need_python_embed_package:
             self.copy_python_embed_package()
         self.copy_readme()
-        self.make_sysroot_link()
         os.chdir(self.home_dir)
         run_command(f"tar -cf {self.name}.tar {self.name}")
         memory_MB = psutil.virtual_memory().available // 1048576 + 3072
