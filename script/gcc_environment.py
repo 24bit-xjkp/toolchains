@@ -306,7 +306,12 @@ class environment:
         os.system(f"{strip} {os.path.join(lib_dir, '*.so')}")
 
     def change_glibc_ldscript(self, arch: str = "") -> None:
-        """替换带有绝对路径的链接器脚本"""
+        """替换带有绝对路径的链接器脚本
+
+        Args:
+            arch (str, optional): glibc链接器脚本的arch字段，若为""则从target中推导. 默认为 "".
+                                  手动设置arch可以用于需要额外字段来区分链接器脚本的情况
+        """
         arch = arch if arch != "" else self.target[: self.target.find("-")]
         dst_dir = os.path.join(self.lib_prefix, "lib")
         for file in filter(lambda file: file.startswith(f"{arch}-lib"), os.listdir(self.current_dir)):
@@ -316,7 +321,10 @@ class environment:
             shutil.copyfile(src_path, dst_path)
 
     def adjust_glibc(self, arch: str = "") -> None:
-        """调整glibc"""
+        """调整glibc
+        Args:
+            arch (str, optional): glibc链接器脚本的arch字段，若为""则自动推导. 默认为 "".
+        """
         self.remove_unused_glibc_file()
         self.strip_glibc_file()
         self.change_glibc_ldscript(arch)
