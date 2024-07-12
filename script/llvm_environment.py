@@ -100,29 +100,31 @@ class environment:
     # 如果符号过多则Windows下需要该用该选项
     # dylib_option_list_windows: dict[str, str] = {"BUILD_SHARED_LIBS": "ON"}
     llvm_option_list_1: dict[str, str] = {  # < 第1阶段编译选项，同时构建工具链和运行库
-        "CMAKE_BUILD_TYPE": "Release",
-        "LLVM_BUILD_DOCS": "OFF",
-        "LLVM_BUILD_EXAMPLES": "OFF",
-        "LLVM_INCLUDE_BENCHMARKS": "OFF",
-        "LLVM_INCLUDE_EXAMPLES": "OFF",
-        "LLVM_INCLUDE_TESTS": "OFF",
-        "LLVM_TARGETS_TO_BUILD": '"X86;AArch64;WebAssembly;RISCV;ARM;LoongArch"',
-        "LLVM_ENABLE_PROJECTS": '"clang;lld"',
-        "LLVM_ENABLE_RUNTIMES": '"libcxx;libcxxabi;libunwind;compiler-rt"',
-        "LLVM_ENABLE_WARNINGS": "OFF",
-        "LLVM_INCLUDE_TESTS": "OFF",
-        "CLANG_INCLUDE_TESTS": "OFF",
-        "BENCHMARK_INSTALL_DOCS": "OFF",
-        "LLVM_INCLUDE_BENCHMARKS": "OFF",
-        "CLANG_DEFAULT_LINKER": "lld",
-        "LLVM_ENABLE_LLD": "ON",
-        "CMAKE_BUILD_WITH_INSTALL_RPATH": "ON",
-        "LIBCXX_INCLUDE_BENCHMARKS": "OFF",
-        "LIBCXX_USE_COMPILER_RT": "ON",
-        "LIBCXX_CXX_ABI": "libcxxabi",
-        "COMPILER_RT_DEFAULT_TARGET_ONLY": "ON",
-        "COMPILER_RT_BUILD_BUILTINS": "ON",
-        "COMPILER_RT_USE_LIBCXX": "ON",
+        "CMAKE_BUILD_TYPE": "Release",  # < 设置构建类型
+        "LLVM_BUILD_DOCS": "OFF",  # < 禁用llvm文档构建
+        "LLVM_BUILD_EXAMPLES": "OFF",  # < 禁用llvm示例构建
+        "LLVM_INCLUDE_BENCHMARKS": "OFF",  # < 禁用llvm基准测试构建
+        "LLVM_INCLUDE_EXAMPLES": "OFF",  # < llvm不包含示例
+        "LLVM_INCLUDE_TESTS": "OFF",  # < llvm不包含单元测试
+        "LLVM_TARGETS_TO_BUILD": '"X86;AArch64;WebAssembly;RISCV;ARM;LoongArch"',  # < 设置需要构建的目标
+        "LLVM_ENABLE_PROJECTS": '"clang;lld"',  # < 设置一同构建的子项目
+        "LLVM_ENABLE_RUNTIMES": '"libcxx;libcxxabi;libunwind;compiler-rt"',  # < 设置一同构建的运行时项目
+        "LLVM_ENABLE_WARNINGS": "OFF",  # < 禁用警告
+        "LLVM_INCLUDE_TESTS": "OFF",  # < llvm不包含单元测试
+        "CLANG_INCLUDE_TESTS": "OFF",  # < clang不包含单元测试
+        "BENCHMARK_INSTALL_DOCS": "OFF",  # < 基准测试不包含文档
+        "LLVM_INCLUDE_BENCHMARKS": "OFF",  # < llvm不包含基准测试
+        "CLANG_DEFAULT_LINKER": "lld",  # < 使用lld作为clang默认的链接器
+        "LLVM_ENABLE_LLD": "ON",  # < 使用lld链接llvm以加速链接
+        "CMAKE_BUILD_WITH_INSTALL_RPATH": "ON",  # < 在linux系统上设置rpath以避免动态库环境混乱
+        "LIBCXX_INCLUDE_BENCHMARKS": "OFF",  # < libcxx不包含测试
+        "LIBCXX_USE_COMPILER_RT": "ON",  # < 使用compiler-rt构建libcxx
+        "LIBCXX_CXX_ABI": "libcxxabi",  # 使用libcxxabi构建libcxx
+        "LIBCXXABI_USE_LLVM_UNWINDER": "ON",  # < 使用libunwind构建libcxxabi
+        "LIBCXXABI_USE_COMPILER_RT": "ON",  # < 使用compiler-rt构建libcxxabi
+        "LIBUNWIND_USE_COMPILER_RT": "ON",  # < 使用compiler-rt构建libunwind
+        "COMPILER_RT_DEFAULT_TARGET_ONLY": "ON",  # < compiler-rt只需构建默认目标即可，禁止自动构建multilib
+        "COMPILER_RT_USE_LIBCXX": "ON",  # < 使用libcxx构建compiler-rt
     }
     llvm_option_list_w64_1: dict[str, str] = {  # < win64运行时第1阶段编译选项
         **llvm_option_list_1,
@@ -249,7 +251,7 @@ class environment:
             list[str]: 编译选项
         """
         assert target in system_list
-        gcc = f"--gcc-toolchain={os.path.join(self.home_dir, 'sysroot')}"
+        gcc = f"--gcc-toolchain={self.sysroot_dir}"
         command_list: list[str] = []
         compiler_path = {"C": "clang", "CXX": "clang++", "ASM": "clang"}
         no_warning = "-Wno-unused-command-line-argument"
@@ -339,7 +341,6 @@ class environment:
                     for item in os.listdir(src_dir):
                         # 复制compiler-rt
                         if item == system_list[target].lower():
-                            item = item.lower()
                             rt_dir = os.path.join(self.compiler_rt_dir, item)
                             if not os.path.exists(rt_dir):
                                 os.mkdir(rt_dir)
