@@ -32,8 +32,7 @@ def build() -> None:
     env.enter_build_dir("glibc")
     env.configure(glibc_option, "libc_cv_forced_unwind=yes")
     env.make("install-headers")
-    with open(os.path.join(env.lib_prefix, "include", "gnu", "stubs.h"), "w+"):
-        pass
+    os.mknod(os.path.join(env.lib_prefix, "include", "gnu", "stubs.h"))
 
     # 编译安装libgcc
     env.enter_build_dir("gcc", False)

@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import gcc_environment as gcc
 from x86_64_linux_gnu_host_arm_none_eabi_target_gcc import copy_lib
-from x86_64_w64_mingw32_native_gcc import build_gdb_requirements
 import os
 import shutil
 
@@ -96,8 +95,7 @@ def build() -> None:
     env.configure(glibc_options)
     env.make("install-headers")
     # 创建include/gnu/stubs.h
-    with open(os.path.join(env.lib_prefix, "include", "gnu", "stubs.h"), "a"):
-        pass
+    os.mknod(os.path.join(env.lib_prefix, "include", "gnu", "stubs.h"))
 
     # 编译安装gcc和libgcc
     env.enter_build_dir("gcc")
