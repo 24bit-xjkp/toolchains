@@ -9,7 +9,7 @@
 | GDB       | 16.0.50      |
 | Binutils  | 2.42.50      |
 | Python    | 3.12.3       |
-| Glibc     | 2.38         |
+| Glibc     | 2.39         |
 | Mingw-w64 | 10.0.0       |
 | PExports  | 0.47         |
 | Iconv     | 1.17         |
@@ -37,7 +37,7 @@ cd  ~/expat/expat
 cd ~
 git clone https://github.com/torvalds/linux.git --depth=1 linux
 # glibc版本要与目标系统使用的版本对应
-git clone https://github.com/bminor/glibc.git -b release/2.38/master --depth=1 glibc
+git clone https://github.com/bminor/glibc.git -b release/2.39/master --depth=1 glibc
 git clone https://github.com/bocke/pexports.git --depth=1 pexports
 cd ~/pexports
 autoreconf -if
@@ -1135,7 +1135,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 | :--------------- | :--------------- | :-------------------- |
 | x86_64-linux-gnu | x86_64-linux-gnu | loongarch64-linux-gnu |
 
-值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台，此处目标系统使用的libc为glibc 2.38。交叉工具链的glibc要与目标系统匹配。
+值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台，此处目标系统使用的libc为glibc 2.39。交叉工具链的glibc要与目标系统匹配。
 
 ### 76.设置环境变量
 
@@ -1268,7 +1268,7 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 | :--------------- | :----------------- | :-------------------- |
 | x86_64-linux-gnu | x86_64-w32-mingw64 | loongarch64-linux-gnu |
 
-值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台，此处目标系统使用的libc为glibc 2.38。交叉工具链的glibc要与目标系统匹配。
+值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台，此处目标系统使用的libc为glibc 2.39。交叉工具链的glibc要与目标系统匹配。
 
 ### 88.设置环境变量
 
@@ -1340,6 +1340,446 @@ make install-strip-gdbserver -j 20
 ```
 
 ### 95.打包工具链
+
+```shell
+cd ~
+cp ~/toolchains/script/.gdbinit $PREFIX/share
+export PACKAGE=$HOST-host-$TARGET-target-gcc15
+tar -cf $PACKAGE.tar $PACKAGE/
+xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
+```
+
+## 构建到arm-linux-gnueabi的交叉工具链
+
+| build            | host             | target            |
+| :--------------- | :--------------- | :---------------- |
+| x86_64-linux-gnu | x86_64-linux-gnu | arm-linux-gnueabi |
+
+值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台，此处目标系统使用的libc为glibc 2.39。交叉工具链的glibc要与目标系统匹配。
+
+### 96.设置环境变量
+
+```shell
+export BUILD=x86_64-linux-gnu
+export HOST=$BUILD
+export TARGET=arm-linux-gnueabi
+export PREFIX=~/$HOST-host-$TARGET-target-gcc15
+```
+
+### 97.编译binutils和gdb
+
+```shell
+cd ~/binutils/build
+rm -rf *
+export ORIGIN='$$ORIGIN'
+../configure --disable-werror --enable-nls --target=$TARGET --prefix=$PREFIX --disable-gdbserver--with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64"
+make -j 20
+make install-strip -j 20
+unset ORIGIN
+echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### 98.安装Linux头文件
+
+```shell
+cd ~/linux
+make ARCH=arm INSTALL_HDR_PATH=$PREFIX/$TARGET headers_install
+```
+
+### 99.编译安装gcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++ --disable-shared
+make all-gcc -j 20
+make install-strip-gcc -j 20
+```
+
+### 100.安装glibc头文件
+
+```shell
+cd ~/glibc
+mkdir build
+cd build
+../configure --host=$TARGET --build=$BUILD --prefix=$PREFIX/$TARGET --disable-werror libc_cv_forced_unwind=yes
+make install-headers
+touch $PREFIX/$TARGET/include/gnu/stubs.h
+```
+
+### 101.编译安装libgcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++ --disable-shared
+make all-target-libgcc -j 20
+make install-strip-target-gcc -j 20
+```
+
+### 102.修改链接器脚本
+
+需要修改`lib/libc.so`为使用相对路径：
+
+```ldscript
+// lib/libc.so
+OUTPUT_FORMAT(elf32-littlearm)
+GROUP (libc.so.6 libc_nonshared.a AS_NEEDED (ld-linux.so.3))
+```
+
+### 103.编译完整gcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++
+make -j 20
+make install-strip -j 20
+# 单独安装带调试符号的库文件
+make install-target-libgcc install-target-libstdc++-v3 install-target-libatomic install-target-libquadmath install-target-libgomp -j 20
+```
+
+### 104.从其他工具链中复制所需库
+
+从[x86_64-linux-gnu本地工具链](#构建gcc本地工具链)中复制动态库：
+
+```shell
+cd ~/$BUILD-host-$HOST-target-gcc15/$HOST
+cp lib64/libstdc++.so.6 $PREFIX/lib64
+cp lib64/libgcc_s.so.1 $PREFIX/lib64
+```
+
+### 105.修复libgcc的limits.h中MB_LEN_MAX定义不准确问题
+
+对limits.h文件末尾的修改如下：
+
+```c++
+// lib/gcc/arm-linux-gnueabi/15.0.0/include/limits.h
+#endif /* _LIMITS_H___ */
+#undef MB_LEN_MAX
+#define MB_LEN_MAX 16
+```
+
+### 106.编译gdbserver
+
+```shell
+cd ~/binutils/build
+rm -rf *
+../configure --prefix=$PREFIX --host=$TARGET --target=$TARGET --disable-werror --disable-binutils --disable-gdb --enable-gdbserver --enable-nls
+make -j 20
+# 其他工具的体系结构与host不同，覆盖host工具会导致错误，故只安装gdbserver
+make install-strip-gdbserver -j 20
+```
+
+### 107.打包工具链
+
+```shell
+cd ~
+cp ~/toolchains/script/.gdbinit $PREFIX/share
+export PACKAGE=$HOST-host-$TARGET-target-gcc15
+tar -cf $PACKAGE.tar $PACKAGE/
+xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
+```
+
+## 构建mingw到arm-linux-gnueabi的加拿大工具链
+
+| build            | host               | target            |
+| :--------------- | :----------------- | :---------------- |
+| x86_64-linux-gnu | x86_64-w32-mingw64 | arm-linux-gnueabi |
+
+值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台，此处目标系统使用的libc为glibc 2.39。交叉工具链的glibc要与目标系统匹配。
+
+### 108.设置环境变量
+
+```shell
+export BUILD=x86_64-linux-gnu
+export HOST=x86_64-w32-mingw64
+export TARGET=arm-linux-gnueabi
+export PREFIX=~/$HOST-host-$TARGET-target-gcc15
+```
+
+### 109.编译binutils和gdb
+
+```shell
+cd ~/binutils/build
+rm -rf *
+export ORIGIN='$$ORIGIN'
+../configure --disable-werror --disable-nls --target=$TARGET --prefix=$PREFIX --disable-gdbserver --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/script/python_config.sh CXXFLAGS=-D_WIN32_WINNT=0x0600
+make -j 20
+make install-strip -j 20
+```
+
+### 110.安装Linux头文件
+
+```shell
+cd ~/linux
+make ARCH=arm INSTALL_HDR_PATH=$PREFIX/$TARGET headers_install
+```
+
+### 111.编译安装gcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --disable-nls --host=$HOST --target=$TARGET --prefix=$PREFIX --disbale-multilib --enable-languages=c,c++
+make -j 20
+make install-strip -j 20
+```
+
+### 112.安装glibc头文件
+
+```shell
+cd ~/glibc
+mkdir build
+cd build
+../configure --host=$TARGET --build=$BUILD --prefix=$PREFIX/$TARGET --disable-werror
+make -j 20
+make install -j 20
+```
+
+### 113.修改链接器脚本
+
+需要修改`lib/libc.so`为使用相对路径：
+
+```ldscript
+// lib/libc.so
+OUTPUT_FORMAT(elf32-littlearm)
+GROUP (libc.so.6 libc_nonshared.a AS_NEEDED (ld-linux.so.3))
+```
+
+### 114.编译gdbserver
+
+```shell
+cd ~/binutils/build
+rm -rf *
+../configure --prefix=$PREFIX --host=$TARGET --target=$TARGET --disable-werror --disable-binutils --disable-gdb --enable-gdbserver --enable-nls
+make -j 20
+# 其他工具的体系结构与host不同，覆盖host工具会导致错误，故只安装gdbserver
+make install-strip-gdbserver -j 20
+```
+
+### 115.打包工具链
+
+```shell
+cd ~
+cp ~/toolchains/script/.gdbinit $PREFIX/share
+export PACKAGE=$HOST-host-$TARGET-target-gcc15
+tar -cf $PACKAGE.tar $PACKAGE/
+xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
+```
+
+## 构建到arm-linux-gnueabihf的交叉工具链
+
+| build            | host             | target            |
+| :--------------- | :--------------- | :---------------- |
+| x86_64-linux-gnu | x86_64-linux-gnu | arm-linux-gnueabihf |
+
+值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台，此处目标系统使用的libc为glibc 2.39。交叉工具链的glibc要与目标系统匹配。
+
+### 116.设置环境变量
+
+```shell
+export BUILD=x86_64-linux-gnu
+export HOST=$BUILD
+export TARGET=arm-linux-gnueabihf
+export PREFIX=~/$HOST-host-$TARGET-target-gcc15
+```
+
+### 117.编译binutils和gdb
+
+```shell
+cd ~/binutils/build
+rm -rf *
+export ORIGIN='$$ORIGIN'
+../configure --disable-werror --enable-nls --target=$TARGET --prefix=$PREFIX --disable-gdbserver--with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64"
+make -j 20
+make install-strip -j 20
+unset ORIGIN
+echo "export PATH=$PREFIX/bin:"'$PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### 118.安装Linux头文件
+
+```shell
+cd ~/linux
+make ARCH=arm INSTALL_HDR_PATH=$PREFIX/$TARGET headers_install
+```
+
+### 119.编译安装gcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++ --disable-shared
+make all-gcc -j 20
+make install-strip-gcc -j 20
+```
+
+### 120.安装glibc头文件
+
+```shell
+cd ~/glibc
+mkdir build
+cd build
+../configure --host=$TARGET --build=$BUILD --prefix=$PREFIX/$TARGET --disable-werror libc_cv_forced_unwind=yes
+make install-headers
+touch $PREFIX/$TARGET/include/gnu/stubs.h
+```
+
+### 121.编译安装libgcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++ --disable-shared
+make all-target-libgcc -j 20
+make install-strip-target-gcc -j 20
+```
+
+### 122.修改链接器脚本
+
+需要修改`lib/libc.so`为使用相对路径：
+
+```ldscript
+// lib/libc.so
+OUTPUT_FORMAT(elf32-littlearm)
+GROUP (libc.so.6 libc_nonshared.a AS_NEEDED (ld-linux-armhf.so.3))
+```
+
+### 123.编译完整gcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++
+make -j 20
+make install-strip -j 20
+# 单独安装带调试符号的库文件
+make install-target-libgcc install-target-libstdc++-v3 install-target-libatomic install-target-libquadmath install-target-libgomp -j 20
+```
+
+### 124.从其他工具链中复制所需库
+
+从[x86_64-linux-gnu本地工具链](#构建gcc本地工具链)中复制动态库：
+
+```shell
+cd ~/$BUILD-host-$HOST-target-gcc15/$HOST
+cp lib64/libstdc++.so.6 $PREFIX/lib64
+cp lib64/libgcc_s.so.1 $PREFIX/lib64
+```
+
+### 125.修复libgcc的limits.h中MB_LEN_MAX定义不准确问题
+
+对limits.h文件末尾的修改如下：
+
+```c++
+// lib/gcc/arm-linux-gnueabihf/15.0.0/include/limits.h
+#endif /* _LIMITS_H___ */
+#undef MB_LEN_MAX
+#define MB_LEN_MAX 16
+```
+
+### 126.编译gdbserver
+
+```shell
+cd ~/binutils/build
+rm -rf *
+../configure --prefix=$PREFIX --host=$TARGET --target=$TARGET --disable-werror --disable-binutils --disable-gdb --enable-gdbserver --enable-nls
+make -j 20
+# 其他工具的体系结构与host不同，覆盖host工具会导致错误，故只安装gdbserver
+make install-strip-gdbserver -j 20
+```
+
+### 127.打包工具链
+
+```shell
+cd ~
+cp ~/toolchains/script/.gdbinit $PREFIX/share
+export PACKAGE=$HOST-host-$TARGET-target-gcc15
+tar -cf $PACKAGE.tar $PACKAGE/
+xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
+```
+
+## 构建mingw到arm-linux-gnueabihf的加拿大工具链
+
+| build            | host               | target            |
+| :--------------- | :----------------- | :---------------- |
+| x86_64-linux-gnu | x86_64-w32-mingw64 | arm-linux-gnueabihf |
+
+值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台，此处目标系统使用的libc为glibc 2.39。交叉工具链的glibc要与目标系统匹配。
+
+### 128.设置环境变量
+
+```shell
+export BUILD=x86_64-linux-gnu
+export HOST=x86_64-w32-mingw64
+export TARGET=arm-linux-gnueabihf
+export PREFIX=~/$HOST-host-$TARGET-target-gcc15
+```
+
+### 129.编译binutils和gdb
+
+```shell
+cd ~/binutils/build
+rm -rf *
+export ORIGIN='$$ORIGIN'
+../configure --disable-werror --disable-nls --target=$TARGET --prefix=$PREFIX --disable-gdbserver --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/script/python_config.sh CXXFLAGS=-D_WIN32_WINNT=0x0600
+make -j 20
+make install-strip -j 20
+```
+
+### 130.安装Linux头文件
+
+```shell
+cd ~/linux
+make ARCH=arm INSTALL_HDR_PATH=$PREFIX/$TARGET headers_install
+```
+
+### 131.编译安装gcc
+
+```shell
+cd ~/gcc/build
+rm -rf *
+../configure --disable-werror --disable-bootstrap --disable-nls --host=$HOST --target=$TARGET --prefix=$PREFIX --disbale-multilib --enable-languages=c,c++
+make -j 20
+make install-strip -j 20
+```
+
+### 132.安装glibc头文件
+
+```shell
+cd ~/glibc
+mkdir build
+cd build
+../configure --host=$TARGET --build=$BUILD --prefix=$PREFIX/$TARGET --disable-werror
+make -j 20
+make install -j 20
+```
+
+### 133.修改链接器脚本
+
+需要修改`lib/libc.so`为使用相对路径：
+
+```ldscript
+// lib/libc.so
+OUTPUT_FORMAT(elf32-littlearm)
+GROUP (libc.so.6 libc_nonshared.a AS_NEEDED (ld-linux-armhf.so.3))
+```
+
+### 134.编译gdbserver
+
+```shell
+cd ~/binutils/build
+rm -rf *
+../configure --prefix=$PREFIX --host=$TARGET --target=$TARGET --disable-werror --disable-binutils --disable-gdb --enable-gdbserver --enable-nls
+make -j 20
+# 其他工具的体系结构与host不同，覆盖host工具会导致错误，故只安装gdbserver
+make install-strip-gdbserver -j 20
+```
+
+### 135.打包工具链
 
 ```shell
 cd ~
