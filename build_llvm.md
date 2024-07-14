@@ -14,7 +14,7 @@
 
 ```shell
 # 使用clang自举
-sudo apt install git python3 cmake ninja-build clang lld libxml2-dev
+sudo apt install git python3 cmake ninja-build clang lld libxml2-dev zlib1g-dev
 ```
 
 ### 2.准备sysroot
@@ -75,4 +75,160 @@ sysroot
 ├── riscv64-linux-gnu
 ├── x86_64-linux-gnu
 └── x86_64-w64-mingw32
+```
+
+### 3.编译x86_64-linux-gnu-llvm工具链
+
+通过clang自举出不依赖gnu相关库的完整llvm工具链需要分为4个阶段进行：
+
+1. 第一次编译llvm及runtimes，依赖gnu相关库
+2. 使用刚才编译的llvm和runtimes重新编译llvm，得到不依赖gnu相关库的llvm
+3. 使用刚才编译的llvm和runtimes重新编译runtimes，得到不依赖gnu相关库的runtimes
+4. 打包工具链
+
+#### (1)首次编译llvm以及runtimes
+
+首先编译llvm：
+
+```shell
+export llvm_prefix=~/x86_64-linux-gnu-clang19
+export runtimes_prefix=$llvm_prefix/install
+export compiler_rt_prefix=$llvm_prefix/lib/clang/19/lib
+# 启用动态链接以减小项目体积
+export dylib_option_list="-DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_BUILD_LLVM_DYLIB=ON -DCLANG_LINK_CLANG_DYLIB=ON"
+# 设置构建模式为Release
+# 关闭llvm文档、示例、基准测试和单元测试的构建
+# 构建目标：X86;AArch64;WebAssembly;RISCV;ARM;LoongArch
+# 在编译llvm时编译子项目：clang;lld
+# 在编译llvm时编译运行时：libcxx;libcxxabi;libunwind;compiler-rt
+# 禁用警告以减少回显噪音
+# 关闭clang单元测试的构建
+# 禁止基准测试安装文档
+# 设置clang默认链接器为lld
+# 使用lld作为链接器（支持多核链接，可加速链接）
+# 使用rpath连接选项，在Linux系统上可以避免动态库环境混乱
+# 关闭libcxx基准测试的构建
+# 使用compiler-rt和libcxxabi构建libcxx
+# 使用compiler-rt和libunwind构建libcxxabi
+# 使用compiler-rt构建libunwind
+# compiler-rt只需构建默认目标即可，禁止自动构建multilib
+# 使用libcxx构建compiler-rt中的asan等项目
+export llvm_option_list1='-DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_DOCS=OFF -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_TARGETS_TO_BUILD="X86;AArch64;WebAssembly;RISCV;ARM;LoongArch" -DLLVM_ENABLE_PROJECTS="clang;lld" -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind;compiler-rt" -DLLVM_ENABLE_WARNINGS=OFF -DCLANG_INCLUDE_TESTS=OFF -DBENCHMARK_INSTALL_DOCS=OFF -DCLANG_DEFAULT_LINKER=lld -DLLVM_ENABLE_LLD=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DLIBCXX_INCLUDE_BENCHMARKS=OFF -DLIBCXX_USE_COMPILER_RT=ON -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=ON -DLIBCXXABI_USE_COMPILER_RT=ON -DLIBUNWIND_USE_COMPILER_RT=ON -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON -DCOMPILER_RT_USE_LIBCXX=ON'
+# 设置编译器为clang
+# 编译器目标平台：x86_64-linux-gnu
+# 禁用unused-command-line-argument警告并设置gcc查找路径以使用最新的gcc
+# 设置COMPILER_WORKS选项以跳过探测（有时探测不能正常工作，尤其是交叉编译时）
+# 设置llvm运行时的目标平台：x86_64-linux-gnu
+# 设置llvm默认的目标平台：x86_64-unknown-linux-gnu
+# 设置llvm的宿主平台：x86_64-unknown-linux-gnu
+export flags="\"-Wno-unused-command-line-argument --gcc-toolchain=$HOME/sysroot\""
+export target=x86_64-linux-gnu
+export host=x86_64-unknown-linux-gnu
+export compiler_option="-DCMAKE_C_COMPILER=\"clang\" -DCMAKE_C_COMPILER_TARGET=$target -DCMAKE_C_FLAGS=$flags -DCMAKE_C_COMPILER_WORKS=ON -DCMAKE_CXX_COMPILER=\"clang++\" -DCMAKE_CXX_COMPILER_TARGET=$target -DCMAKE_CXX_FLAGS=$flags -DCMAKE_CXX_COMPILER_WORKS=ON -DCMAKE_ASM_COMPILER=\"clang\" -DCMAKE_ASM_COMPILER_TARGET=$target -DCMAKE_ASM_FLAGS=$flags -DCMAKE_ASM_COMPILER_WORKS=ON -DLLVM_RUNTIMES_TARGET=$target -DLLVM_DEFAULT_TARGET_TRIPLE=$host -DLLVM_HOST_TRIPLE=$host"
+# 进入llvm项目目录
+cd ~/llvm
+# 配置llvm
+cmake -G Ninja --install-prefix $llvm_prefix -B build-x86_64-linux-gnu-llvm -S llvm $dylib_option_list $llvm_option_list1 $compiler_option
+# 编译llvm
+ninja -C build -j 20
+# 安装llvm
+ninja -C build install/strip -j 20
+```
+
+接下来编译所有需要的runtimes，值得注意的是，在Windows上尚不支持使用libcxxabi，故而需要改用libsupc++作为libcxx的abi。此时需要额外的设置
+`LIBCXX_CXX_ABI_INCLUDE_PATHS`来确定libsupc++头文件的查找路径。而在`sysroot/x86_64(i686)-w64-mingw32/include/c++/version`下可以查找到所需的头文件。
+
+```shell
+export version="15.0.0"
+# 为llvm_option_list1移除libcxxabi相关选项并且使用libsupc++作为abi
+export llvm_option_list_w_1='-DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_DOCS=OFF -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_TARGETS_TO_BUILD="X86;AArch64;WebAssembly;RISCV;ARM;LoongArch" -DLLVM_ENABLE_PROJECTS="clang;lld" -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind;compiler-rt" -DLLVM_ENABLE_WARNINGS=OFF -DCLANG_INCLUDE_TESTS=OFF -DBENCHMARK_INSTALL_DOCS=OFF -DCLANG_DEFAULT_LINKER=lld -DLLVM_ENABLE_LLD=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DLIBCXX_INCLUDE_BENCHMARKS=OFF -DLIBCXX_USE_COMPILER_RT=ON -DLIBCXXABI_USE_COMPILER_RT=ON -DLIBUNWIND_USE_COMPILER_RT=ON -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON -DCOMPILER_RT_USE_LIBCXX=ON -DLLVM_ENABLE_RUNTIMES="libcxx;libunwind;compiler-rt" -DLIBCXX_CXX_ABI=libsupc++'
+# 增加头文件搜索路径
+export llvm_option_list_w64_1="$llvm_option_list_w_1 -DLIBCXX_CXX_ABI_INCLUDE_PATHS=\"$HOME/sysroot/x86_64-w64-mingw32/include/c++/$version\""
+export llvm_option_list_w32_1="$llvm_option_list_w_1 -DLIBCXX_CXX_ABI_INCLUDE_PATHS=\"$HOME/sysroot/i686-w64-mingw32/include/c++/$version\""
+# 进入llvm项目目录
+cd ~/llvm
+# 配置runtimes
+cmake -G Ninja --install-prefix $runtimes_prefix -B build-x86_64-linux-gnu-runtimes -S runtimes $dylib_option_list $llvm_option_list1 $compiler_option
+# 编译runtimes
+ninja -C build -j 20
+# 安装runtimes
+ninja -C build install/strip -j 20
+
+# 在编译非host平台的runtimes时需要进行交叉编译，故而需要修改compiler_option
+# 以编译x86_64-w64-mingw32上的runtimes为例
+export target=x86_64-w64-mingw32
+# 设置编译器为clang
+# 设置编译器的目标平台为x86_64-w64-mingw32
+# 禁用unused-command-line-argument警告并设置gcc查找路径以使用最新的gcc
+# 设置COMPILER_WORKS选项以跳过探测（有时探测不能正常工作，尤其是交叉编译时）
+# 设置目标平台：Windows，目标架构：x86_64
+# 设置sysroot为先前制作的sysroot以进行交叉编译
+# 设置llvm运行时的目标平台：x86_64-w64-mingw32
+# 设置llvm默认的目标平台：x86_64-unknown-w64-mingw32
+# 设置llvm的宿主平台：x86_64-unknown-linux-gnu
+export compiler_option="-DCMAKE_C_COMPILER=\"clang\" -DCMAKE_C_COMPILER_TARGET=$target -DCMAKE_C_FLAGS=$flags -DCMAKE_C_COMPILER_WORKS=ON -DCMAKE_CXX_COMPILER=\"clang++\" -DCMAKE_CXX_COMPILER_TARGET=$target -DCMAKE_CXX_FLAGS=$flags -DCMAKE_CXX_COMPILER_WORKS=ON -DCMAKE_ASM_COMPILER=\"clang\" -DCMAKE_ASM_COMPILER_TARGET=$target -DCMAKE_ASM_FLAGS=$flags -DCMAKE_ASM_COMPILER_WORKS=ON -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=x86_64 -DCMAKE_SYSROOT=\"$HOME/sysroot\" -DLLVM_RUNTIMES_TARGET=$target -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-w64-mingw32 -DLLVM_HOST_TRIPLE=$host"
+# 进入llvm项目目录
+cd ~/llvm
+# 配置runtimes（编译Windows平台的需要设置llvm_option_list_w64(32)_1，Linux平台使用llvm_option_list1）
+cmake -G Ninja --install-prefix $runtimes_prefix -B build-x86_64-linux-gnu-runtimes -S runtimes $dylib_option_list $llvm_option_list_w64_1 $compiler_option
+# 编译runtimes
+ninja -C build -j 20
+# 安装runtimes
+ninja -C build install/strip -j 20
+```
+
+在编译完runtimes后还需要将llvm相关库复制到sysroot下，以便在后续使用过程中通过命令行选项切换使用的库，以及编译出不依赖gnu相关库的llvm。
+值得注意的是，compiler-rt相关库需要复制到`prefix/lib/clang/version`而不是sysroot下。同时，对于Windows平台而言，dll位于`bin`目录下，而对于
+Linux平台而言，so位于`lib`目录下。最后，在安装带runtimes的llvm时会安装一份libcxx的头文件到`prefix/include/c++/v1`下，此部分头文件是跨平台的，无需重复
+复制到sysroot下。而libcxx中与平台相关的部分储存在`__config_site`文件中，故该文件需要复制到sysroot下。
+下面以复制`x86_64-linux-gnu`相关的库为例：
+
+```python
+import os
+import shutil
+
+def overwrite_copy(src: str, dst: str, is_dir: bool = False):
+    """复制文件或目录，会覆盖已存在项
+
+    Args:
+        src (str): 源路径
+        dst (str): 目标路径
+        is_dir (bool, optional): 目标是否为目录. 默认为否（文件）
+    """
+    if is_dir:
+        if os.path.exists(dst):
+            shutil.rmtree(dst)
+        shutil.copytree(src, dst)
+    else:
+        if os.path.exists(dst):
+            os.remove(dst)
+        shutil.copyfile(src, dst, follow_symlinks=False)
+
+home = os.environ["HOME"]
+prefix = f"{home}/x86_64-linux-gnu-clang19/install"
+sysroot = f"{home}/sysroot"
+compiler_rt = f"{home}/x86_64-linux-gnu-clang19/lib/clang/19/lib"
+for dir in os.listdir(prefix):
+    src_dir = os.path.join(prefix, dir)
+    match dir:
+        case "lib":
+            dst_dir = os.path.join(sysroot, target, "lib")
+            if not os.path.exists(compiler_rt):
+                os.mkdir(compiler_rt)
+            for item in os.listdir(src_dir):
+                # 复制compiler-rt
+                if item == "linux":
+                    item = item.lower()
+                    rt_dir = os.path.join(compiler_rt, item)
+                    if not os.path.exists(rt_dir):
+                        os.mkdir(rt_dir)
+                    for file in os.listdir(os.path.join(src_dir, item)):
+                        overwrite_copy(os.path.join(src_dir, item, file), os.path.join(rt_dir, file))
+                    continue
+                # 复制其他库
+                overwrite_copy(os.path.join(src_dir, item), os.path.join(dst_dir, item))
+        case "include":
+            # 复制__config_site
+            dst_dir = os.path.join(sysroot, target, "include")
+            overwrite_copy(os.path.join(src_dir, "c++", "v1", "__config_site"), os.path.join(dst_dir, "__config_site"))
 ```
