@@ -232,3 +232,42 @@ for dir in os.listdir(prefix):
             dst_dir = os.path.join(sysroot, target, "include")
             overwrite_copy(os.path.join(src_dir, "c++", "v1", "__config_site"), os.path.join(dst_dir, "__config_site"))
 ```
+
+#### (2)再次编译llvm
+
+此次只编译llvm及子项目，不编译runtimes，但可以启用`clang-tools-extra`等额外的子项目。值得注意的是，本次构建结束后需要保留构建目录，其中包含交叉
+编译`clang-tools-extra`等项目所需的本地工具，同时它们不会被构建脚本安装到`prefix`中。如果删除该目录，在交叉编译时llvm的`NATIVE`编译过程不能正确的生成这部分工具，
+进而导致交叉编译失败。
+
+为了实现全面的llvm化，可以将clang默认的库设置成llvm相关库而不是gnu相关库，以实现运行库的替换。它们的关系如下：
+
+| gnu          | llvm                            |
+| ------------ | ------------------------------- |
+| libsanitizer | compiler-rt                     |
+| libgcc       | compiler-rt+libunwind+libcxxabi |
+| libstdc++    | libcxx                          |
+
+使用选项`-stdlib=libc++`，`-unwindlib=libunwind`和`-rtlib=compiler-rt`即可将clang使用的运行库切换到llvm相关库上。
+
+下面是再次编译llvm的相关选项（一些重复选项的说明请参阅[首次编译流程](#1首次编译llvm以及runtimes)：
+
+```shell
+# 重复部分参考llvm_option_list1
+# 增加子项目：clang-tools-extra
+# 开启LTO以提升性能
+# 设置clang默认运行库为libcxx、libunwind和compiler-rt
+export llvm_option_list2='-DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_DOCS=OFF -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_TARGETS_TO_BUILD="X86;AArch64;WebAssembly;RISCV;ARM;LoongArch" -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DLLVM_ENABLE_WARNINGS=OFF -DCLANG_INCLUDE_TESTS=OFF -DBENCHMARK_INSTALL_DOCS=OFF -DCLANG_DEFAULT_LINKER=lld -DLLVM_ENABLE_LLD=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DLIBCXX_INCLUDE_BENCHMARKS=OFF -DLIBCXX_USE_COMPILER_RT=ON -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=ON -DLIBCXXABI_USE_COMPILER_RT=ON -DLIBUNWIND_USE_COMPILER_RT=ON -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON -DCOMPILER_RT_USE_LIBCXX=ON -DLLVM_ENABLE_LTO=Thin -DCLANG_DEFAULT_CXX_STDLIB=libc++ -DCLANG_DEFAULT_RTLIB=compiler-rt -DCLANG_DEFAULT_UNWINDLIB=libunwind'
+# 切换运行库为llvm相关库
+export lib_flags="-stdlib=libc++ -unwindlib=libunwind -rtlib=compiler-rt"
+# 设置编译器为clang并且使用llvm相关库
+export flags="\"-Wno-unused-command-line-argument --gcc-toolchain=$HOME/sysroot $lib_flags\""
+export compiler_option="-DCMAKE_C_COMPILER=\"clang\" -DCMAKE_C_COMPILER_TARGET=$target -DCMAKE_C_FLAGS=$flags -DCMAKE_C_COMPILER_WORKS=ON -DCMAKE_CXX_COMPILER=\"clang++\" -DCMAKE_CXX_COMPILER_TARGET=$target -DCMAKE_CXX_FLAGS=$flags -DCMAKE_CXX_COMPILER_WORKS=ON -DCMAKE_ASM_COMPILER=\"clang\" -DCMAKE_ASM_COMPILER_TARGET=$target -DCMAKE_ASM_FLAGS=$flags -DCMAKE_ASM_COMPILER_WORKS=ON -DLLVM_RUNTIMES_TARGET=$target -DLLVM_DEFAULT_TARGET_TRIPLE=$host -DLLVM_HOST_TRIPLE=$host -DCMAKE_LINK_FLAGS=\"$lib_flags\""
+# 进入llvm项目目录
+cd ~/llvm
+# 配置llvm
+cmake -G Ninja --install-prefix $llvm_prefix -B build-x86_64-linux-gnu-llvm -S llvm $dylib_option_list $llvm_option_list2 $compiler_option
+# 编译llvm
+ninja -C build -j 20
+# 安装llvm
+ninja -C build install/strip -j 20
+```
