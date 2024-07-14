@@ -1,0 +1,2 @@
+OUTPUT_FORMAT(elf64-littleriscv)
+GROUP (libc.so.6 libc_nonshared.a AS_NEEDED (ld-linux-riscv64-lp64d.so.1))
