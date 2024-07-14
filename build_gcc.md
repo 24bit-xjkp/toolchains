@@ -1571,8 +1571,8 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 
 ## 构建到arm-linux-gnueabihf的交叉工具链
 
-| build            | host             | target            |
-| :--------------- | :--------------- | :---------------- |
+| build            | host             | target              |
+| :--------------- | :--------------- | :------------------ |
 | x86_64-linux-gnu | x86_64-linux-gnu | arm-linux-gnueabihf |
 
 值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台，此处目标系统使用的libc为glibc 2.39。交叉工具链的glibc要与目标系统匹配。
@@ -1704,8 +1704,8 @@ xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 
 ## 构建mingw到arm-linux-gnueabihf的加拿大工具链
 
-| build            | host               | target            |
-| :--------------- | :----------------- | :---------------- |
+| build            | host               | target              |
+| :--------------- | :----------------- | :------------------ |
 | x86_64-linux-gnu | x86_64-w32-mingw64 | arm-linux-gnueabihf |
 
 值得注意的是，libc版本、种类不同的工具链是不同的工具链，它们具有不同的target平台，此处目标系统使用的libc为glibc 2.39。交叉工具链的glibc要与目标系统匹配。
@@ -1788,3 +1788,7 @@ export PACKAGE=$HOST-host-$TARGET-target-gcc15
 tar -cf $PACKAGE.tar $PACKAGE/
 xz -ev9 -T 0 --memlimit=$MEMORY $PACKAGE.tar
 ```
+
+## 后记
+
+其他GCC工具链的编译流程大同小异，此处不再赘述，具体可参照对应的编译脚本。
