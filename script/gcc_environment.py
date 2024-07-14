@@ -169,7 +169,8 @@ class environment:
             option (tuple[str, ...]): 配置选项
         """
         options = " ".join(("", *option))
-        run_command(f"../configure {options}")
+        # 编译glibc时LD_LIBRARY_PATH中不能包含当前路径，此处直接清空LD_LIBRARY_PATH环境变量
+        run_command(f"../configure {options} LD_LIBRARY_PATH=")
 
     def make(self, *target: str) -> None:
         """自动对库进行编译
@@ -236,8 +237,9 @@ class environment:
             assert dll_list != (), f'Cannot find python*.dll in "{lib_dir}" directory.'
             assert len(dll_list) == 1, f'Find too many python*.dll in "{lib_dir}" directory:\n{" ".join(dll_list)}'
             dll_path = os.path.join(lib_dir, dll_list[0])
-            run_command(f"{self.target}-pexports {dll_path} > {def_path}")
-            run_command(f"{self.target}-dlltool -D {dll_path} -d {def_path} -l {lib_path}")
+            # 工具链最后运行在宿主平台上，故而应该使用宿主平台的工具链从.lib文件制作.a文件
+            run_command(f"{self.host}-pexports {dll_path} > {def_path}")
+            run_command(f"{self.host}-dlltool -D {dll_path} -d {def_path} -l {lib_path}")
 
     def copy_python_embed_package(self) -> None:
         """复制python embed package到安装目录"""
