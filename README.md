@@ -19,6 +19,7 @@
 | gcc    | x86_64-linux-gnu   | arm-none-eabi                                    |
 | gcc    | x86_64-linux-gnu   | x86_64-elf                                       |
 | gcc    | x86_64-linux-gnu   | loongarch64-linux-gnu                            |
+| gcc    | x86_64-linux-gnu   | loongarch64-loongnix-linux-gnu                   |
 | gcc    | x86_64-linux-gnu   | riscv64-linux-gnu                                |
 | gcc    | x86_64-linux-gnu   | aarch64-linux-gnu                                |
 | gcc    | x86_64-linux-gnu   | arm-linux-gnueabi                                |
@@ -30,6 +31,7 @@
 | gcc    | x86_64-w64-mingw32 | arm-none-eabi                                    |
 | gcc    | x86_64-w64-mingw32 | x86_64-elf                                       |
 | gcc    | x86_64-w64-mingw32 | loongarch64-linux-gnu                            |
+| gcc    | x86_64-w64-mingw32 | loongarch64-loongnix-linux-gnu                   |
 | gcc    | x86_64-w64-mingw32 | riscv64-linux-gnu                                |
 | gcc    | x86_64-w64-mingw32 | aarch64-linux-gnu                                |
 | gcc    | x86_64-w64-mingw32 | arm-linux-gnueabi                                |
