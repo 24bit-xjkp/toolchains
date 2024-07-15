@@ -111,7 +111,11 @@ class environment:
         self.gdbinit_path = os.path.join(self.share_dir, ".gdbinit")
         self.lib_dir_list = {}
         for lib in lib_list:
-            lib_dir = os.path.join(self.home_dir, lib)
+            if lib in ("glibc", "linux") and self.target.count("-") == 3:
+                vendor = self.target.split("-")[1]
+                lib_dir = os.path.join(self.home_dir, f"{lib}-{vendor}")
+            else:
+                lib_dir = os.path.join(self.home_dir, lib)
             assert os.path.exists(lib_dir), f'Cannot find lib "{lib}" in directory "{lib_dir}"'
             self.lib_dir_list[lib] = lib_dir
         self.tool_prefix = f"{self.target}-" if self.cross_compiler else ""
@@ -151,12 +155,22 @@ class environment:
         """
         assert lib in lib_list
         build_dir = self.lib_dir_list[lib]
-        if lib not in ("python-embed", "linux"):
-            build_dir = os.path.join(self.home_dir, lib, "build" if lib != "expat" else "expat/build")
+        need_make_build_dir = True  # < 是否需要建立build目录
+        match lib:
+            case ("python-embed" | "linux"):
+                need_make_build_dir = False  # 跳过python-embed和linux，python-embed仅需要生成静态库，linux有独立的编译方式
+            case "expat":
+                build_dir = os.path.join(build_dir, "expat", "build") # < expat项目内嵌套了一层目录
+            case _:
+                build_dir = os.path.join(build_dir, "build")
+
+        if need_make_build_dir:
             if os.path.isdir(build_dir) and remove_files:
                 shutil.rmtree(build_dir)
             if not os.path.isdir(build_dir):
                 os.mkdir(build_dir)
+
+        print(build_dir)
         os.chdir(build_dir)
         # 添加构建gdb所需的环境变量
         if lib == "binutils":
