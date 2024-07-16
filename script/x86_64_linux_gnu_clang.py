@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import llvm_environment as llvm
 
-env = llvm.environment("19", "x86_64-linux-gnu")
+env = llvm.environment()
 
 
 def build(stage: int = env.stage) -> None:
