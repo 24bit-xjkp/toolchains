@@ -1,10 +1,8 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 import os
-import psutil
 import shutil
-import sys
-from math import floor
+from common import *
 
 lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports", "iconv", "python-embed", "glibc")
 dll_target_list = (
@@ -46,28 +44,16 @@ disable_hosted_option = (
 arch_32_bit_list = ("arm", "armeb", "i486", "i686", "risc32", "risc32be")
 
 
-def run_command(command: str) -> None:
-    print(command)
-    assert os.system(command) == 0, f'Command "{command}" failed.'
-
-
-class environment:
-    major_version: str  # < GCC的主版本号
+class environment(basic_environment):
     build: str  # < build平台
     host: str  # < host平台
     target: str  # < target平台
     toolchain_type: str  # < 工具链类别
     cross_compiler: bool  # < 是否是交叉编译器
-    name_without_version: str  # < 不带版本号的工具链名
-    name: str  # < 工具链名
-    home_dir: str  # < 源代码所在的目录，默认为$HOME
     prefix: str  # < 工具链安装位置
-    num_cores: int  # < 编译所用线程数
-    current_dir: str  # < toolchains项目所在目录
     lib_prefix: str  # < 安装后库目录的前缀
-    bin_dir: str  # < 安装后可执行文件所在目录
     symlink_list: list[str]  # < 构建过程中创建的软链接表
-    share_dir: str  # < 安装后.share目录
+    share_dir: str  # < 安装后share目录
     gdbinit_path: str  # < 安装后.gdbinit文件所在路径
     lib_dir_list: dict[str, str]  # < 所有库所在目录
     tool_prefix: str  # < 工具的前缀，如x86_64-w64-mingw32-
@@ -78,7 +64,6 @@ class environment:
     rpath_dir: str  # < rpath所在目录
 
     def __init__(self, build: str = "x86_64-linux-gnu", host: str = "", target: str = "") -> None:
-        self.major_version = "15"
         self.build = build
         self.host = host if host != "" else build
         self.target = target if target != "" else self.host
@@ -92,31 +77,22 @@ class environment:
         else:
             self.toolchain_type = "canadian cross"
         self.cross_compiler = self.host != self.target
-        self.name_without_version = (f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native") + "-gcc"
-        self.name = self.name_without_version + self.major_version
-        self.home_dir = ""
-        for option in sys.argv:
-            if option.startswith("--home="):
-                self.home_dir = option[7:]
-                break
-        if self.home_dir == "":
-            self.home_dir = os.environ["HOME"]
+        name_without_version = (f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native") + "-gcc"
+        super().__init__("15", name_without_version)
         self.prefix = os.path.join(self.home_dir, self.name)
-        self.num_cores = floor(psutil.cpu_count() * 1.5)
-        self.current_dir = os.path.abspath(os.path.dirname(__file__))
         self.lib_prefix = os.path.join(self.prefix, self.target) if self.cross_compiler else self.prefix
-        self.bin_dir = os.path.join(self.prefix, "bin")
         self.symlink_list = []
         self.share_dir = os.path.join(self.prefix, "share")
         self.gdbinit_path = os.path.join(self.share_dir, ".gdbinit")
         self.lib_dir_list = {}
         for lib in lib_list:
-            if lib in ("glibc", "linux") and self.target.count("-") == 3:
-                vendor = self.target.split("-")[1]
-                lib_dir = os.path.join(self.home_dir, f"{lib}-{vendor}")
-            else:
-                lib_dir = os.path.join(self.home_dir, lib)
-            assert os.path.exists(lib_dir), f'Cannot find lib "{lib}" in directory "{lib_dir}"'
+            match lib:
+                case "glibc" | "linux" if self.target.count("-") == 3:
+                    vendor = self.target.split("-")[1]
+                    lib_dir = os.path.join(self.home_dir, f"{lib}-{vendor}")
+                case _:
+                    lib_dir = os.path.join(self.home_dir, lib)
+            check_lib_dir(lib, lib_dir)
             self.lib_dir_list[lib] = lib_dir
         self.tool_prefix = f"{self.target}-" if self.cross_compiler else ""
         # NOTE：添加平台后需要在此处注册dll_name_list
@@ -157,10 +133,10 @@ class environment:
         build_dir = self.lib_dir_list[lib]
         need_make_build_dir = True  # < 是否需要建立build目录
         match lib:
-            case ("python-embed" | "linux"):
+            case "python-embed" | "linux":
                 need_make_build_dir = False  # 跳过python-embed和linux，python-embed仅需要生成静态库，linux有独立的编译方式
             case "expat":
-                build_dir = os.path.join(build_dir, "expat", "build") # < expat项目内嵌套了一层目录
+                build_dir = os.path.join(build_dir, "expat", "build")  # < expat项目内嵌套了一层目录
             case _:
                 build_dir = os.path.join(build_dir, "build")
 
@@ -186,16 +162,16 @@ class environment:
         # 编译glibc时LD_LIBRARY_PATH中不能包含当前路径，此处直接清空LD_LIBRARY_PATH环境变量
         run_command(f"../configure {options} LD_LIBRARY_PATH=")
 
-    def make(self, *target: str) -> None:
+    def make(self, *target: str, ignore_error: bool = False) -> None:
         """自动对库进行编译
 
         Args:
             target (tuple[str, ...]): 要编译的目标
         """
         targets = " ".join(("", *target))
-        run_command(f"make {targets} -j {self.num_cores}")
+        run_command(f"make {targets} -j {self.num_cores}", ignore_error)
 
-    def install(self, *target: str) -> None:
+    def install(self, *target: str, ignore_error: bool = False) -> None:
         """自动对库进行安装
 
         Args:
@@ -204,11 +180,11 @@ class environment:
         if target != ():
             targets = " ".join(("", *target))
         elif os.getcwd() == os.path.join(self.lib_dir_list["gcc"], "build"):
-            run_command(f"make install-strip -j {self.num_cores}")
+            run_command(f"make install-strip -j {self.num_cores}", ignore_error)
             targets = " ".join(dll_target_list)
         else:
             targets = "install-strip"
-        run_command(f"make {targets} -j {self.num_cores}")
+        run_command(f"make {targets} -j {self.num_cores}", ignore_error)
 
     def strip_debug_symbol(self) -> None:
         """剥离动态库的调试符号到独立的符号文件"""
@@ -221,25 +197,10 @@ class environment:
                 run_command(f"{self.tool_prefix}strip {dll_path}")
                 run_command(f"{self.tool_prefix}objcopy --add-gnu-debuglink={symbol_path} {dll_path}")
 
-    def register_in_env(self) -> None:
-        """注册安装路径到环境变量"""
-        os.environ["PATH"] = f"{self.bin_dir}:{os.environ['PATH']}"
-
-    def register_in_bashrc(self) -> None:
-        """注册安装路径到用户配置文件"""
-        with open(os.path.join(self.home_dir, ".bashrc"), "a") as bashrc_file:
-            bashrc_file.write(f"export PATH={self.bin_dir}:$PATH\n")
-
     def copy_gdbinit(self) -> None:
         """复制.gdbinit文件"""
         gdbinit_src_path = os.path.join(self.current_dir, ".gdbinit")
-        shutil.copyfile(gdbinit_src_path, self.gdbinit_path)
-
-    def copy_readme(self) -> None:
-        """复制工具链说明文件"""
-        readme_path = os.path.join(self.current_dir, "..", "readme", f"{self.name_without_version}.md")
-        target_path = os.path.join(self.prefix, "README.md")
-        shutil.copyfile(readme_path, target_path)
+        overwrite_copy(gdbinit_src_path, self.gdbinit_path)
 
     def build_libpython(self) -> None:
         """创建libpython.a"""
@@ -257,12 +218,11 @@ class environment:
 
     def copy_python_embed_package(self) -> None:
         """复制python embed package到安装目录"""
-        for file in os.listdir(self.lib_dir_list["python-embed"]):
-            if file.startswith("python"):
-                shutil.copyfile(
-                    os.path.join(self.lib_dir_list["python-embed"], file),
-                    os.path.join(self.bin_dir, file),
-                )
+        for file in filter(lambda x: x.startswith("python"), os.listdir(self.lib_dir_list["python-embed"])):
+            overwrite_copy(
+                os.path.join(self.lib_dir_list["python-embed"], file),
+                os.path.join(self.bin_dir, file),
+            )
 
     def symlink_multilib(self) -> None:
         """为编译带有multilib支持的交叉编译器创建软链接，如将lib/32链接到lib32"""
@@ -297,10 +257,7 @@ class environment:
         if need_python_embed_package:
             self.copy_python_embed_package()
         self.copy_readme()
-        os.chdir(self.home_dir)
-        run_command(f"tar -cf {self.name}.tar {self.name}")
-        memory_MB = psutil.virtual_memory().available // 1048576 + 3072
-        run_command(f"xz -fev9 -T 0 --memlimit={memory_MB}MiB {self.name}.tar")
+        self.compress()
 
     def remove_unused_glibc_file(self) -> None:
         """移除不需要的glibc文件"""
@@ -313,13 +270,15 @@ class environment:
             os.path.join(self.lib_prefix, "lib", "gconv"),
             os.path.join(self.lib_prefix, "lib", "audit"),
         ):
-            shutil.rmtree(os.path.join(self.lib_prefix, dir))
+            path = os.path.join(self.lib_prefix, dir)
+            if os.path.exists(path):
+                shutil.rmtree(path)
 
     def strip_glibc_file(self) -> None:
         """剥离调试符号"""
         strip = f"{self.tool_prefix}strip"
         lib_dir = os.path.join(self.lib_prefix, "lib")
-        os.system(f"{strip} {os.path.join(lib_dir, '*.so')}")
+        run_command(f"{strip} {os.path.join(lib_dir, '*.so')}", True)
 
     def change_glibc_ldscript(self, arch: str = "") -> None:
         """替换带有绝对路径的链接器脚本
@@ -333,8 +292,7 @@ class environment:
         for file in filter(lambda file: file.startswith(f"{arch}-lib"), os.listdir(self.current_dir)):
             dst_path = os.path.join(dst_dir, file[len(f"{arch}-") :])
             src_path = os.path.join(self.current_dir, file)
-            os.remove(dst_path)
-            shutil.copyfile(src_path, dst_path)
+            overwrite_copy(src_path, dst_path)
 
     def adjust_glibc(self, arch: str = "") -> None:
         """调整glibc
