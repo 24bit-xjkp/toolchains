@@ -46,7 +46,7 @@ def build() -> None:
     env.install()
 
     # 复制gdb所需运行库
-    copy_lib()
+    copy_lib(env)
     # 复制pretty-printer
     copy_pretty_printer()
 

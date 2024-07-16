@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 import gcc_environment as gcc
-from x86_64_linux_gnu_host_i686_w64_mingw32_target_gcc import env as cross_env
-import shutil
+from x86_64_w64_mingw32_native_gcc import build_gdb_requirements
 import os
+from x86_64_w64_mingw32_host_arm_none_eabi_target_gcc import copy_lib
 
 env = gcc.environment(host="x86_64-w64-mingw32", target="i686-w64-mingw32")
 
@@ -14,6 +14,7 @@ def build() -> None:
 
     basic_option = f"--disable-werror --prefix={env.prefix} --host={env.host} --target={env.target}"
     gcc_option = "--disable-multilib --enable-languages=c,c++ --disable-sjlj-exceptions --enable-threads=win32"
+    binutils_option = f"--with-system-gdbinit={env.gdbinit_path} --disable-gdbserver --with-python={env.python_config_path} CXXFLAGS=-D_WIN32_WINNT=0x0600"
 
     # 编译安装完整gcc
     env.enter_build_dir("gcc")
@@ -22,25 +23,24 @@ def build() -> None:
     env.install("install-strip")
 
     # 删除已安装的dll
-    os.chdir(env.bin_dir)
-    for file in os.listdir(env.bin_dir):
-        if file.endswith(".dll"):
-            os.remove(file)
-    # 从交叉工具链复制文件
-    for dir in ("include", "lib"):
-        cross_dir = os.path.join(cross_env.lib_prefix, dir)
-        current_dir = os.path.join(env.lib_prefix, dir)
-        for item in os.listdir(cross_dir):
-            dst_path = os.path.join(current_dir, item)
-            src_path = os.path.join(cross_dir, item)
-            if not os.path.exists(dst_path):
-                shutil.copytree(src_path, dst_path) if os.path.isdir(src_path) else shutil.copyfile(src_path, dst_path)
+    for file in filter(lambda x: x.endswith(".dll"), os.listdir(env.bin_dir)):
+        gcc.remove(os.path.join(env.bin_dir, file))
 
-    # 编译安装binutils
+    # 创建libpython.a
+    env.build_libpython()
+    # 编译安装libgmp, libexpat, libiconv, libmpfr
+    lib_option = build_gdb_requirements()
+
+    # 编译安装binutils和gdb
     env.enter_build_dir("binutils")
-    env.configure(basic_option, "--disable-gdb")
+    env.configure(basic_option, *lib_option, binutils_option)
     env.make()
     env.install()
+
+    # 复制gdb所需运行库
+    copy_lib(env)
+    # 复制文件
+    env.copy_from_cross_toolchain()
 
     # 编译安装pexports
     env.enter_build_dir("pexports")

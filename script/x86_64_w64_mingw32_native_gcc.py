@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 import gcc_environment as gcc
-from x86_64_linux_gnu_host_x86_64_w64_mingw32_target_gcc import env as cross_env
 import os
 import shutil
 
@@ -9,6 +8,12 @@ env = gcc.environment(host="x86_64-w64-mingw32")
 lib_install_dir_list: dict[str, str] = {}
 for lib in ("gmp", "expat", "iconv", "mpfr"):
     lib_install_dir_list[lib] = os.path.join(env.home_dir, lib, "install")
+
+def copy_lib(env: gcc.environment = env) -> None:
+    """从x86_64-w64-mingw32交叉工具链中复制运行库"""
+    cross_toolchain = gcc.environment(target="x86_64-w64-mingw32")
+    for dll in ("libstdc++-6.dll", "libgcc_s_seh-1.dll"):
+        shutil.copy(os.path.join(cross_toolchain.lib_prefix, "lib", dll), env.bin_dir)
 
 
 def build_gdb_requirements(env: gcc.environment = env) -> list[str]:
@@ -52,23 +57,11 @@ def build():
     env.install("install-strip")
 
     # 删除已安装的dll
-    os.chdir(env.bin_dir)
-    for file in os.listdir(env.bin_dir):
-        if file.endswith(".dll"):
-            os.remove(file)
-    # 从交叉工具链复制文件
-    for dir in ("include", "lib", "lib32"):
-        cross_dir = os.path.join(cross_env.lib_prefix, dir)
-        current_dir = os.path.join(env.lib_prefix, dir)
-        for item in os.listdir(cross_dir):
-            dst_path = os.path.join(current_dir, item)
-            src_path = os.path.join(cross_dir, item)
-            if not os.path.exists(dst_path):
-                shutil.copytree(src_path, dst_path) if os.path.isdir(src_path) else shutil.copyfile(src_path, dst_path)
+    for file in filter(lambda x: x.endswith(".dll"), os.listdir(env.bin_dir)):
+        gcc.remove(os.path.join(env.bin_dir, file))
 
     # 创建libpython.a
     env.build_libpython()
-
     # 编译安装libgmp, libexpat, libiconv, libmpfr
     lib_option = build_gdb_requirements()
 
@@ -77,6 +70,11 @@ def build():
     env.configure(basic_option, *lib_option, binutils_option)
     env.make()
     env.install()
+
+    # 复制gdb所需运行库
+    copy_lib()
+    # 复制文件
+    env.copy_from_cross_toolchain()
 
     # 编译安装pexports
     env.enter_build_dir("pexports")

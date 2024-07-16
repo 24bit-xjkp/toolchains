@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import gcc_environment as gcc
 from x86_64_w64_mingw32_native_gcc import build_gdb_requirements
+from x86_64_w64_mingw32_host_arm_none_eabi_target_gcc import copy_lib
 
 env = gcc.environment(host="x86_64-w64-mingw32", target="loongarch64-loongnix-linux-gnu")
 
@@ -31,6 +32,8 @@ def build() -> None:
     env.make()
     env.install()
 
+    # 复制gdb所需运行库
+    copy_lib(env)
     # 复制文件
     env.copy_from_cross_toolchain()
 

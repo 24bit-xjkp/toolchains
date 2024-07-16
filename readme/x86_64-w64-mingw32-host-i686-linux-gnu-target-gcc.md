@@ -10,9 +10,13 @@
 
 - GCC：15.0.0
 - Binutils：2.42.50
+- GDB: 16.0.50
 
 ## 组件
 
 - gcc
 - g++
 - binutils
+- gdb (需要python3.12.3)
+- Python3.12.3 embed package
+- .gdbinit (位于share下)
