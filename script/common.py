@@ -24,14 +24,17 @@ def run_command(command: str, ignore_error: bool = False) -> None:
         print(f'Command "{command}" failed with errno={errno}, but it is ignored.')
 
 
-def overwrite_copy(src: str, dst: str, follow_symlinks: bool = False) -> None:
-    """复制文件或目录，会覆盖已存在项
+def copy(src: str, dst: str, overwrite=True, follow_symlinks: bool = False) -> None:
+    """复制文件或目录
 
     Args:
         src (str): 源路径
         dst (str): 目标路径
-        follow_symlinks (bool, optional): 是否复制软链接指向的目标，而不是软链接本身. 默认为否（保留软链接）
+        overwrite (bool, optional): 是否覆盖已存在项. 默认为覆盖.
+        follow_symlinks (bool, optional): 是否复制软链接指向的目标，而不是软链接本身. 默认为保留软链接.
     """
+    if not overwrite and os.path.exists(dst):
+        return
     if os.path.isdir(src):
         if os.path.exists(dst):
             shutil.rmtree(dst)
@@ -40,6 +43,41 @@ def overwrite_copy(src: str, dst: str, follow_symlinks: bool = False) -> None:
         if os.path.exists(dst):
             os.remove(dst)
         shutil.copyfile(src, dst, follow_symlinks=follow_symlinks)
+
+
+def copy_if_exist(src: str, dst: str, overwrite=True, follow_symlinks: bool = False) -> None:
+    """如果文件或目录存在则复制文件或目录
+
+    Args:
+        src (str): 源路径
+        dst (str): 目标路径
+        overwrite (bool, optional): 是否覆盖已存在项. 默认为覆盖.
+        follow_symlinks (bool, optional): 是否复制软链接指向的目标，而不是软链接本身. 默认为保留软链接.
+    """
+    if os.path.exists(src):
+        copy(src, dst, overwrite, follow_symlinks)
+
+
+def remove(path: str) -> None:
+    """删除指定路径
+
+    Args:
+        path (str): 要删除的路径
+    """
+    if os.path.isdir(path):
+        shutil.rmtree(path)
+    else:
+        os.remove(path)
+
+
+def remove_if_exists(path: str) -> None:
+    """如果指定路径存在则删除指定路径
+
+    Args:
+        path (str): 要删除的路径
+    """
+    if os.path.exists(path):
+        remove(path)
 
 
 def check_lib_dir(lib: str, lib_dir: str, do_assert=True) -> bool:
@@ -60,6 +98,7 @@ def check_lib_dir(lib: str, lib_dir: str, do_assert=True) -> bool:
     else:
         assert os.path.exists(lib_dir), message
     return True
+
 
 class basic_environment:
     """gcc和llvm共用基本环境"""
@@ -107,7 +146,7 @@ class basic_environment:
         """复制工具链说明文件"""
         readme_path = os.path.join(self.current_dir, "..", "readme", f"{self.name_without_version}.md")
         target_path = os.path.join(os.path.join(self.home_dir, self.name), "README.md")
-        overwrite_copy(readme_path, target_path)
+        copy(readme_path, target_path)
 
 
 assert __name__ != "__main__", "Import this file instead of running it directly."

@@ -200,7 +200,7 @@ class environment(basic_environment):
     def copy_gdbinit(self) -> None:
         """复制.gdbinit文件"""
         gdbinit_src_path = os.path.join(self.current_dir, ".gdbinit")
-        overwrite_copy(gdbinit_src_path, self.gdbinit_path)
+        copy(gdbinit_src_path, self.gdbinit_path)
 
     def build_libpython(self) -> None:
         """创建libpython.a"""
@@ -219,7 +219,7 @@ class environment(basic_environment):
     def copy_python_embed_package(self) -> None:
         """复制python embed package到安装目录"""
         for file in filter(lambda x: x.startswith("python"), os.listdir(self.lib_dir_list["python-embed"])):
-            overwrite_copy(
+            copy(
                 os.path.join(self.lib_dir_list["python-embed"], file),
                 os.path.join(self.bin_dir, file),
             )
@@ -270,9 +270,7 @@ class environment(basic_environment):
             os.path.join(self.lib_prefix, "lib", "gconv"),
             os.path.join(self.lib_prefix, "lib", "audit"),
         ):
-            path = os.path.join(self.lib_prefix, dir)
-            if os.path.exists(path):
-                shutil.rmtree(path)
+            remove_if_exists(os.path.join(self.lib_prefix, dir))
 
     def strip_glibc_file(self) -> None:
         """剥离调试符号"""
@@ -292,7 +290,7 @@ class environment(basic_environment):
         for file in filter(lambda file: file.startswith(f"{arch}-lib"), os.listdir(self.current_dir)):
             dst_path = os.path.join(dst_dir, file[len(f"{arch}-") :])
             src_path = os.path.join(self.current_dir, file)
-            overwrite_copy(src_path, dst_path)
+            copy(src_path, dst_path)
 
     def adjust_glibc(self, arch: str = "") -> None:
         """调整glibc
@@ -309,6 +307,23 @@ class environment(basic_environment):
         include_dir = os.path.join(libgcc_prefix, os.listdir(libgcc_prefix)[0], "include")
         with open(os.path.join(include_dir, "limits.h"), "a") as file:
             file.writelines(("#undef MB_LEN_MAX\n", "#define MB_LEN_MAX 16\n"))
+
+    def copy_from_cross_toolchain(self) -> None:
+        """从交叉工具链中复制libc、linux头文件、gdbserver等到本工具链中"""
+        # 从交叉工具链中复制libc、linux头文件等到本工具链中
+        cross_toolchain = environment(self.build, self.build, self.target)
+        for dir in filter(lambda x: x != "bin", os.listdir(cross_toolchain.lib_prefix)):
+            src_prefix = os.path.join(cross_toolchain.lib_prefix, dir)
+            dst_prefix = os.path.join(self.lib_prefix, dir)
+            for item in os.listdir(src_prefix):
+                src_path = os.path.join(src_prefix, item)
+                dst_path = os.path.join(dst_prefix, item)
+                copy(src_path, dst_path, False)
+
+        # 复制gdbserver
+        src_path = os.path.join(cross_toolchain.bin_dir, "gdbserver")
+        dst_path = os.path.join(self.bin_dir, "gdbserver")
+        copy_if_exist(src_path, dst_path)
 
 
 assert __name__ != "__main__", "Import this file instead of running it directly."
