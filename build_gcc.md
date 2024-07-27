@@ -201,6 +201,9 @@ objcopy --add-gnu-debuglink=$PREFIX/lib64/libgcc_s.so.1.debug $PREFIX/lib64/libg
 ### 9.打包工具链
 
 ```shell
+cd $PREFIX/bin
+# 值得注意的是，此时编译出来的gcc不包含cc，这会导致编译build的目标时一些依赖cc的工具报错
+ln -s gcc cc
 cd ~
 cp ~/toolchains/script/.gdbinit $PREFIX/share
 export MEMORY=$(cat /proc/meminfo | awk '/MemTotal/ {printf "%dGiB\n", int($2/1024/1024)}')

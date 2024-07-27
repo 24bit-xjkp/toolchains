@@ -252,6 +252,9 @@ class environment(basic_environment):
             need_gdbinit (bool, optional): 是否需要打包.gdbinit文件. 默认需要.
             need_python_embed_package (bool, optional): 是否需要打包python embed package. 默认不需要.
         """
+        if self.toolchain_type == "native":
+            # 本地工具链需要添加cc以代替系统提供的cc
+            os.symlink(os.path.join(self.bin_dir, "gcc"), os.path.join(self.bin_dir, "cc"))
         if need_gdbinit:
             self.copy_gdbinit()
         if need_python_embed_package:
