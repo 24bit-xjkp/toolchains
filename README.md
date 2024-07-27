@@ -19,8 +19,11 @@
 | gcc    | x86_64-linux-gnu   | arm-none-eabi                                    |
 | gcc    | x86_64-linux-gnu   | x86_64-elf                                       |
 | gcc    | x86_64-linux-gnu   | loongarch64-linux-gnu                            |
+| gcc    | x86_64-linux-gnu   | loongarch64-loongnix-linux-gnu                   |
 | gcc    | x86_64-linux-gnu   | riscv64-linux-gnu                                |
 | gcc    | x86_64-linux-gnu   | aarch64-linux-gnu                                |
+| gcc    | x86_64-linux-gnu   | arm-linux-gnueabi                                |
+| gcc    | x86_64-linux-gnu   | arm-linux-gnueabihf                              |
 | gcc    | x86_64-w64-mingw32 | x86_64-w64-mingw32                               |
 | gcc    | x86_64-w64-mingw32 | i686-w64-mingw32                                 |
 | gcc    | x86_64-w64-mingw32 | x86_64-linux-gnu                                 |
@@ -28,7 +31,10 @@
 | gcc    | x86_64-w64-mingw32 | arm-none-eabi                                    |
 | gcc    | x86_64-w64-mingw32 | x86_64-elf                                       |
 | gcc    | x86_64-w64-mingw32 | loongarch64-linux-gnu                            |
+| gcc    | x86_64-w64-mingw32 | loongarch64-loongnix-linux-gnu                   |
 | gcc    | x86_64-w64-mingw32 | riscv64-linux-gnu                                |
 | gcc    | x86_64-w64-mingw32 | aarch64-linux-gnu                                |
+| gcc    | x86_64-w64-mingw32 | arm-linux-gnueabi                                |
+| gcc    | x86_64-w64-mingw32 | arm-linux-gnueabihf                              |
 | llvm   | x86_64-linux-gnu   | X86, ARM, AArch64, LoongArch, RISCV, WebAssembly |
 | llvm   | x86_64-w64-mingw32 | X86, ARM, AArch64, LoongArch, RISCV, WebAssembly |

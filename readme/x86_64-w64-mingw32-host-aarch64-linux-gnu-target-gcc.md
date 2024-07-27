@@ -2,9 +2,9 @@
 
 ## 平台
 
-| build            | host               | target                |
-| :--------------- | :----------------- | :-------------------- |
-| x86_64-linux-gnu | x86_64-w64-mingw32 | loongarch64-linux-gnu |
+| build            | host               | target            |
+| :--------------- | :----------------- | :---------------- |
+| x86_64-linux-gnu | x86_64-w64-mingw32 | aarch64-linux-gnu |
 
 ## 版本
 

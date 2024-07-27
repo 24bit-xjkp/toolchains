@@ -4,7 +4,7 @@ import gcc_environment as gcc
 import os
 from x86_64_linux_gnu_host_arm_none_eabi_target_gcc import copy_lib
 
-env = gcc.environment(target="aarch64-linux-gnu")
+env = gcc.environment(target="arm-linux-gnueabihf")
 
 
 def build() -> None:
@@ -31,7 +31,7 @@ def build() -> None:
 
     # 安装Linux头文件
     env.enter_build_dir("linux")
-    env.make(f"ARCH=arm64 INSTALL_HDR_PATH={env.lib_prefix} headers_install")
+    env.make(f"ARCH=arm INSTALL_HDR_PATH={env.lib_prefix} headers_install")
 
     # 安装glibc头文件
     env.enter_build_dir("glibc")
@@ -49,7 +49,7 @@ def build() -> None:
     env.configure(glibc_option)
     env.make()
     env.install("install")
-    env.adjust_glibc()
+    env.adjust_glibc("arm-hf")
 
     # 编译完整gcc
     env.enter_build_dir("gcc")

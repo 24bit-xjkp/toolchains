@@ -4,7 +4,7 @@ import gcc_environment as gcc
 import os
 from x86_64_linux_gnu_host_arm_none_eabi_target_gcc import copy_lib
 
-env = gcc.environment(target="aarch64-linux-gnu")
+env = gcc.environment(target="loongarch64-loongnix-linux-gnu")
 
 
 def build() -> None:
@@ -12,8 +12,9 @@ def build() -> None:
     # env.update()
 
     basic_option = f"--disable-werror --enable-nls --target={env.target} --prefix={env.prefix}"
-    glibc_option = f"--prefix={env.lib_prefix} --host={env.target} --build={env.build} --disable-werror"
-    gcc_option = "--disable-bootstrap --disable-multilib --enable-languages=c,c++"
+    glibc_option = f"--prefix={env.lib_prefix} --host={env.target} --build={env.build} --disable-werror --enable-obsolete-rpc"
+    gcc_option = "--disable-bootstrap --disable-multilib --enable-languages=c,c++ --disable-libsanitizer"
+    stubs_path = os.path.join(env.lib_prefix, "include", "gnu", "stubs.h")
 
     # 编译binutils和gdb
     env.enter_build_dir("binutils")
@@ -31,13 +32,13 @@ def build() -> None:
 
     # 安装Linux头文件
     env.enter_build_dir("linux")
-    env.make(f"ARCH=arm64 INSTALL_HDR_PATH={env.lib_prefix} headers_install")
+    env.make(f"ARCH=loongarch INSTALL_HDR_PATH={env.lib_prefix} headers_install")
 
     # 安装glibc头文件
     env.enter_build_dir("glibc")
     env.configure(glibc_option, "libc_cv_forced_unwind=yes")
     env.make("install-headers")
-    os.mknod(os.path.join(env.lib_prefix, "include", "gnu", "stubs.h"))
+    os.mknod(stubs_path)
 
     # 编译安装libgcc
     env.enter_build_dir("gcc", False)
@@ -49,7 +50,7 @@ def build() -> None:
     env.configure(glibc_option)
     env.make()
     env.install("install")
-    env.adjust_glibc()
+    env.adjust_glibc("loongarch64-loongnix")
 
     # 编译完整gcc
     env.enter_build_dir("gcc")
