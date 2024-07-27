@@ -141,10 +141,7 @@ class environment(basic_environment):
                 build_dir = os.path.join(build_dir, "build")
 
         if need_make_build_dir:
-            if os.path.isdir(build_dir) and remove_files:
-                shutil.rmtree(build_dir)
-            if not os.path.isdir(build_dir):
-                os.mkdir(build_dir)
+            mkdir(build_dir, remove_files)
 
         print(build_dir)
         os.chdir(build_dir)

@@ -100,6 +100,18 @@ def check_lib_dir(lib: str, lib_dir: str, do_assert=True) -> bool:
     return True
 
 
+def mkdir(path: str, remove_if_exist=True) -> None:
+    """创建目录
+
+    Args:
+        path (str): 要创建的目录
+        remove_if_exist (bool, optional): 是否先删除已存在的同名目录. 默认先删除已存在的同名目录.
+    """
+    if remove_if_exist and os.path.exists(path):
+        shutil.rmtree(path)
+    os.makedirs(path, exist_ok=True)
+
+
 class basic_environment:
     """gcc和llvm共用基本环境"""
 

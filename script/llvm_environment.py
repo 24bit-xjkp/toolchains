@@ -128,7 +128,7 @@ class environment(basic_environment):
         self.prefix["runtimes"] = os.path.join(self.prefix["llvm"], "install")
         self.compiler_rt_dir = os.path.join(self.prefix["llvm"], "lib", "clang", self.major_version, "lib")
 
-    def __init__(self, build: str = "x86_64-linux-gnu", host: str = "") -> None:
+    def __init__(self, build: str = "x86_64-linux-gnu", host: str = "", has_sysroot: bool = True) -> None:
         self.build = build
         self.host = host if host != "" else self.build
         name_without_version = f"{self.host}-clang"
@@ -148,17 +148,18 @@ class environment(basic_environment):
             check_lib_dir(lib, self.source_dir[lib])
         # 设置sysroot目录
         self.sysroot_dir = os.path.join(self.home_dir, "sysroot")
-        # 配置Windows运行库编译选项
-        include_dir = os.path.join(self.sysroot_dir, "x86_64-w64-mingw32/include/c++")
-        for dir in os.listdir(include_dir):
-            if dir[0:2].isdigit():
-                include_dir = os.path.join(include_dir, dir)
-        self.llvm_option_list_w64_1["LIBCXX_CXX_ABI_INCLUDE_PATHS"] = include_dir
-        include_dir = os.path.join(self.sysroot_dir, "i686-w64-mingw32/include/c++")
-        for dir in os.listdir(include_dir):
-            if dir[0:2].isdigit():
-                include_dir = os.path.join(include_dir, dir)
-        self.llvm_option_list_w32_1["LIBCXX_CXX_ABI_INCLUDE_PATHS"] = include_dir
+        if has_sysroot:
+            # 配置Windows运行库编译选项
+            include_dir = os.path.join(self.sysroot_dir, "x86_64-w64-mingw32/include/c++")
+            for dir in os.listdir(include_dir):
+                if dir[0:2].isdigit():
+                    include_dir = os.path.join(include_dir, dir)
+            self.llvm_option_list_w64_1["LIBCXX_CXX_ABI_INCLUDE_PATHS"] = include_dir
+            include_dir = os.path.join(self.sysroot_dir, "i686-w64-mingw32/include/c++")
+            for dir in os.listdir(include_dir):
+                if dir[0:2].isdigit():
+                    include_dir = os.path.join(include_dir, dir)
+            self.llvm_option_list_w32_1["LIBCXX_CXX_ABI_INCLUDE_PATHS"] = include_dir
         # 第2阶段不编译运行库
         if "LLVM_ENABLE_RUNTIMES" in self.llvm_option_list_2:
             del self.llvm_option_list_2["LLVM_ENABLE_RUNTIMES"]
@@ -278,15 +279,13 @@ class environment(basic_environment):
                             copy(os.path.join(src_dir, file), os.path.join(dst_dir, file))
                 case "lib":
                     dst_dir = os.path.join(self.sysroot_dir, target, "lib")
-                    if not os.path.exists(self.compiler_rt_dir):
-                        os.mkdir(self.compiler_rt_dir)
+                    mkdir(self.compiler_rt_dir)
                     for item in os.listdir(src_dir):
                         # 复制compiler-rt
                         if item == system_list[target].lower():
                             item = item.lower()
                             rt_dir = os.path.join(self.compiler_rt_dir, item)
-                            if not os.path.exists(rt_dir):
-                                os.mkdir(rt_dir)
+                            mkdir(rt_dir)
                             for file in os.listdir(os.path.join(src_dir, item)):
                                 copy(os.path.join(src_dir, item, file), os.path.join(rt_dir, file))
                             continue
@@ -310,10 +309,9 @@ class environment(basic_environment):
         # 复制公用libc++头文件
         src_dir = os.path.join(native_bin_dir, "..", "include", "c++", "v1")
         dst_dir = os.path.join(self.prefix["llvm"], "include", "c++")
-        if not os.path.exists(dst_dir):
-            os.mkdir(dst_dir)
+        mkdir(dst_dir)
         dst_dir = os.path.join(dst_dir, "v1")
-        copy(src_dir, dst_dir, True)
+        copy(src_dir, dst_dir)
         if self.build != self.host:
             # 从build下的本地工具链复制compiler-rt
             # 其他库在sysroot中，无需复制
