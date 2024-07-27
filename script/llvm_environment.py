@@ -1,17 +1,8 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 import os
-import psutil
 import shutil
-import sys
-from math import floor
-
-
-def run_command(command: str) -> None:
-    """运行程序，并在失败时退出脚本"""
-    print(command)
-    assert os.system(command) == 0, f'Command "{command}" failed.'
-
+from common import *
 
 lib_list = ("zlib", "libxml2")
 system_list: dict[str, str] = {
@@ -57,34 +48,10 @@ def gnu_to_llvm(target: str) -> str:
         return target
 
 
-def overwrite_copy(src: str, dst: str, is_dir: bool = False):
-    """复制文件或目录，会覆盖已存在项
-
-    Args:
-        src (str): 源路径
-        dst (str): 目标路径
-        is_dir (bool, optional): 目标是否为目录. 默认为否（文件）
-    """
-    if is_dir:
-        if os.path.exists(dst):
-            shutil.rmtree(dst)
-        shutil.copytree(src, dst)
-    else:
-        if os.path.exists(dst):
-            os.remove(dst)
-        shutil.copyfile(src, dst, follow_symlinks=False)
-
-
-class environment:
-    major_version: str  # < LLVM的主版本号
+class environment(basic_environment):
     host: str  # < host平台
     build: str  # build平台
-    name_without_version: str  # < 不带版本号的工具链名
-    name: str  # < 工具链名
-    home_dir: str  # < 源代码所在的目录，默认为$HOME
     prefix: dict[str, str] = {}  # < 工具链安装位置
-    num_cores: int  # < 编译所用线程数
-    current_dir: str  # < toolchains项目所在目录
     lib_dir_list: dict[str, str]  # < 所有库所在目录
     bin_dir: str  # < 安装后可执行文件所在目录
     source_dir: dict[str, str] = {}  # < 源代码所在目录
@@ -163,38 +130,24 @@ class environment:
         self.prefix["runtimes"] = os.path.join(self.prefix["llvm"], "install")
         self.compiler_rt_dir = os.path.join(self.prefix["llvm"], "lib", "clang", self.major_version, "lib")
 
-    def __init__(self, major_version: str, build: str, host: str = "") -> None:
-        self.major_version = major_version
+    def __init__(self, build: str = "x86_64-linux-gnu", host: str = "") -> None:
         self.build = build
         self.host = host if host != "" else self.build
-        self.name_without_version = f"{self.host}-clang"
-        self.name = self.name_without_version + major_version
-        self.home_dir = ""
-        for option in sys.argv:
-            if option.startswith("--home="):
-                self.home_dir = option[7:]
-            elif option.startswith("--stage="):
-                value = option[8:]
-                assert value.isdigit(), 'Option "--stage=" needs an integer'
-                self.stage = int(value)
-                assert 1 <= self.stage <= 4, "Stage should range from 1 to 4"
-        if self.home_dir == "":
-            self.home_dir = os.environ["HOME"]
+        name_without_version = f"{self.host}-clang"
+        super().__init__("19", name_without_version)
         # 设置prefix
         self._set_prefix()
         for lib in lib_list:
             self.prefix[lib] = os.path.join(self.home_dir, lib, "install")
-        # 设置并发数
-        self.num_cores = floor(psutil.cpu_count() * 1.5)
-        self.current_dir = os.path.abspath(os.path.dirname(__file__))
-        self.bin_dir = os.path.join(os.path.join(self.home_dir, self.name), "bin")
         # 设置源目录和构建目录
         for project in subproject_list:
             self.source_dir[project] = os.path.join(self.home_dir, "llvm", project)
             self.build_dir[project] = os.path.join(self.home_dir, "llvm", f"build-{self.host}-{project}")
+            check_lib_dir(project, self.source_dir[project])
         for lib in lib_list:
             self.source_dir[lib] = os.path.join(self.home_dir, lib)
             self.build_dir[lib] = os.path.join(self.source_dir[lib], "build")
+            check_lib_dir(lib, self.source_dir[lib])
         # 设置sysroot目录
         self.sysroot_dir = os.path.join(self.home_dir, "sysroot")
         # 配置Windows运行库编译选项
@@ -231,15 +184,6 @@ class environment:
         """进入下一阶段"""
         self.stage += 1
         self._set_prefix()
-
-    def register_in_env(self) -> None:
-        """注册安装路径到环境变量"""
-        os.environ["PATH"] = f"{self.bin_dir}:{os.environ['PATH']}"
-
-    def register_in_bashrc(self) -> None:
-        """注册安装路径到用户配置文件"""
-        with open(os.path.join(self.home_dir, ".bashrc"), "a") as bashrc_file:
-            bashrc_file.write(f"export PATH={self.bin_dir}:$PATH\n")
 
     def get_compiler(self, target: str, *command_list_in) -> list[str]:
         """获取编译器选项
@@ -333,7 +277,7 @@ class environment:
                     dst_dir = os.path.join(self.sysroot_dir, target, "lib")
                     for file in os.listdir(src_dir):
                         if file.endswith("dll"):
-                            overwrite_copy(os.path.join(src_dir, file), os.path.join(dst_dir, file))
+                            copy(os.path.join(src_dir, file), os.path.join(dst_dir, file))
                 case "lib":
                     dst_dir = os.path.join(self.sysroot_dir, target, "lib")
                     if not os.path.exists(self.compiler_rt_dir):
@@ -345,14 +289,14 @@ class environment:
                             if not os.path.exists(rt_dir):
                                 os.mkdir(rt_dir)
                             for file in os.listdir(os.path.join(src_dir, item)):
-                                overwrite_copy(os.path.join(src_dir, item, file), os.path.join(rt_dir, file))
+                                copy(os.path.join(src_dir, item, file), os.path.join(rt_dir, file))
                             continue
                         # 复制其他库
-                        overwrite_copy(os.path.join(src_dir, item), os.path.join(dst_dir, item))
+                        copy(os.path.join(src_dir, item), os.path.join(dst_dir, item))
                 case "include":
                     # 复制__config_site
                     dst_dir = os.path.join(self.sysroot_dir, target, "include")
-                    overwrite_copy(os.path.join(src_dir, "c++", "v1", "__config_site"), os.path.join(dst_dir, "__config_site"))
+                    copy(os.path.join(src_dir, "c++", "v1", "__config_site"), os.path.join(dst_dir, "__config_site"))
 
     def copy_llvm_libs(self) -> None:
         """复制工具链所需库"""
@@ -363,30 +307,24 @@ class environment:
         native_compiler_rt_dir = os.path.join(native_dir, "lib", "clang", self.major_version, "lib")
         # 复制libc++和libunwind运行库
         for file in filter(lambda file: file.startswith(("libc++", "libunwind")) and not file.endswith(".a"), os.listdir(src_dir)):
-            overwrite_copy(os.path.join(src_dir, file), os.path.join(dst_dir, file))
+            copy(os.path.join(src_dir, file), os.path.join(dst_dir, file))
         # 复制公用libc++头文件
         src_dir = os.path.join(native_bin_dir, "..", "include", "c++", "v1")
         dst_dir = os.path.join(self.prefix["llvm"], "include", "c++")
         if not os.path.exists(dst_dir):
             os.mkdir(dst_dir)
         dst_dir = os.path.join(dst_dir, "v1")
-        overwrite_copy(src_dir, dst_dir, True)
+        copy(src_dir, dst_dir, True)
         if self.build != self.host:
             # 从build下的本地工具链复制compiler-rt
             # 其他库在sysroot中，无需复制
             src_dir = native_compiler_rt_dir
             dst_dir = self.compiler_rt_dir
-            overwrite_copy(src_dir, dst_dir, True)
+            copy(src_dir, dst_dir, True)
             # 复制libxml2
             src_path = os.path.join(self.prefix["libxml2"], "bin", "libxml2.dll")
             dst_path = os.path.join(self.prefix["llvm"], "lib", "libxml2.dll")
-            overwrite_copy(src_path, dst_path)
-
-    def copy_readme(self) -> None:
-        """复制工具链说明文件"""
-        readme_path = os.path.join(self.current_dir, "..", "readme", f"{self.name_without_version}.md")
-        target_path = os.path.join(os.path.join(self.home_dir, self.name), "README.md")
-        shutil.copyfile(readme_path, target_path)
+            copy(src_path, dst_path)
 
     def change_name(self) -> None:
         """修改多阶段自举时的安装目录名"""
@@ -400,7 +338,4 @@ class environment:
     def package(self) -> None:
         """打包工具链"""
         self.copy_readme()
-        os.chdir(self.home_dir)
-        run_command(f"tar -cf {self.name}.tar {self.name}")
-        memory_MB = psutil.virtual_memory().total // 1048576
-        run_command(f"xz -fev9 -T 0 --memlimit={memory_MB}MiB {self.name}.tar")
+        self.compress()
