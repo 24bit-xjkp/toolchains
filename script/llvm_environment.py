@@ -4,6 +4,7 @@ import os
 import shutil
 from common import *
 from auto_gcc import scripts
+import sys
 
 lib_list = ("zlib", "libxml2")
 subproject_list = ("llvm", "runtimes")
@@ -43,6 +44,7 @@ def gnu_to_llvm(target: str) -> str:
 class environment(basic_environment):
     host: str  # host平台
     build: str  # build平台
+    bootstrap: bool = False  # 是否进行自举以便不依赖gnu相关库，需要多次编译
     prefix: dict[str, str] = {}  # 工具链安装位置
     lib_dir_list: dict[str, str]  # 所有库所在目录
     bin_dir: str  # 安装后可执行文件所在目录
@@ -88,8 +90,7 @@ class environment(basic_environment):
     }
     llvm_option_list_w64_1: dict[str, str] = {  # win64运行时第1阶段编译选项
         **llvm_option_list_1,
-        "LLVM_ENABLE_RUNTIMES": '"libcxx;libunwind;compiler-rt"',
-        "LIBCXX_CXX_ABI": "libsupc++",
+        "LIBCXXABI_HAS_WIN32_THREAD_API": "ON",
     }
     llvm_option_list_w32_1: dict[str, str] = {**llvm_option_list_w64_1}  # win32运行时第1阶段编译选项
     llvm_option_list_2: dict[str, str] = {  # 第2阶段编译选项，该阶段不编译运行库
@@ -130,6 +131,16 @@ class environment(basic_environment):
         super().__init__("19.0.1", name_without_version)
         # 设置prefix
         self._set_prefix()
+        for i in sys.argv[1:]:
+            if i == "--bootstrap":
+                self.bootstrap = True
+            elif i.startswith("--stage="):
+                self.stage = int(i[8:])
+            else:
+                assert False, f'Unknown option: "{i}"'
+        # 非自举在第1阶段就编译clang-tools-extra
+        if not self.bootstrap:
+            self.llvm_option_list_1["LLVM_ENABLE_PROJECTS"] = '"clang;clang-tools-extra;lld"'
         for target, _ in filter(lambda x: x[1], scripts.host_target_list):
             target_field = target.split("-")
             self.system_list[target] = "Linux" if "linux" in target_field else "Windows"

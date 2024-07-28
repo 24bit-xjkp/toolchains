@@ -10,6 +10,8 @@ env = llvm.environment()
 
 def build(stage: int = env.stage) -> None:
     env.stage = stage
+    if not env.bootstrap:
+        assert env.stage == 1, "No bootstrap build must be started with stage 1."
     if env.stage == 1:
         env.config("llvm", env.host, **{**env.dylib_option_list, **env.llvm_option_list_1})
         env.make("llvm")
@@ -28,6 +30,8 @@ def build(stage: int = env.stage) -> None:
             env.install("runtimes")
             env.build_sysroot(target)
             env.remove_build_dir("runtimes")
+        if not env.bootstrap:
+            return
         env.stage += 1
 
     basic_command = ("-stdlib=libc++", "-unwindlib=libunwind", "-rtlib=compiler-rt")
