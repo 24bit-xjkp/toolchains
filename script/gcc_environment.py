@@ -45,23 +45,24 @@ arch_32_bit_list = ("arm", "armeb", "i486", "i686", "risc32", "risc32be")
 
 
 class environment(basic_environment):
-    build: str  # < build平台
-    host: str  # < host平台
-    target: str  # < target平台
-    toolchain_type: str  # < 工具链类别
-    cross_compiler: bool  # < 是否是交叉编译器
-    prefix: str  # < 工具链安装位置
-    lib_prefix: str  # < 安装后库目录的前缀
-    symlink_list: list[str]  # < 构建过程中创建的软链接表
-    share_dir: str  # < 安装后share目录
-    gdbinit_path: str  # < 安装后.gdbinit文件所在路径
-    lib_dir_list: dict[str, str]  # < 所有库所在目录
-    tool_prefix: str  # < 工具的前缀，如x86_64-w64-mingw32-
-    dll_name_list: tuple  # < 该平台上需要保留调试符号的dll列表
-    python_config_path: str  # < python_config.sh所在路径
-    host_32_bit: bool  # < 宿主环境是否是32位的
-    rpath_option: str  # < 设置rpath的链接选项
-    rpath_dir: str  # < rpath所在目录
+    build: str  # build平台
+    host: str  # host平台
+    target: str  # target平台
+    toolchain_type: str  # 工具链类别
+    cross_compiler: bool  # 是否是交叉编译器
+    prefix: str  # 工具链安装位置
+    lib_prefix: str  # 安装后库目录的前缀
+    symlink_list: list[str]  # 构建过程中创建的软链接表
+    share_dir: str  # 安装后share目录
+    gdbinit_path: str  # 安装后.gdbinit文件所在路径
+    lib_dir_list: dict[str, str]  # 所有库所在目录
+    tool_prefix: str  # 工具的前缀，如x86_64-w64-mingw32-
+    dll_name_list: tuple  # 该平台上需要保留调试符号的dll列表
+    python_config_path: str  # python_config.sh所在路径
+    host_32_bit: bool  # 宿主环境是否是32位的
+    rpath_option: str  # 设置rpath的链接选项
+    rpath_dir: str  # rpath所在目录
+    freestanding: bool  # 是否为独立工具链
 
     def __init__(self, build: str = "x86_64-linux-gnu", host: str = "", target: str = "") -> None:
         self.build = build
@@ -85,10 +86,11 @@ class environment(basic_environment):
         self.share_dir = os.path.join(self.prefix, "share")
         self.gdbinit_path = os.path.join(self.share_dir, ".gdbinit")
         self.lib_dir_list = {}
+        target_field = self.target.split("-")
         for lib in lib_list:
             match lib:
                 case "glibc" | "linux" if self.target.count("-") == 3:
-                    vendor = self.target.split("-")[1]
+                    vendor = target_field[1]
                     lib_dir = os.path.join(self.home_dir, f"{lib}-{vendor}")
                 case _:
                     lib_dir = os.path.join(self.home_dir, lib)
@@ -115,6 +117,7 @@ class environment(basic_environment):
             environment(target=self.target).register_in_env()
         # 将自身注册到环境变量中
         self.register_in_env()
+        self.freestanding = "elf" in target_field or "eabi" in target_field
 
     def update(self) -> None:
         """更新源代码"""
@@ -249,6 +252,9 @@ class environment(basic_environment):
             need_gdbinit (bool, optional): 是否需要打包.gdbinit文件. 默认需要.
             need_python_embed_package (bool, optional): 是否需要打包python embed package. 默认不需要.
         """
+        if self.toolchain_type == "native":
+            # 本地工具链需要添加cc以代替系统提供的cc
+            os.symlink(os.path.join(self.bin_dir, "gcc"), os.path.join(self.bin_dir, "cc"))
         if need_gdbinit:
             self.copy_gdbinit()
         if need_python_embed_package:
@@ -310,12 +316,7 @@ class environment(basic_environment):
         # 从交叉工具链中复制libc、linux头文件等到本工具链中
         cross_toolchain = environment(self.build, self.build, self.target)
         for dir in filter(lambda x: x != "bin", os.listdir(cross_toolchain.lib_prefix)):
-            src_prefix = os.path.join(cross_toolchain.lib_prefix, dir)
-            dst_prefix = os.path.join(self.lib_prefix, dir)
-            for item in os.listdir(src_prefix):
-                src_path = os.path.join(src_prefix, item)
-                dst_path = os.path.join(dst_prefix, item)
-                copy(src_path, dst_path, False)
+            copy(os.path.join(cross_toolchain.lib_prefix, dir), os.path.join(self.lib_prefix, dir))
 
         # 复制gdbserver
         src_path = os.path.join(cross_toolchain.bin_dir, "gdbserver")
