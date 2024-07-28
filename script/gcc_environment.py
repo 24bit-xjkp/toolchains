@@ -313,12 +313,7 @@ class environment(basic_environment):
         # 从交叉工具链中复制libc、linux头文件等到本工具链中
         cross_toolchain = environment(self.build, self.build, self.target)
         for dir in filter(lambda x: x != "bin", os.listdir(cross_toolchain.lib_prefix)):
-            src_prefix = os.path.join(cross_toolchain.lib_prefix, dir)
-            dst_prefix = os.path.join(self.lib_prefix, dir)
-            for item in os.listdir(src_prefix):
-                src_path = os.path.join(src_prefix, item)
-                dst_path = os.path.join(dst_prefix, item)
-                copy(src_path, dst_path, False)
+            copy(os.path.join(cross_toolchain.lib_prefix, dir), os.path.join(self.lib_prefix, dir))
 
         # 复制gdbserver
         src_path = os.path.join(cross_toolchain.bin_dir, "gdbserver")
