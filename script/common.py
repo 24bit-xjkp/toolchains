@@ -115,6 +115,7 @@ def mkdir(path: str, remove_if_exist=True) -> None:
 class basic_environment:
     """gcc和llvm共用基本环境"""
 
+    version: str  # 版本号
     major_version: str  # 主版本号
     home_dir: str  # 源代码所在的目录，默认为$HOME
     num_cores: int  # < 编译所用线程数
@@ -123,8 +124,9 @@ class basic_environment:
     name: str  # < 工具链名
     bin_dir: str  # < 安装后可执行文件所在目录
 
-    def __init__(self, major_version: str, name_without_version: str) -> None:
-        self.major_version = major_version
+    def __init__(self, version: str, name_without_version: str) -> None:
+        self.version = version
+        self.major_version = self.version.split('.')[0]
         self.name_without_version = name_without_version
         self.name = self.name_without_version + self.major_version
         self.home_dir = ""

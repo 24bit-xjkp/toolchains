@@ -78,7 +78,7 @@ class environment(basic_environment):
             self.toolchain_type = "canadian cross"
         self.cross_compiler = self.host != self.target
         name_without_version = (f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native") + "-gcc"
-        super().__init__("15", name_without_version)
+        super().__init__("15.0.0", name_without_version)
         self.prefix = os.path.join(self.home_dir, self.name)
         self.lib_prefix = os.path.join(self.prefix, self.target) if self.cross_compiler else self.prefix
         self.symlink_list = []

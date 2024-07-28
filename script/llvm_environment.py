@@ -134,7 +134,7 @@ class environment(basic_environment):
         self.build = build
         self.host = host if host != "" else self.build
         name_without_version = f"{self.host}-clang"
-        super().__init__("19", name_without_version)
+        super().__init__("19.0.1", name_without_version)
         # 设置prefix
         self._set_prefix()
         for lib in lib_list:
