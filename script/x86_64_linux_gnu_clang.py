@@ -1,7 +1,10 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 import llvm_environment as llvm
+from sysroot import auto_build_sysroot
 
+# 确保sysroot存在
+auto_build_sysroot()
 env = llvm.environment()
 
 
@@ -12,7 +15,7 @@ def build(stage: int = env.stage) -> None:
         env.make("llvm")
         env.install("llvm")
         env.remove_build_dir("llvm")
-        for target in llvm.system_list.keys():
+        for target in env.system_list.keys():
             match target:
                 case "x86_64-w64-mingw32":
                     option = env.llvm_option_list_w64_1
@@ -36,7 +39,7 @@ def build(stage: int = env.stage) -> None:
         env.stage += 1
 
     if env.stage == 3:
-        for target in llvm.system_list.keys():
+        for target in env.system_list.keys():
             command = basic_command
             match target:
                 case "x86_64-w64-mingw32":
