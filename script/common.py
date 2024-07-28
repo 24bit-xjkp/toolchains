@@ -92,7 +92,7 @@ def check_lib_dir(lib: str, lib_dir: str, do_assert=True) -> bool:
         bool: 返回库是否存在
     """
     message = f'Cannot find lib "{lib}" in directory "{lib_dir}"'
-    if do_assert and not os.path.exists(lib_dir):
+    if not do_assert and not os.path.exists(lib_dir):
         print(message)
         return False
     else:
