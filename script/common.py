@@ -126,7 +126,7 @@ class basic_environment:
 
     def __init__(self, version: str, name_without_version: str) -> None:
         self.version = version
-        self.major_version = self.version.split('.')[0]
+        self.major_version = self.version.split(".")[0]
         self.name_without_version = name_without_version
         self.name = self.name_without_version + self.major_version
         self.home_dir = ""
@@ -140,12 +140,17 @@ class basic_environment:
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
         self.bin_dir = os.path.join(self.home_dir, self.name, "bin")
 
-    def compress(self) -> None:
-        """压缩构建完成的工具链"""
+    def compress(self, name: str = "") -> None:
+        """压缩构建完成的工具链
+
+        Args:
+            name (str, optional): 要压缩的目标名称，是相对于self.home_dir的路径. 默认为self.name.
+        """
         os.chdir(self.home_dir)
-        run_command(f"tar -cf {self.name}.tar {self.name}")
+        name = self.name if name == "" else name
+        run_command(f"tar -cf {name}.tar {name}")
         memory_MB = psutil.virtual_memory().available // 1048576 + 3072
-        run_command(f"xz -fev9 -T 0 --memlimit={memory_MB}MiB {self.name}.tar")
+        run_command(f"xz -fev9 -T 0 --memlimit={memory_MB}MiB {name}.tar")
 
     def register_in_env(self) -> None:
         """注册安装路径到环境变量"""

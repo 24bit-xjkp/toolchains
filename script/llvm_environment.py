@@ -84,15 +84,15 @@ class environment(basic_environment):
         "LIBCXX_CXX_ABI": "libcxxabi",  # 使用libcxxabi构建libcxx
         "LIBCXXABI_USE_LLVM_UNWINDER": "ON",  # 使用libunwind构建libcxxabi
         "LIBCXXABI_USE_COMPILER_RT": "ON",  # 使用compiler-rt构建libcxxabi
-        "LIBUNWIND_USE_COMPILER_RT": "ON",  # 使用compiler-rt构建libunwind
         "COMPILER_RT_DEFAULT_TARGET_ONLY": "ON",  # compiler-rt只需构建默认目标即可，禁止自动构建multilib
         "COMPILER_RT_USE_LIBCXX": "ON",  # 使用libcxx构建compiler-rt
     }
-    llvm_option_list_w64_1: dict[str, str] = {  # win64运行时第1阶段编译选项
+    llvm_option_list_w32_1: dict[str, str] = {  # win32运行时第1阶段编译选项
         **llvm_option_list_1,
         "LIBCXXABI_HAS_WIN32_THREAD_API": "ON",
+        "LIBCXXABI_ENABLE_SHARED": "OFF",
+        "LIBCXX_ENABLE_STATIC_ABI_LIBRARY": "ON",
     }
-    llvm_option_list_w32_1: dict[str, str] = {**llvm_option_list_w64_1}  # win32运行时第1阶段编译选项
     llvm_option_list_2: dict[str, str] = {  # 第2阶段编译选项，该阶段不编译运行库
         **llvm_option_list_1,
         "LLVM_ENABLE_PROJECTS": '"clang;clang-tools-extra;lld"',
@@ -101,8 +101,10 @@ class environment(basic_environment):
         "CLANG_DEFAULT_RTLIB": "compiler-rt",
         "CLANG_DEFAULT_UNWINDLIB": "libunwind",
     }
-    llvm_option_list_3: dict[str, str] = {**llvm_option_list_2}  # 第3阶段编译选项，编译运行库
-    llvm_option_list_w64_3: dict[str, str] = {}  # win64运行时第3阶段编译选项
+    llvm_option_list_3: dict[str, str] = {
+        **llvm_option_list_2,
+        "LIBUNWIND_USE_COMPILER_RT": "ON",  # 使用compiler-rt构建libunwind
+    }  # 第3阶段编译选项，编译运行库
     llvm_option_list_w32_3: dict[str, str] = {}  # win32运行时第3阶段编译选项
     lib_option: dict[str, str] = {  # llvm依赖库编译选项
         "BUILD_SHARED_LIBS": "ON",
@@ -138,9 +140,11 @@ class environment(basic_environment):
                 self.stage = int(i[8:])
             else:
                 assert False, f'Unknown option: "{i}"'
+        self.llvm_option_list_1["LLVM_PARALLEL_LINK_JOBS"] = str(self.num_cores // 5)
         # 非自举在第1阶段就编译clang-tools-extra
         if not self.bootstrap:
             self.llvm_option_list_1["LLVM_ENABLE_PROJECTS"] = '"clang;clang-tools-extra;lld"'
+            self.llvm_option_list_1["LLVM_ENABLE_LTO"] = "Thin"
         for target, _ in filter(lambda x: x[1], scripts.host_target_list):
             target_field = target.split("-")
             self.system_list[target] = "Linux" if "linux" in target_field else "Windows"
@@ -157,22 +161,9 @@ class environment(basic_environment):
             check_lib_dir(lib, self.source_dir[lib])
         # 设置sysroot目录
         self.sysroot_dir = os.path.join(self.home_dir, "sysroot")
-        if has_sysroot:
-            # 配置Windows运行库编译选项
-            include_dir = os.path.join(self.sysroot_dir, "x86_64-w64-mingw32/include/c++")
-            for dir in os.listdir(include_dir):
-                if dir[0:2].isdigit():
-                    include_dir = os.path.join(include_dir, dir)
-            self.llvm_option_list_w64_1["LIBCXX_CXX_ABI_INCLUDE_PATHS"] = include_dir
-            include_dir = os.path.join(self.sysroot_dir, "i686-w64-mingw32/include/c++")
-            for dir in os.listdir(include_dir):
-                if dir[0:2].isdigit():
-                    include_dir = os.path.join(include_dir, dir)
-            self.llvm_option_list_w32_1["LIBCXX_CXX_ABI_INCLUDE_PATHS"] = include_dir
         # 第2阶段不编译运行库
         if "LLVM_ENABLE_RUNTIMES" in self.llvm_option_list_2:
             del self.llvm_option_list_2["LLVM_ENABLE_RUNTIMES"]
-        self.llvm_option_list_w64_3 = {**self.llvm_option_list_3, **self.llvm_option_list_w64_1}
         self.llvm_option_list_w32_3 = {**self.llvm_option_list_3, **self.llvm_option_list_w32_1}
         # 设置llvm依赖库编译选项
         zlib = f'"{os.path.join(self.prefix["zlib"], "lib", "libzlibstatic.a")}"'
@@ -232,6 +223,7 @@ class environment(basic_environment):
             command_list: 附加编译选项
             cmake_option_list: 附加cmake配置选项
         """
+        remove_if_exists(self.build_dir[project])
         assert project in (*subproject_list, *lib_list)
         command = f"cmake -G Ninja --install-prefix {self.prefix[project]} -B {self.build_dir[project]} -S {self.source_dir[project]} "
         command += " ".join(self.get_compiler(target, *command_list) + get_cmake_option(**cmake_option_list))
@@ -288,12 +280,12 @@ class environment(basic_environment):
                             copy(os.path.join(src_dir, file), os.path.join(dst_dir, file))
                 case "lib":
                     dst_dir = os.path.join(self.sysroot_dir, target, "lib")
-                    mkdir(self.compiler_rt_dir)
+                    mkdir(self.compiler_rt_dir, False)
                     for item in os.listdir(src_dir):
                         # 复制compiler-rt
                         if item == self.system_list[target].lower():
                             rt_dir = os.path.join(self.compiler_rt_dir, item)
-                            mkdir(rt_dir)
+                            mkdir(rt_dir, False)
                             for file in os.listdir(os.path.join(src_dir, item)):
                                 copy(os.path.join(src_dir, item, file), os.path.join(rt_dir, file))
                             continue
@@ -303,6 +295,9 @@ class environment(basic_environment):
                     # 复制__config_site
                     dst_dir = os.path.join(self.sysroot_dir, target, "include")
                     copy(os.path.join(src_dir, "c++", "v1", "__config_site"), os.path.join(dst_dir, "__config_site"))
+                    # 对于Windows目标，需要在sysroot/include下准备一份头文件
+                    dst_dir = os.path.join(self.sysroot_dir, "include", "c++")
+                    copy(os.path.join(self.prefix["llvm"], "include", "c++"), dst_dir, False)
 
     def copy_llvm_libs(self) -> None:
         """复制工具链所需库"""
@@ -336,7 +331,7 @@ class environment(basic_environment):
         name = os.path.join(self.home_dir, self.name)
         # clang->clang-old
         # clang-new->clang
-        if not os.path.exists(f"{name}-old"):
+        if not os.path.exists(f"{name}-old") and self.bootstrap:
             os.rename(name, f"{name}-old")
             os.rename(self.prefix["llvm"], name)
 
@@ -344,3 +339,4 @@ class environment(basic_environment):
         """打包工具链"""
         self.copy_readme()
         self.compress()
+        self.compress("sysroot")
