@@ -68,7 +68,7 @@ class environment(basic_environment):
         "LLVM_INCLUDE_BENCHMARKS": "OFF",  # 禁用llvm基准测试构建
         "LLVM_INCLUDE_EXAMPLES": "OFF",  # llvm不包含示例
         "LLVM_INCLUDE_TESTS": "OFF",  # llvm不包含单元测试
-        "LLVM_TARGETS_TO_BUILD": '"X86;AArch64;WebAssembly;RISCV;ARM;LoongArch"',  # 设置需要构建的目标
+        "LLVM_TARGETS_TO_BUILD": '"X86;AArch64;RISCV;ARM;LoongArch"',  # 设置需要构建的目标
         "LLVM_ENABLE_PROJECTS": '"clang;lld"',  # 设置一同构建的子项目
         "LLVM_ENABLE_RUNTIMES": '"libcxx;libcxxabi;libunwind;compiler-rt"',  # 设置一同构建的运行时项目
         "LLVM_ENABLE_WARNINGS": "OFF",  # 禁用警告
@@ -128,7 +128,7 @@ class environment(basic_environment):
         self.build = build
         self.host = host if host != "" else self.build
         name_without_version = f"{self.host}-clang"
-        super().__init__("19.0.1", name_without_version)
+        super().__init__("20.0.0", name_without_version)
         # 设置prefix
         self._set_prefix()
         for i in sys.argv[1:]:
