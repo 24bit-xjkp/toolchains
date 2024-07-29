@@ -3,7 +3,7 @@ from common import *
 from llvm_environment import *
 from importlib import import_module
 
-env = environment(has_sysroot=False)
+env = environment()
 
 def need_build() -> bool:
     """是否需要创建原始sysroot

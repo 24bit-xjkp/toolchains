@@ -41,6 +41,7 @@ def gnu_to_llvm(target: str) -> str:
         return target
 
 
+
 class environment(basic_environment):
     host: str  # host平台
     build: str  # build平台
@@ -126,7 +127,7 @@ class environment(basic_environment):
         self.prefix["runtimes"] = os.path.join(self.prefix["llvm"], "install")
         self.compiler_rt_dir = os.path.join(self.prefix["llvm"], "lib", "clang", self.major_version, "lib")
 
-    def __init__(self, build: str = "x86_64-linux-gnu", host: str = "", has_sysroot: bool = True) -> None:
+    def __init__(self, build: str = "x86_64-linux-gnu", host: str = "") -> None:
         self.build = build
         self.host = host if host != "" else self.build
         name_without_version = f"{self.host}-clang"
@@ -165,17 +166,20 @@ class environment(basic_environment):
         if "LLVM_ENABLE_RUNTIMES" in self.llvm_option_list_2:
             del self.llvm_option_list_2["LLVM_ENABLE_RUNTIMES"]
         self.llvm_option_list_w32_3 = {**self.llvm_option_list_3, **self.llvm_option_list_w32_1}
-        # 设置llvm依赖库编译选项
-        zlib = f'"{os.path.join(self.prefix["zlib"], "lib", "libzlibstatic.a")}"'
-        self.llvm_cross_option = {
-            "LIBXML2_INCLUDE_DIR": f'"{os.path.join(self.prefix["libxml2"], "include", "libxml2")}"',
-            "LIBXML2_LIBRARY": f'"{os.path.join(self.prefix["libxml2"], "lib", "libxml2.dll.a")}"',
-            "CLANG_ENABLE_LIBXML2": "ON",
-            "ZLIB_INCLUDE_DIR": f'"{os.path.join(self.prefix["zlib"], "include")}"',
-            "ZLIB_LIBRARY": zlib,
-            "ZLIB_LIBRARY_RELEASE": zlib,
-            "LLVM_NATIVE_TOOL_DIR": f'"{os.path.join(self.source_dir["llvm"], f"build-{self.build}-llvm", "bin")}"',
-        }
+        if self.build != self.host:
+            # 交叉编译时runtimes已经编译过了
+            del self.llvm_option_list_1["LLVM_ENABLE_RUNTIMES"]
+            # 设置llvm依赖库编译选项
+            zlib = f'"{os.path.join(self.prefix["zlib"], "lib", "libzlibstatic.a")}"'
+            self.llvm_cross_option = {
+                "LIBXML2_INCLUDE_DIR": f'"{os.path.join(self.prefix["libxml2"], "include", "libxml2")}"',
+                "LIBXML2_LIBRARY": f'"{os.path.join(self.prefix["libxml2"], "lib", "libxml2.dll.a")}"',
+                "CLANG_ENABLE_LIBXML2": "ON",
+                "ZLIB_INCLUDE_DIR": f'"{os.path.join(self.prefix["zlib"], "include")}"',
+                "ZLIB_LIBRARY": zlib,
+                "ZLIB_LIBRARY_RELEASE": zlib,
+                "LLVM_NATIVE_TOOL_DIR": f'"{os.path.join(self.home_dir, f'{self.build}-clang{self.major_version}', "bin")}"',
+            }
         # 将自身注册到环境变量中
         self.register_in_env()
 
@@ -301,26 +305,26 @@ class environment(basic_environment):
 
     def copy_llvm_libs(self) -> None:
         """复制工具链所需库"""
-        src_dir = os.path.join(self.sysroot_dir, self.host, "lib")
-        dst_dir = os.path.join(self.prefix["llvm"], "lib")
+        src_prefix = os.path.join(self.sysroot_dir, self.host, "lib")
+        dst_prefix = os.path.join(self.prefix["llvm"], "lib")
         native_dir = os.path.join(self.home_dir, f"{self.build}-clang{self.major_version}")
         native_bin_dir = os.path.join(native_dir, "bin")
         native_compiler_rt_dir = os.path.join(native_dir, "lib", "clang", self.major_version, "lib")
         # 复制libc++和libunwind运行库
-        for file in filter(lambda file: file.startswith(("libc++", "libunwind")) and not file.endswith(".a"), os.listdir(src_dir)):
-            copy(os.path.join(src_dir, file), os.path.join(dst_dir, file))
-        # 复制公用libc++头文件
-        src_dir = os.path.join(native_bin_dir, "..", "include", "c++", "v1")
-        dst_dir = os.path.join(self.prefix["llvm"], "include", "c++")
-        mkdir(dst_dir)
-        dst_dir = os.path.join(dst_dir, "v1")
-        copy(src_dir, dst_dir)
+        for file in filter(lambda file: file.startswith(("libc++", "libunwind")) and not file.endswith(".a"), os.listdir(src_prefix)):
+            copy(os.path.join(src_prefix, file), os.path.join(dst_prefix, file))
+        # 复制公用libc++和libunwind头文件
+        src_prefix = os.path.join(native_bin_dir, "..", "include")
+        dst_prefix = os.path.join(self.prefix["llvm"], "include")
+        for item in filter(lambda item: "unwind" in item or item == "c++", os.listdir(src_prefix)):
+            copy(os.path.join(src_prefix, item), os.path.join(dst_prefix, item))
+
         if self.build != self.host:
             # 从build下的本地工具链复制compiler-rt
             # 其他库在sysroot中，无需复制
-            src_dir = native_compiler_rt_dir
-            dst_dir = self.compiler_rt_dir
-            copy(src_dir, dst_dir, True)
+            src_prefix = native_compiler_rt_dir
+            dst_prefix = self.compiler_rt_dir
+            copy(src_prefix, dst_prefix, True)
             # 复制libxml2
             src_path = os.path.join(self.prefix["libxml2"], "bin", "libxml2.dll")
             dst_path = os.path.join(self.prefix["llvm"], "lib", "libxml2.dll")
@@ -339,4 +343,6 @@ class environment(basic_environment):
         """打包工具链"""
         self.copy_readme()
         self.compress()
-        self.compress("sysroot")
+        # 编译本地工具链时才需要打包sysroot
+        if self.build == self.host:
+            self.compress("sysroot")
