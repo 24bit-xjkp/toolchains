@@ -77,7 +77,9 @@ sysroot
 └── x86_64-w64-mingw32
 ```
 
-### 3.编译x86_64-linux-gnu-llvm工具链
+## 构建流程
+
+### 编译x86_64-linux-gnu-llvm工具链
 
 通过clang自举出不依赖gnu相关库的完整llvm工具链需要分为4个阶段进行：
 
@@ -86,14 +88,18 @@ sysroot
 3. 使用刚才编译的llvm和runtimes重新编译runtimes，得到不依赖gnu相关库的runtimes
 4. 打包工具链
 
+上述流程共计需要编译llvm部分2次，runtimes部分2次，为缩短构建流程可跳过一些自举步骤。
+如果无需自举llvm，则可以跳过[再次编译llvm](#2再次编译llvm)，并且可以按需在[首次编译llvm](#1首次编译llvm以及runtimes)流程中启用`clang-tools-extra`组件和LTO优化；
+如果无需自举runtimes，则可以跳过[再次编译runtimes](#3再次编译runtimes)。
+
 #### (1)首次编译llvm以及runtimes
 
 首先编译llvm：
 
 ```shell
-export llvm_prefix=~/x86_64-linux-gnu-clang19
+export llvm_prefix=~/x86_64-linux-gnu-clang20
 export runtimes_prefix=$llvm_prefix/install
-export compiler_rt_prefix=$llvm_prefix/lib/clang/19/lib
+export compiler_rt_prefix=$llvm_prefix/lib/clang/20/lib
 # 启用动态链接以减小项目体积
 export dylib_option_list="-DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_BUILD_LLVM_DYLIB=ON -DCLANG_LINK_CLANG_DYLIB=ON"
 # 设置构建模式为Release
@@ -110,10 +116,10 @@ export dylib_option_list="-DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_BUILD_LLVM_DYLIB=ON -
 # 关闭libcxx基准测试的构建
 # 使用compiler-rt和libcxxabi构建libcxx
 # 使用compiler-rt和libunwind构建libcxxabi
-# 使用compiler-rt构建libunwind
 # compiler-rt只需构建默认目标即可，禁止自动构建multilib
 # 使用libcxx构建compiler-rt中的asan等项目
-export llvm_option_list1='-DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_DOCS=OFF -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_TARGETS_TO_BUILD="X86;AArch64;RISCV;ARM;LoongArch" -DLLVM_ENABLE_PROJECTS="clang;lld" -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind;compiler-rt" -DLLVM_ENABLE_WARNINGS=OFF -DCLANG_INCLUDE_TESTS=OFF -DBENCHMARK_INSTALL_DOCS=OFF -DCLANG_DEFAULT_LINKER=lld -DLLVM_ENABLE_LLD=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DLIBCXX_INCLUDE_BENCHMARKS=OFF -DLIBCXX_USE_COMPILER_RT=ON -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=ON -DLIBCXXABI_USE_COMPILER_RT=ON -DLIBUNWIND_USE_COMPILER_RT=ON -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON -DCOMPILER_RT_USE_LIBCXX=ON'
+# 值得注意的是，libunwind的构建早于compiler-rt，故而此处不能选择使用compiler-rt编译libunwind
+export llvm_option_list1='-DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_DOCS=OFF -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_TARGETS_TO_BUILD="X86;AArch64;RISCV;ARM;LoongArch" -DLLVM_ENABLE_PROJECTS="clang;lld" -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind;compiler-rt" -DLLVM_ENABLE_WARNINGS=OFF -DCLANG_INCLUDE_TESTS=OFF -DBENCHMARK_INSTALL_DOCS=OFF -DCLANG_DEFAULT_LINKER=lld -DLLVM_ENABLE_LLD=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DLIBCXX_INCLUDE_BENCHMARKS=OFF -DLIBCXX_USE_COMPILER_RT=ON -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=ON -DLIBCXXABI_USE_COMPILER_RT=ON -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON -DCOMPILER_RT_USE_LIBCXX=ON'
 # 设置编译器为clang
 # 编译器目标平台：x86_64-linux-gnu
 # 禁用unused-command-line-argument警告并设置gcc查找路径以使用最新的gcc
@@ -135,16 +141,14 @@ ninja -C build -j 20
 ninja -C build install/strip -j 20
 ```
 
-接下来编译所有需要的runtimes，值得注意的是，在Windows上尚不支持使用libcxxabi，故而需要改用libsupc++作为libcxx的abi。此时需要额外的设置
-`LIBCXX_CXX_ABI_INCLUDE_PATHS`来确定libsupc++头文件的查找路径。而在`sysroot/x86_64(i686)-w64-mingw32/include/c++/version`下可以查找到所需的头文件。
+接下来编译所有需要的runtimes，值得注意的是，在Windows上尚不支持使用动态链接的libcxxabi，故而需要改用静态链接的libcxxabi作为libcxx的abi实现。这需要增加
+`-DLIBCXXABI_ENABLE_SHARED=OFF`和`-DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON`选项。参见[GitHub Issue](https://github.com/llvm/llvm-project/issues/62798)。
+而编译runtimes需要较新的Linux header和Glibc，故而不能为`loongarch64-loongnix-linux-gnu`等老旧目标编译runtimes。
+同时在为arm平台编译runtimes时需要armv6+的配置才能完成编译，故而需要为`$flags`增加`-march=armv6`选项。
 
 ```shell
-export version="15.0.0"
-# 为llvm_option_list1移除libcxxabi相关选项并且使用libsupc++作为abi
-export llvm_option_list_w_1='-DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_DOCS=OFF -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_TARGETS_TO_BUILD="X86;AArch64;RISCV;ARM;LoongArch" -DLLVM_ENABLE_PROJECTS="clang;lld" -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind;compiler-rt" -DLLVM_ENABLE_WARNINGS=OFF -DCLANG_INCLUDE_TESTS=OFF -DBENCHMARK_INSTALL_DOCS=OFF -DCLANG_DEFAULT_LINKER=lld -DLLVM_ENABLE_LLD=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DLIBCXX_INCLUDE_BENCHMARKS=OFF -DLIBCXX_USE_COMPILER_RT=ON -DLIBCXXABI_USE_COMPILER_RT=ON -DLIBUNWIND_USE_COMPILER_RT=ON -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON -DCOMPILER_RT_USE_LIBCXX=ON -DLLVM_ENABLE_RUNTIMES="libcxx;libunwind;compiler-rt" -DLIBCXX_CXX_ABI=libsupc++'
-# 增加头文件搜索路径
-export llvm_option_list_w64_1="$llvm_option_list_w_1 -DLIBCXX_CXX_ABI_INCLUDE_PATHS=\"$HOME/sysroot/x86_64-w64-mingw32/include/c++/$version\""
-export llvm_option_list_w32_1="$llvm_option_list_w_1 -DLIBCXX_CXX_ABI_INCLUDE_PATHS=\"$HOME/sysroot/i686-w64-mingw32/include/c++/$version\""
+# 静态构建libcxxabi
+export llvm_option_list_w32_1="$llvm_option_list1 -DLIBCXXABI_ENABLE_SHARED=OFF -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON"
 # 进入llvm项目目录
 cd ~/llvm
 # 配置runtimes
@@ -170,7 +174,7 @@ export compiler_option="-DCMAKE_C_COMPILER=\"clang\" -DCMAKE_C_COMPILER_TARGET=$
 # 进入llvm项目目录
 cd ~/llvm
 # 配置runtimes（编译Windows平台的需要设置llvm_option_list_w64(32)_1，Linux平台使用llvm_option_list1）
-cmake -G Ninja --install-prefix $runtimes_prefix -B build-x86_64-linux-gnu-runtimes -S runtimes $dylib_option_list $llvm_option_list_w64_1 $compiler_option
+cmake -G Ninja --install-prefix $runtimes_prefix -B build-x86_64-linux-gnu-runtimes -S runtimes $dylib_option_list $llvm_option_list_w32 $compiler_option
 # 编译runtimes
 ninja -C build -j 20
 # 安装runtimes
@@ -179,23 +183,23 @@ ninja -C build install/strip -j 20
 
 在编译完runtimes后还需要将llvm相关库复制到sysroot下，以便在后续使用过程中通过命令行选项切换使用的库，以及编译出不依赖gnu相关库的llvm。
 值得注意的是，compiler-rt相关库需要复制到`prefix/lib/clang/version`而不是sysroot下。同时，对于Windows平台而言，dll位于`bin`目录下，而对于
-Linux平台而言，so位于`lib`目录下。最后，在安装带runtimes的llvm时会安装一份libcxx的头文件到`prefix/include/c++/v1`下，此部分头文件是跨平台的，无需重复
-复制到sysroot下。而libcxx中与平台相关的部分储存在`__config_site`文件中，故该文件需要复制到sysroot下。
+Linux平台而言，so位于`lib`目录下。最后，在安装带runtimes的llvm时会安装一份libcxx的头文件到`prefix/include/c++/v1`下，此部分头文件是跨平台的，
+但在编译Windows平台的程序时，clang不会在`prefix/include`路径下查找，故还需要复制一份到sysroot下，但该过程只需要进行一次即可。
+而libcxx中与平台相关的部分储存在`__config_site`文件中，故该文件需要复制到sysroot下。
 下面以复制`x86_64-linux-gnu`相关的库为例：
 
 ```python
 import os
 import shutil
 
-def overwrite_copy(src: str, dst: str, is_dir: bool = False):
+def overwrite_copy(src: str, dst: str):
     """复制文件或目录，会覆盖已存在项
 
     Args:
         src (str): 源路径
         dst (str): 目标路径
-        is_dir (bool, optional): 目标是否为目录. 默认为否（文件）
     """
-    if is_dir:
+    if os.path.isdir(src):
         if os.path.exists(dst):
             shutil.rmtree(dst)
         shutil.copytree(src, dst)
@@ -205,9 +209,9 @@ def overwrite_copy(src: str, dst: str, is_dir: bool = False):
         shutil.copyfile(src, dst, follow_symlinks=False)
 
 home = os.environ["HOME"]
-prefix = f"{home}/x86_64-linux-gnu-clang19/install"
+prefix = f"{home}/x86_64-linux-gnu-clang20/install"
 sysroot = f"{home}/sysroot"
-compiler_rt = f"{home}/x86_64-linux-gnu-clang19/lib/clang/19/lib"
+compiler_rt = f"{home}/x86_64-linux-gnu-clang20/lib/clang/20/lib"
 for dir in os.listdir(prefix):
     src_dir = os.path.join(prefix, dir)
     match dir:
@@ -231,13 +235,15 @@ for dir in os.listdir(prefix):
             # 复制__config_site
             dst_dir = os.path.join(sysroot, target, "include")
             overwrite_copy(os.path.join(src_dir, "c++", "v1", "__config_site"), os.path.join(dst_dir, "__config_site"))
+# 只要复制一次即可
+src_dir = os.path.join(prefix, "include", "c++")
+dst_dir = os.path.join(sysroot, "include", "c++")
+overwrite_copy(src_dir, dst_dir)
 ```
 
 #### (2)再次编译llvm
 
-此次只编译llvm及子项目，不编译runtimes，但可以启用`clang-tools-extra`等额外的子项目。值得注意的是，本次构建结束后需要保留构建目录，其中包含交叉
-编译`clang-tools-extra`等项目所需的本地工具，同时它们不会被构建脚本安装到`prefix`中。如果删除该目录，在交叉编译时llvm的`NATIVE`编译过程不能正确的生成这部分工具，
-进而导致交叉编译失败。
+此次只编译llvm及子项目，不编译runtimes，但可以启用`clang-tools-extra`等额外的子项目。
 
 为了实现全面的llvm化，可以将clang默认的库设置成llvm相关库而不是gnu相关库，以实现运行库的替换。它们的关系如下：
 
@@ -270,4 +276,107 @@ cmake -G Ninja --install-prefix $llvm_prefix -B build-x86_64-linux-gnu-llvm -S l
 ninja -C build -j 20
 # 安装llvm
 ninja -C build install/strip -j 20
+```
+
+#### (3)再次编译runtimes
+
+此次构建的流程可以参考[首次编译runtimes](#1首次编译llvm以及runtimes)，下面阐述一些注意事项。
+
+- 如果是自举编译，即完成了[再次编译llvm](#2再次编译llvm)流程，那么此时的clang默认就是使用llvm相关库，反之clang依然使用gnu相关库。
+  那么需要向`$flags`中额外增加`-stdlib=libc++ -unwindlib=libunwind -rtlib=compiler-rt`选项以切换构建时使用的库。
+- 尽管已经完成了llvm相关库的构建，在编译Windows目标时依然需要依赖libgcc来提供`___chkstk_ms`等函数，故而需要向`$flags`中额外增加`-lgcc`选项，但这不会引入对`libgcc`动态库的依赖。
+- 尽管使用了llvm相关库代替gnu相关库，但个别链接库如`libclang_rt.asan-x86_64.so`依然会依赖`libgcc_s.so.1`，没有完全脱离gnu相关库。
+
+#### (4)打包工具链
+
+到此为止，一个完整的llvm工具链就完成了构建和组装。下面对工具链的两部分进行打包。
+
+```shell
+cd ~
+tar -cf x86_64-linux-gnu-clang20.tar x86_64-linux-gnu-clang20
+tar -cf sysroot.tar sysroot
+xz -ev9 -T 0 --memlimit=14GiB x86_64-linux-gnu-clang20.tar
+xz -ev9 -T 0 --memlimit=14GiB sysroot.tar
+```
+
+### 编译x86_64-w64-mingw32-llvm工具链
+
+这是一个加拿大工具链，运行在Windows平台上，故而不需要对它进行自举编译，同时runtimes已经完成编译，此时只需编译llvm即可。
+
+### (1)编译依赖库
+
+此处需要编译的依赖库为`zlib`和`libxml2`。
+
+```shell
+export native_prefix=~/x86_64-linux-gnu-clang20
+export zlib_prefix=~/zlib/install
+export libxml2_prefix=~/libxml2/install
+# 切换运行库为llvm相关库，编译libxml2需要ws2_32和bcrypt，为简化流程而在此处添加
+export lib_flags="-stdlib=libc++ -unwindlib=libunwind -rtlib=compiler-rt -lws2_32 -lbcrypt"
+export flags="-Wno-unused-command-line-argument --gcc-toolchain=/home/luo/sysroot $lib_flags"
+export host=x86_64-w64-mingw32
+export sysroot=~/sysroot
+export compiler_option="-DCMAKE_C_COMPILER=\"clang\" -DCMAKE_C_COMPILER_TARGET=$target -DCMAKE_C_FLAGS=$flags -DCMAKE_C_COMPILER_WORKS=ON -DCMAKE_CXX_COMPILER=\"clang++\" -DCMAKE_CXX_COMPILER_TARGET=$target -DCMAKE_CXX_FLAGS=$flags -DCMAKE_CXX_COMPILER_WORKS=ON -DCMAKE_ASM_COMPILER=\"clang\" -DCMAKE_ASM_COMPILER_TARGET=$target -DCMAKE_ASM_FLAGS=$flags -DCMAKE_ASM_COMPILER_WORKS=ON -DLLVM_RUNTIMES_TARGET=$target -DLLVM_DEFAULT_TARGET_TRIPLE=$host -DLLVM_HOST_TRIPLE=$host -DCMAKE_LINK_FLAGS=\"$lib_flags\" -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=x86_64 -DCMAKE_SYSROOT=\"$sysroot\" -DCMAKE_CROSSCOMPILING=TRUE"
+# 构建zlib
+cd ~/zlib
+cmake -G Ninja --install-prefix $zlib_prefix -B build -S . $compiler_option
+ninja -C build -j 20
+ninja -C build install/strip -j 20
+# 构建libxml2
+cd ~/zlib
+cmake -G Ninja --install-prefix $libxml2_prefix -B build -S . $compiler_option
+ninja -C build -j 20
+ninja -C build install/strip -j 20
+# 定义交叉编译所需选项
+# 设置libxml2头文件查找路径
+# 设置libxml2链接库查找路径
+# 启用libxml2支持
+# 设置zlib头文件查找路径
+# 设置zlib链接库查找路径，静态链接
+# 启用zlib支持
+# 设置llvm本地工具查找路径，如llvm-tblgen
+export llvm_cross_option="-DLIBXML2_INCLUDE_DIR=\"$libxml2_prefix/include/libxml2\" -DLIBXML2_LIBRARY=\"$libxml2_prefix/lib/libxml2.dll.a\" -DCLANG_ENABLE_LIBXML2=ON -DZLIB_INCLUDE_DIR=\"$zlib_prefix/include\" -DZLIB_LIBRARY=\"$zlib_prefix/lib/libzlibstatic.a\" -DZLIB_LIBRARY_RELEASE=\"$zlib_prefix/lib/libzlibstatic.a\" -DLLVM_NATIVE_TOOL_DIR=\"$native_prefix/bin\""
+```
+
+#### (2)编译llvm
+
+```shell
+export prefix=~/$host-clang20
+# 如果符号过多则需要改用-DBUILD_SHARED_LIBS=ON
+export dylib_option_list="-DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_BUILD_LLVM_DYLIB=ON -DCLANG_LINK_CLANG_DYLIB=ON"
+export llvm_option_list1='-DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_DOCS=OFF -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_TARGETS_TO_BUILD="X86;AArch64;RISCV;ARM;LoongArch" -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind;compiler-rt" -DLLVM_ENABLE_WARNINGS=OFF -DCLANG_INCLUDE_TESTS=OFF -DBENCHMARK_INSTALL_DOCS=OFF -DCLANG_DEFAULT_LINKER=lld -DLLVM_ENABLE_LLD=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DLIBCXX_INCLUDE_BENCHMARKS=OFF -DLIBCXX_USE_COMPILER_RT=ON -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=ON -DLIBCXXABI_USE_COMPILER_RT=ON -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON -DCOMPILER_RT_USE_LIBCXX=ON'
+# 进入llvm项目目录
+cd ~/llvm
+# 配置llvm
+cmake -G Ninja --install-prefix $prefix -B build-$host-llvm -S llvm $dylib_option_list $llvm_option_list1 $compiler_option $llvm_cross_option
+# 编译llvm
+ninja -C build -j 20
+# 安装llvm
+ninja -C build install/strip -j 20
+```
+
+#### (3)打包工具链
+
+此时需要从本地工具链中复制未编译的`compiler-rt`到交叉工具链下，还需要复制`libxml2.dll`、`libc++.dll`和`libunwind.dll`以提供运行库，
+复制`libc++`和`libunwind`头文件以提供头文件支持，最后打包工具链。
+
+```shell
+# 复制compiler-rt
+export src_dir=$native_prefix/lib/clang/20/lib
+export dst_dir=$prefix/lib/clang/20/lib
+cp -rf $src_dir $dst_dir
+# 复制libxml2.dll
+cp $libxml2_prefix/bin/libxml2.dll $prefix/bin
+# 复制libc++.dll
+cp $sysroot/$host/lib/libc++.dll $prefix/bin
+# 复制libunwind.dll
+cp $sysroot/$host/lib/libunwind.dll $prefix/bin
+# 复制libc++头文件
+cp -r $native_prefix/include/c++ $prefix/include
+# 复制libunwind头文件
+cp $native_prefix/include/*unwind* $prefix/include
+# 打包工具链
+cd ~
+tar -cf $host-clang20.tar $host-clang20
+xz -ev9 -T 0 --memlimit=14GiB $host-clang20.tar
 ```

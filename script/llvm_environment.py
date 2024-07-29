@@ -60,7 +60,7 @@ class environment(basic_environment):
         "LLVM_BUILD_LLVM_DYLIB": "ON",
         "CLANG_LINK_CLANG_DYLIB": "ON",
     }
-    # 如果符号过多则Windows下需要该用该选项
+    # 如果符号过多则Windows下需要改用该选项
     # dylib_option_list_windows: dict[str, str] = {"BUILD_SHARED_LIBS": "ON"}
     llvm_option_list_1: dict[str, str] = {  # 第1阶段编译选项，同时构建工具链和运行库
         "CMAKE_BUILD_TYPE": "Release",  # 设置构建类型
@@ -306,12 +306,12 @@ class environment(basic_environment):
     def copy_llvm_libs(self) -> None:
         """复制工具链所需库"""
         src_prefix = os.path.join(self.sysroot_dir, self.host, "lib")
-        dst_prefix = os.path.join(self.prefix["llvm"], "lib")
+        dst_prefix = os.path.join(self.prefix["llvm"], "bin" if self.system_list[self.host] == "Windows" else "lib")
         native_dir = os.path.join(self.home_dir, f"{self.build}-clang{self.major_version}")
         native_bin_dir = os.path.join(native_dir, "bin")
         native_compiler_rt_dir = os.path.join(native_dir, "lib", "clang", self.major_version, "lib")
         # 复制libc++和libunwind运行库
-        for file in filter(lambda file: file.startswith(("libc++", "libunwind")) and not file.endswith(".a"), os.listdir(src_prefix)):
+        for file in filter(lambda file: file.startswith(("libc++", "libunwind")) and not file.endswith((".a", ".json")), os.listdir(src_prefix)):
             copy(os.path.join(src_prefix, file), os.path.join(dst_prefix, file))
         # 复制公用libc++和libunwind头文件
         src_prefix = os.path.join(native_bin_dir, "..", "include")
