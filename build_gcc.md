@@ -1475,13 +1475,16 @@ export ARCH=loongarch
 
 参见[loongarch64-linux-gnu工具链](#构建到loongarch64-linux-gnu的交叉工具链)的构建流程。
 与loongarch64-linux-gnu工具链不同，此版本的glibc在configure时需要额外增加`--enable-obsolete-rpc`选项。
-此版本的glibc的动态链接器名为`ld.so.1`
+由于Glibc和Linux内核版本较老旧，此平台不支持`libsanitizer`，故而需要增加`--disable-libsanitizer`选项。
+此版本的glibc的动态链接器名为`ld.so.1`，故而链接器脚本需要做如下修改：
 
 ```ldscript
 // lib/libc.so
 OUTPUT_FORMAT(elf64-loongarch)
 GROUP (libc.so.6 libc_nonshared.a AS_NEEDED (ld.so.1))
 ```
+
+同时在使用工具链时需要增加链接选项`-Wl,-dynamic-linker=/lib64/ld.so.1`以设置动态链接器路径。
 
 ## 构建mingw到loongarch64-loongnix-linux-gnu的加拿大工具链
 
