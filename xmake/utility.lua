@@ -3,80 +3,80 @@ import("core.cache.detectcache")
 -- @brief 判断工具链是否是clang
 -- @return boolean 是否是clang工具链
 function _is_clang()
-    return string.find(get_config("toolchain") or "", "clang") ~= nil
+    return string.find(get_config("toolchain") or "", "clang", 1, true) ~= nil
 end
 
--- @brief 根据选项或探测结果获取sysroot选项列表
--- @return {flag, option}/{} 选项列表
-function get_sysroot_option()
-    local cache_key = "toolchain.utility.get_sysroot"
+-- 本模块使用的缓存键
+local cache_key = "toolchain.utility"
+
+-- @brief 获取缓存信息
+-- @return table 缓存信息表
+function _get_cache()
     local cache_info = detectcache:get(cache_key)
     if not cache_info then
         cache_info = {}
         detectcache:set(cache_key, cache_info)
     end
-    -- sysroot缓存
-    local sysroot_cache = cache_info["sysroot"]
-    -- 通过探测获得的sysroot缓存，探测失败为"no"，未探测为nil
-    local detect_sysroot_cache = cache_info["detect_sysroot"]
-    -- 是否发生了更改
-    local changed = false
+    return cache_info
+end
 
-    local sysroot = get_config("sysroot")
-    sysroot = sysroot ~= "" and sysroot or nil
-    -- 有指定sysroot且和缓存不一致则检查合法性
-    if sysroot and sysroot ~= sysroot_cache then
-        assert(os.isdir(sysroot), string.format([[The sysroot "%s" is not a directory.]], sysroot))
-        changed = true
+-- @brief 更新缓存信息
+-- @param cache_info 要保存的缓存信息
+function _update_cache(cache_info)
+    detectcache:set(cache_key, cache_info)
+    detectcache:save()
+end
+
+-- @brief 根据选项或探测结果获取sysroot选项列表
+-- @return {flag, option}/nil 选项列表
+function get_sysroot_option()
+    local cache_info = _get_cache()
+    -- sysroot缓存
+    local sysroot = cache_info["sysroot"]
+    -- 根据sysroot获取选项列表
+    local function get_option_list()
+        local sysroot_option = "--sysroot=" .. sysroot
+        -- 判断是不是libc++
+        local is_libcxx = (get_config("runtimes") or ""):startswith("c++")
+        local libcxx_option = is_libcxx and "-isystem" .. path.join(sysroot, "include", "c++", "v1") or nil
+        return { cxflags = { sysroot_option, libcxx_option }, ldflags = sysroot_option, shflags = sysroot_option }
+    end
+    if sysroot == "" then
+        return nil                      -- 已经探测过，无sysroot可用
+    elseif sysroot then
+        return get_option_list(sysroot) -- 已经探测过，使用缓存的sysroot
     end
 
-    -- 若使用clang工具链且未指定sysroot则尝试自动探测
-    if not sysroot and _is_clang() then
-        -- 没有探测缓存则进行探测
-        if not detect_sysroot_cache then
-            changed = true
-            local bin_dir = get_config("bin") or try {function () return os.iorunv("llvm-config", {"--bindir"}) end}
-            if bin_dir then
-                prefix = path.directory(bin_dir)
-                -- 尝试下列目录：1. prefix/sysroot 2. prefix/../sysroot 优先使用更局部的目录
-                for _, v in ipairs({"sysroot", "../sysroot"}) do
-                    local dir = path.join(prefix, v)
-                    if os.isdir(dir) then
-                        sysroot = dir
-                        detect_sysroot_cache = sysroot
-                        cprint("detecting for sysroot ... ${color.success}%s", sysroot)
-                        break
-                    end
+    -- 检查给定sysroot或者自动探测sysroot
+    sysroot = get_config("sysroot")
+    sysroot = sysroot ~= "" and sysroot or nil
+    if sysroot then         -- 有指定sysroot则检查合法性
+        assert(os.isdir(sysroot), string.format([[The sysroot "%s" is not a directory.]], sysroot))
+    elseif _is_clang() then -- 若使用clang工具链且未指定sysroot则尝试自动探测
+        local bin_dir = get_config("bin") or try { function() return os.iorunv("llvm-config", { "--bindir" }) end }
+        if bin_dir then
+            local prefix = path.directory(bin_dir)
+            -- 尝试下列目录：1. prefix/sysroot 2. prefix/../sysroot 优先使用更局部的目录
+            for _, v in ipairs({ "sysroot", "../sysroot" }) do
+                local dir = path.join(prefix, v)
+                if os.isdir(dir) then
+                    sysroot = path.normalize(dir)
+                    cprint("detecting for sysroot ... ${color.success}%s", sysroot)
+                    break
                 end
             end
-
-            if not sysroot then
-                detect_sysroot_cache = "no"
-                cprint("detecting for sysroot ... ${color.failure}not found")
-            end
-        -- 有缓存直接用缓存
-        else
-            sysroot = detect_sysroot_cache ~= "no" and detect_sysroot_cache or nil
-            changed = sysroot ~= sysroot_cache
         end
     end
 
     -- 更新缓存
-    if changed then
-        cache_info["sysroot"] = sysroot
-        cache_info["detect_sysroot"] = detect_sysroot_cache
-        detectcache:set(cache_key, cache_info)
-        detectcache:save()
-    end
+    cache_info["sysroot"] = sysroot or ""
+    _update_cache(cache_info)
 
     if sysroot then
-        local sysroot_option = "--sysroot="..sysroot
-        -- 判断是不是libc++
-        local is_libcxx = (get_config("runtimes") or ""):startswith("c++")
-        local libcxx_option = is_libcxx and "-isystem"..path.join(sysroot, "include", "c++", "v1") or nil
-        return {cxflags = {sysroot_option, libcxx_option}, ldflags = sysroot_option, shflags = sysroot_option}
+        return get_option_list(sysroot)
     else
-        return {}
+        cprint("detecting for sysroot ... ${color.failure}no")
+        return nil
     end
 end
 
@@ -86,37 +86,52 @@ end
 -- @note 在target和toolchain存在时才检查选项合法性
 -- @return string/nil march选项
 function get_march_option(target, toolchain)
+    local cache_info = _get_cache()
+    local option = cache_info["march"]
+    if option == "" then
+        return nil    -- 已经探测过，-march不受支持
+    elseif option then
+        return option -- 已经探测过，支持-march选项
+    end
+
+    -- 探测march是否受支持
     local arch = get_config("march")
     if arch ~= "no" then
-        local option = {"-march="..arch}
+        option = { "-march=" .. arch }
         -- 在target和toolchain存在时才检查选项合法性
         if target and toolchain then
             import("core.tool.compiler")
             if toolchain == "clang" and target ~= "native" then
-                table.insert(option, "--target="..target)
+                table.insert(option, "--target=" .. target)
             end
             local support = compiler.has_flags("cxx", table.concat(option, " "))
             local message = "checking for march ... "
-            cprint(message..(support and "${color.success}" or "${color.failure}")..arch)
+            cprint(message .. (support and "${color.success}" or "${color.failure}") .. arch)
             if not support then
                 if arch == "native" then
-                    cprint([[${color.warning}The toolchain doesn't support the arch "native". No "-march" option will be set.]])
+                    cprint(
+                        [[${color.warning}The toolchain doesn't support the arch "native". No "-march" option will be set.]])
                 else
                     raise(string.format([[The toolchain doesn't support the arch "%s"]], arch))
                 end
             end
         end
-        return option[1]
+        option = option[1]
     else
-        return nil
+        option = ""
     end
+
+    -- 更新缓存
+    cache_info["march"] = option
+    _update_cache(cache_info)
+    return option
 end
 
 -- @brief 获取rtlib选项
 -- @return string/nil rtlib选项
 function get_rtlib_option()
     local config = get_config("rtlib")
-    return (_is_clang() and config ~= "default") and "-rtlib="..config or nil
+    return (_is_clang() and config ~= "default") and "-rtlib=" .. config or nil
 end
 
 -- @brief 获取unwindlib选项
@@ -125,7 +140,7 @@ function get_unwindlib_option()
     local config = get_config("unwindlib")
     local force = config:startswith("force")
     local lib = force and string.sub(config, 7, #config) or config
-    local option = config ~= "default" and "-unwindlib="..lib or nil
+    local option = config ~= "default" and "-unwindlib=" .. lib or nil
     return (_is_clang() and (force or get_config("rtlib") == "compiler-rt")) and option or nil
 end
 
@@ -133,6 +148,6 @@ end
 -- @param mode xmake风格编译模式
 -- @return string/nil cmake风格编译模式
 function get_cmake_mode(mode)
-    local table = {debug = "Debug", release = "Release", minsizerel = "MinSizeRel", releasedbg = "RelWithDebInfo"}
+    local table = { debug = "Debug", release = "Release", minsizerel = "MinSizeRel", releasedbg = "RelWithDebInfo" }
     return table[mode]
 end
