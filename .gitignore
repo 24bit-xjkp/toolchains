@@ -3,3 +3,5 @@ __pycache__
 .VSCodeCounter
 .xmake
 build
+xmake.lua
+*.cpp

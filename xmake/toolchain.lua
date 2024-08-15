@@ -1,4 +1,4 @@
-includes("option.lua")
+includes("option.lua", "utility/target.lua")
 
 -- @brief 注册clang工具链
 -- @parma target clang工具链目标平台
@@ -26,7 +26,7 @@ function register_clang_toolchain(target, modifier)
         end)
 
         on_load(function (toolchain)
-            import("utility")
+            import("utility.utility")
             if toolchain:is_plat("windows") then
                 toolchain:add("runtimes", "MT", "MTd", "MD", "MDd")
             end
@@ -49,7 +49,6 @@ function register_clang_toolchain(target, modifier)
     toolchain_end()
 end
 
-includes("target.lua")
 for target, modifier in pairs(target_list) do
     register_clang_toolchain(target, modifier)
 end
@@ -80,7 +79,7 @@ function register_gcc_toolchain(target, modifier)
         end)
 
         on_load(function (toolchain)
-            import("utility")
+            import("utility.utility")
 
             toolchain:add("cxflags", utility.get_march_option(target, "gcc"))
             local sysroot_option = utility.get_sysroot_option()

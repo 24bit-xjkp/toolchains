@@ -49,10 +49,14 @@ function get_sysroot_option()
 
     -- 检查给定sysroot或者自动探测sysroot
     sysroot = get_config("sysroot")
-    sysroot = sysroot ~= "" and sysroot or nil
+    local detect = sysroot == "detect"
+    -- sysroot不为"no"或"detect"则为指定的sysroot
+    sysroot = (sysroot ~= "no" and not detect) and sysroot or nil
+    -- 若使用clang工具链且未指定sysroot则尝试自动探测
+    detect = detect and _is_clang()
     if sysroot then         -- 有指定sysroot则检查合法性
         assert(os.isdir(sysroot), string.format([[The sysroot "%s" is not a directory.]], sysroot))
-    elseif _is_clang() then -- 若使用clang工具链且未指定sysroot则尝试自动探测
+    elseif detect then -- 尝试探测
         local bin_dir = get_config("bin") or try { function() return os.iorunv("llvm-config", { "--bindir" }) end }
         if bin_dir then
             local prefix = path.directory(bin_dir)
@@ -75,7 +79,9 @@ function get_sysroot_option()
     if sysroot then
         return get_option_list(sysroot)
     else
-        cprint("detecting for sysroot ... ${color.failure}no")
+        if detect then
+            cprint("detecting for sysroot ... ${color.failure}no")
+        end
         return nil
     end
 end
