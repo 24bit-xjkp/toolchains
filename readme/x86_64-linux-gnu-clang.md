@@ -9,3 +9,7 @@
 ## 版本
 
 - LLVM：20.0.0
+
+## 说明
+
+clang建议配合sysroot使用，具体请参阅sysroot包内`README.md`文件。

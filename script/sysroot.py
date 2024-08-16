@@ -5,6 +5,7 @@ from importlib import import_module
 
 env = environment()
 
+
 def need_build() -> bool:
     """是否需要创建原始sysroot
 
@@ -38,6 +39,9 @@ def build_origin_sysroot() -> None:
         # 复制libgcc对应的.o .a文件和include文件夹
         for item in filter(lambda x: x.endswith((".o", ".a", "include")), os.listdir(src_dir)):
             copy(os.path.join(src_dir, item), os.path.join(dst_dir, item))
+
+    # 复制说明文件
+    copy(os.path.join(env.current_dir, "..", "readme", "sysroot.md"), os.path.join(env.sysroot_dir, "README.md"))
 
 
 def auto_build_sysroot() -> None:

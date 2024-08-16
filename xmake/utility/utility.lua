@@ -57,9 +57,8 @@ function get_sysroot_option()
     if sysroot then         -- 有指定sysroot则检查合法性
         assert(os.isdir(sysroot), string.format([[The sysroot "%s" is not a directory.]], sysroot))
     elseif detect then -- 尝试探测
-        local bin_dir = get_config("bin") or try { function() return os.iorunv("llvm-config", { "--bindir" }) end }
-        if bin_dir then
-            local prefix = path.directory(bin_dir)
+        local prefix = get_config("bin") or try { function() return os.iorunv("llvm-config", { "--prefix" }) end }
+        if prefix then
             -- 尝试下列目录：1. prefix/sysroot 2. prefix/../sysroot 优先使用更局部的目录
             for _, v in ipairs({ "sysroot", "../sysroot" }) do
                 local dir = path.join(prefix, v)
@@ -120,9 +119,13 @@ function get_march_option(target, toolchain)
                 else
                     raise(string.format([[The toolchain doesn't support the arch "%s"]], arch))
                 end
+                option = ""
+            else
+                option = option[1]
             end
+        else
+            option = nil -- 未探测，设置为nil在下次进行探测
         end
-        option = option[1]
     else
         option = ""
     end

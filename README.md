@@ -150,8 +150,10 @@ xmake支持文件位于`xmake`文件夹下，下面是各个文件的说明：
     | 选项   | 说明                                                                         |
     | :----- | :--------------------------------------------------------------------------- |
     | no     | 不添加`--sysroot`选项                                                        |
-    | detect | 工具链为clang则自动探测sysroot，为gcc则不添加选项                            |
+    | detect | 工具链为clang则自动探测sysroot，为gcc则不添加选项 $^*$                       |
     | path   | 添加`--sysroot=path`选项，`path`可以是绝对路径或不为`no`和`detect`的相对路径 |
+
+    *：关于自动探测支持请参阅[sysroot说明](readme/sysroot.md#说明)。
 
 - rtlib 设置clang的`-rtlib`选项，默认为`default`
     | 选项        | 说明                                                |
