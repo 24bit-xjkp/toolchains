@@ -36,3 +36,6 @@ rule("releasedbg")
         target:set("strip", debug_strip)
     end)
 rule_end()
+
+-- 受支持的规则表
+support_rules_table = {"debug", "release", "minsizerel", "releasedbg"}
