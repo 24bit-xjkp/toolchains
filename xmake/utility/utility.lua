@@ -202,7 +202,8 @@ function get_march_option(target, toolchain)
     -- 探测march是否受支持
     local arch = get_config("march")
     if arch ~= "no" then
-        option = { "-march=" .. arch }
+        local march = (arch ~= "default" and arch or "native")
+        option = { "-march=" .. march }
         -- 在target和toolchain存在时才检查选项合法性
         if target and toolchain then
             import("core.tool.compiler")
@@ -211,13 +212,10 @@ function get_march_option(target, toolchain)
             end
             local support = compiler.has_flags("cxx", table.concat(option, " "))
             local message = "checking for march ... "
-            cprint(message .. (support and "${color.success}" or "${color.failure}") .. arch)
+            cprint(message .. (support and "${color.success}" or "${color.failure}") .. march)
             if not support then
-                if arch == "native" then
-                    cprint(
-                        [[${color.warning}The toolchain doesn't support the arch "native". No "-march" option will be set.]])
-                else
-                    raise(string.format([[The toolchain doesn't support the arch "%s"]], arch))
+                if arch ~= "default" then
+                    raise(string.format([[The toolchain doesn't support the arch "%s"]], march))
                 end
                 option = ""
             else

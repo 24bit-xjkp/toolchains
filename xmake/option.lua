@@ -2,8 +2,9 @@ option("march")
     set_description([[Set the "-march" option for gcc and clang.]],
                     "The option is automatically added if using our toolchain option.",
                     [[    no: Don't set the "-march" option, use the default march of the toolchain.]],
-                    [[    arch: Set the "-march" option as "-march=arch". Note that "arch" is any value other than "no".]])
-    set_default("native")
+                    [[    default: Set the "-march" option as "-march=native" if possible, otherwise don't set the "-march" option and use the default march of the toolchain.]],
+                    [[    arch: Set the "-march" option as "-march=arch". Note that "arch" is any value other than "no" and "default".]])
+    set_default("default")
     after_check(function (option)
         import("utility.utility")
         option:add("cxflags", utility.get_march_option())
