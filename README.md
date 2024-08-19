@@ -114,11 +114,35 @@ target("test")
 target_end()
 ```
 
+通过`toolchain`选项可以轻松地选取要使用的工具链，并完成`--sysroot`等选项的配置，下面是一个示例：
+
 ```shell
 # 使用clang进行交叉编译
 xmake f --toolchain=aarch64-linux-gnu-clang -a arm64-v8a -p linux
 # 使用gcc进行交叉编译
 xmake f --toolchain=aarch64-linux-gnu-gcc -a arm64-v8a -p linux
+```
+
+xmake支持也提供了`target-clang`和`target-gcc`工具链。使用这两个工具链时脚本会尝试根据`plat`和`arch`推导出目标平台，若无法推导则配置失败，此时应该指定一个具体的工具链。
+在常用平台上编译时可以直接使用这两个工具链，而无需在xmake选项和工具链间重复指定目标平台。下面是一个示例：
+
+```shell
+# 根据arch和plat自动推导工具链，相当于--toolchain=aarch64-linux-gnu-clang
+xmake f --toolchain=target-clang -a arm64-v8a -p linux
+```
+
+如果想通过该方式处理较为复杂的平台，则需要使用xmake的`cross`平台，并通过`--target_os`指定一些额外信息，如`vendor`和`abi`。下面是一个示例：
+
+```shell
+# 指定vendor为loongnix，相当于loongarch64-loongnix-linux-gnu
+xmake f --toolchain=target-clang -a loong64 -p cross --target_os=loongnix-linux-gnu
+```
+
+使用`cross`平台并且不指定`--target_os`选项则会推导出独立工具链，下面是一个示例：
+
+```shell
+# 推导出独立工具链，相当于--toolchain=arm-none-eabi
+xmake f --toolchain=target-clang -a arm -p cross
 ```
 
 ### xmake文件说明
@@ -134,17 +158,19 @@ xmake支持文件位于`xmake`文件夹下，下面是各个文件的说明：
 | utility/utility.lua | 提供各种配置工具，内部文件                                      |
 
 其中`option.lua`可以单独使用，此时需要使用`add_options`来关联选项和目标。如果使用`toolchain.lua`中定义的工具链，这些选项会自动添加到相应工具链中。
+`utility/target.lua`可以通过`includes`函数引入到描述域中，此时函数和变量均可使用；也可以通过`import`函数引入脚本域，此时仅函数接口可用。
 
 ### xmake选项说明
 
 下面是`option.lua`提供的xmake配置选项说明：
 
-- march 设置工具链的`-march`选项，默认为`native`
+- march 设置工具链的`-march`选项，默认为`default`
 
-   | 选项 | 说明                                    |
-   | :--- | :-------------------------------------- |
-   | no   | 不添加`-march`选项                      |
-   | arch | 添加`-march=arch`选项，`arch`不能为`no` |
+   | 选项   | 说明                                                      |
+   | :----- | :-------------------------------------------------------- |
+   | no     | 不添加`-march`选项                                        |
+   | detect | 如果可以则添加`-march=native`选项，否则不添加`-march`选项 |
+   | arch   | 添加`-march=arch`选项，`arch`不能为`no`和`detect`         |
 
 - sysroot 设置工具链的`--sysroot`选项，默认为`detect`
     | 选项   | 说明                                                                         |
@@ -183,6 +209,15 @@ xmake支持文件位于`xmake`文件夹下，下面是各个文件的说明：
     | debug | 剥离调试符号到独立符号文件                             |
     | all   | 剥离调试符号到独立符号文件，然后去除目标文件中所有符号 |
 
+- enable_lto 设置在具有发布属性的规则（如`release`，`minsizerel`和`releasedbg`）中是否启用链接时优化（LTO），默认为`true`
+    | 选项  | 说明    |
+    | :---- | :------ |
+    | true  | 启用LTO |
+    | false | 禁用LTO |
+
+    该选项在编译器与链接器不匹配时特别有用，因为此时需要禁用LTO才能正常完成构建流程。例如使用`clang`进行编译而使用`ld.bfd`进行链接，此时若启用LTO则会提示无法识别文件格式。
+    通常，`clang`使用`lld`进行链接，但如果`lld`不支持目标平台，则可能发生上述情况。使用该选项可以方便地根据需求设置或禁用LTO。
+
 ### xmake工具链说明
 
 可以使用`xmake show -l toolchains`命令查看所有受支持的工具链名称，具体工具链的信息可以参阅[受支持的工具链](#工具链)。
@@ -191,6 +226,9 @@ xmake支持文件位于`xmake`文件夹下，下面是各个文件的说明：
 | 名称        | 说明                                                                                    |
 | :---------- | :-------------------------------------------------------------------------------------- |
 | native-tool | 本地工具链，对于clang不会添加`--target`选项，对于gcc会查找`gcc`工具                     |
+| target-tool | 根据xmake的`arch`和`plat`选项自动推导出目标平台工具链                                   |
 | plat-tool   | 目标平台为plat的工具链，对于clang会添加`--target=plat`选项，对于gcc会查找`plat-gcc`工具 |
+
+注解：`tool`表示工具链类型，为`clang`或`gcc`
 
 xmake工具链还会根据目标平台的特性添加一些选项，如为`loongarch64-loongnix-linux-gnu`平台添加`-Wl,-dynamic-linker=/lib64/ld.so.1`选项以修改动态库加载器路径。
