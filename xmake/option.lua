@@ -64,3 +64,10 @@ option("debug_strip")
     set_default("no")
     set_values("no", "debug", "all")
 option_end()
+option("enable_lto")
+    set_description("Whether to enable LTO while building in release/minsizerel/releasedbg mode.",
+                    "LTO is enabled by default, but when use different compiler and linker, "..
+                    "for example, compiling with clang while linking with bfd, LTO should be disabled.",
+                    [[Errors may be reported as "file not recognized: file format not recognized".]])
+    set_default(true)
+option_end()
