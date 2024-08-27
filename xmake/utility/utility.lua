@@ -58,8 +58,9 @@ function get_target_modifier(toolchain)
         arm64 = "aarch64",
         arm64ec = "aarch64"
     }
+    local old_arch = arch
     arch = arch_table[arch]
-    assert(arch, format(message, "arch", arch))
+    assert(arch, format(message, "arch", old_arch))
 
     if plat == "windows" and toolchain == "gcc" then
         plat = "mingw" -- gcc不支持msvc目标，但clang支持
@@ -71,19 +72,9 @@ function get_target_modifier(toolchain)
         windows = "windows",
         cross = target_os
     }
+    local old_plat = plat
     plat = plat_table[plat]
-    assert(plat, format(message, "plat", plat))
-    local vendor
-    local abi
-    local field = plat:split("-")
-    if #field == 2 then
-        plat = field[1]
-        abi = field[2]
-    elseif #field == 3 then
-        vendor = field[1]
-        plat = field[2]
-        abi = field[3]
-    end
+    assert(plat, format(message, "plat", old_plat))
 
     local x86_abi_table = {
         windows = "msvc",
@@ -103,11 +94,9 @@ function get_target_modifier(toolchain)
         riscv64 = linux_abi_table,
         loongarch64 = linux_abi_table
     }
-    if not abi then
-        abi = (abi_table[arch] or {})[plat] or "unknown"
-    end
+    local abi = (abi_table[arch] or {})[plat] or "unknown"
 
-    field = { arch, plat, abi }
+    local field = { arch, plat, abi }
     -- 针对arch-elf的特殊处理
     if plat == "none" and abi == "elf" then
         table.remove(field, 2)

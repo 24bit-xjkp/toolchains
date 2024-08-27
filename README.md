@@ -131,11 +131,11 @@ xmake支持也提供了`target-clang`和`target-gcc`工具链。使用这两个�
 xmake f --toolchain=target-clang -a arm64-v8a -p linux
 ```
 
-如果想通过该方式处理较为复杂的平台，则需要使用xmake的`cross`平台，并通过`--target_os`指定一些额外信息，如`vendor`和`abi`。下面是一个示例：
+如果使用`cross`平台，则需要通过`--target_os`选项指定目标平台。下面是一个示例：
 
 ```shell
-# 指定vendor为loongnix，相当于loongarch64-loongnix-linux-gnu
-xmake f --toolchain=target-clang -a loong64 -p cross --target_os=loongnix-linux-gnu
+# 相当于--toolchain=loongarch64-linux-gnu-clang
+xmake f --toolchain=target-clang -a loong64 -p cross --target_os=linux
 ```
 
 使用`cross`平台并且不指定`--target_os`选项则会推导出独立工具链，下面是一个示例：
