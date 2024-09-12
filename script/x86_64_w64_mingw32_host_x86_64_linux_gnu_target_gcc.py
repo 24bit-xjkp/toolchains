@@ -27,11 +27,14 @@ def build() -> None:
     env.enter_build_dir("linux")
     env.make(f"ARCH=x86 INSTALL_HDR_PATH={env.lib_prefix} headers_install")
 
-    # 安装glibc头文件
+    # TODO 验证正确性
+    # 修复 https://github.com/24bit-xjkp/toolchains/issues/2#issuecomment-2345700213
+    # 编译安装glibc
     env.enter_build_dir("glibc")
-    env.configure(glibc_option, "libc_cv_forced_unwind=yes")
-    env.make("install-headers")
-    os.mknod(os.path.join(env.lib_prefix, "include", "gnu", "stubs.h"))
+    env.configure(glibc_option)
+    env.make()
+    env.install("install")
+    env.adjust_glibc()
 
     # 创建libpython.a
     env.build_libpython()
