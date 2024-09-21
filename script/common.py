@@ -168,4 +168,37 @@ class basic_environment:
         copy(readme_path, target_path)
 
 
+class triplet_field:
+    """平台名称各个域的内容"""
+
+    arch: str  # 架构
+    os: str  # 操作系统
+    vendor: str  # 制造商
+    abi: str  # abi/libc
+    num : int # 非unknown的字段数
+
+    def __init__(self, triplet: str) -> None:
+        """解析平台名称
+
+        Args:
+            triplet (str): 输入平台名称
+        """
+        field = triplet.split("-")
+        self.arch = field[0]
+        self.num = len(field)
+        match (self.num):
+            case 2:
+                self.os = "unknown"
+                self.vendor = "unknown"
+                self.abi = field[1]
+            case 3:
+                self.os = field[1]
+                self.vendor = "unknown"
+                self.abi = field[2]
+            case 4:
+                self.os = field[1]
+                self.vendor = field[2]
+                self.abi = field[3]
+
+
 assert __name__ != "__main__", "Import this file instead of running it directly."
