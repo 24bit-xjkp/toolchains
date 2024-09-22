@@ -190,7 +190,7 @@ register_libstdcxx_printers(gdb.current_objfile())
 
 ```shell
 # 生成独立的调试符号文件
-objcopy --only-keep-debug $PREFIX/lib64/libgcc_s.so.1 $PREFIX/lib64/libgcc_so.1.debug
+objcopy --only-keep-debug $PREFIX/lib64/libgcc_s.so.1 $PREFIX/lib64/libgcc_s.so.1.debug
 # 剥离动态库的调试符号
 strip $PREFIX/lib64/libgcc_s.so.1
 # 关联调试符号和动态库
