@@ -5,7 +5,7 @@ import shutil
 from typing import LiteralString
 from common import *
 
-lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports", "python-embed", "glibc")
+lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports", "python-embed", "glibc", "newlib")
 dll_target_list = (
     "install-target-libgcc",
     "install-target-libstdc++-v3",
@@ -35,15 +35,14 @@ dll_name_list = {
 
 disable_hosted_option = (
     "--disable-threads",
-    "--disable-hosted-libstdcxx",
     "--disable-libstdcxx-verbose",
     "--disable-shared",
-    "--without-headers",
-    "--disable-libvtv",
+    "--with-headers",
     "--disable-libsanitizer",
     "--disable-libssp",
     "--disable-libquadmath",
     "--disable-libgomp",
+    "--with-newlib",
 )
 
 # 32位架构，其他32位架构需自行添加
@@ -393,13 +392,17 @@ class cross_environment:
     full_build: bool  # 是否进行完整自举流程
     glibc_phony_stubs_path: str  # glibc占位文件所在路径
     adjust_glibc_arch: str  # 调整glibc链接器脚本时使用的架构名
+    need_multilib: bool  # 是否需要编译multilib
+    need_gdb: bool  # 是否需要编译gdb
+    need_gdbserver: bool  # 是否需要编译gdbserver
 
-    def __init__(self, target: str, multilib: bool, gdb: bool, gdbserver: bool, *modifiers) -> None:
-        self.env = environment(target=target)
+    def __init__(self, host: str, target: str, multilib: bool, gdb: bool, gdbserver: bool, *modifiers) -> None:
+        self.env = environment(host=host, target=target)
         self.host_os = self.env.host_field.os
         self.target_os = self.env.target_field.os
         self.target_arch = self.env.target_field.arch
         self.basic_option = ["--disable-werror", " --enable-nls", f"--target={self.env.target}", f"--prefix={self.env.prefix}"]
+        self.need_multilib, self.need_gdb, self.need_gdbserver = multilib, gdb, gdbserver
 
         libc_option_list = {
             "linux": [f"--prefix={self.env.lib_prefix}", f"--host={self.env.target}", f"--build={self.env.build}"],
@@ -436,7 +439,7 @@ class cross_environment:
                 "--enable-gdb",
             ]
             if gdb
-            else ["--disable-gdbserver"]
+            else ["--disable-gdbserver", "--disable-gdb"]
         )
         # 创建libpython.a
         if gdb and self.host_os == "w64":
@@ -468,15 +471,28 @@ class cross_environment:
         for modifier in modifiers:
             modifier(self)
 
-    def _copy_lib(self) -> None:
-        """从其他工具链中复制运行库"""
-        gcc = environment(target=self.env.host)
-        if self.host_os == "linux":
-            for dll in ("libstdc++.so.6", "libgcc_s.so.1"):
-                shutil.copy(os.path.join(gcc.rpath_dir, dll), self.env.rpath_dir)
-        else:
-            for dll in ("libstdc++-6.dll", "libgcc_s_seh-1.dll"):
-                shutil.copy(os.path.join(gcc.lib_prefix, "lib", dll), self.env.bin_dir)
+    def _after_build_gcc(self) -> None:
+        """在编译完gcc后完成收尾工作"""
+        # 编译gdbserver
+        if self.need_gdbserver:
+            self.env.solve_libgcc_limits()
+            self.env.enter_build_dir("binutils")
+            self.env.configure(*self.basic_option, *self.gdbserver_option)
+            self.env.make()
+            self.env.install("install-strip-gdbserver")
+
+        # 复制gdb所需运行库
+        if self.need_gdb:
+            gcc = environment(target=self.env.host)
+            if self.host_os == "linux":
+                for dll in ("libstdc++.so.6", "libgcc_s.so.1"):
+                    shutil.copy(os.path.join(gcc.rpath_dir, dll), self.env.rpath_dir)
+            else:
+                for dll in ("libstdc++-6.dll", "libgcc_s_seh-1.dll"):
+                    shutil.copy(os.path.join(gcc.lib_prefix, "lib", dll), self.env.bin_dir)
+
+        # 打包工具链
+        self.env.package(self.need_gdb, self.host_os == "w64")
 
     def _full_build_linux(self) -> None:
         """完整自举target为linux的gcc"""
@@ -507,7 +523,7 @@ class cross_environment:
         # 编译安装libgcc
         self.env.enter_build_dir("gcc", False)
         self.env.make("all-target-libgcc")
-        self.env.install("install-strip-target-libgcc")
+        self.env.install("install-target-libgcc")
 
         # 编译安装glibc
         self.env.enter_build_dir("glibc")
@@ -523,18 +539,8 @@ class cross_environment:
         self.env.install()
         self.env.strip_debug_symbol()
 
-        # 编译gdbserver
-        if self.gdbserver_option != []:
-            self.env.solve_libgcc_limits()
-            self.env.enter_build_dir("binutils")
-            self.env.configure(*self.basic_option, *self.gdbserver_option)
-            self.env.make()
-            self.env.install("install-strip-gdbserver")
-
-        # 复制gdb所需运行库
-        self._copy_lib()
-        # 打包工具链
-        self.env.package()
+        # 完成后续工作
+        self._after_build_gcc()
 
     def _full_build_mingw(self) -> None:
         """完整自举target为mingw的gcc"""
@@ -548,7 +554,7 @@ class cross_environment:
         self.env.enter_build_dir("gcc")
         self.env.configure(*self.basic_option, *self.gcc_option, "--disable-shared")
         self.env.make("all-gcc all-target-libgcc")
-        self.env.install("install-strip-gcc install-strip-target-libgcc")
+        self.env.install("install-strip-gcc install-target-libgcc")
 
         # 编译完整mingw-w64
         self.env.enter_build_dir("mingw")
@@ -572,7 +578,37 @@ class cross_environment:
         self.env.install()
         # 添加target前缀
         os.rename(os.path.join(self.env.bin_dir, "pexports"), os.path.join(self.env.bin_dir, f"{self.env.target}-pexports"))
-        self.env.package()
+        # 完成后续工作
+        self._after_build_gcc()
+
+    def _full_build_freestanding(self) -> None:
+        """完整自举target为独立平台的gcc"""
+        # 编译binutils，如果启用gdb则一并编译
+        self.env.enter_build_dir("binutils")
+        self.env.configure(*self.basic_option, *self.gdb_option)
+        self.env.make()
+        self.env.install()
+
+        # 编译安装gcc
+        self.env.enter_build_dir("gcc")
+        self.env.configure(*self.basic_option, *self.gcc_option)
+        self.env.make("all-gcc")
+        self.env.install("install-strip-gcc")
+
+        # 编译安装newlib
+        self.env.enter_build_dir("newlib")
+        self.env.configure(*self.basic_option)
+        self.env.make()
+        self.env.install()
+
+        # 编译安装完整gcc
+        self.env.enter_build_dir("gcc", False)
+        self.env.make()
+        self.env.install()
+        self.env.strip_debug_symbol()
+
+        # 完成后续工作
+        self._after_build_gcc()
 
     def _partial_build(self) -> None:
         """编译gcc而无需自举"""
@@ -588,12 +624,8 @@ class cross_environment:
         self.env.make("all-gcc")
         self.env.install("install-strip-gcc")
 
-        # 复制gdb所需运行库
-        self._copy_lib()
-        # 复制文件
-        self.env.copy_from_cross_toolchain()
-        # 打包工具链
-        self.env.package(need_python_embed_package=self.host_os == "w64")
+        # 完成后续工作
+        self._after_build_gcc()
 
     def build(self) -> None:
         """构建gcc工具链"""
@@ -603,7 +635,8 @@ class cross_environment:
                     self._full_build_linux()
                 case "w64":
                     self._full_build_mingw()
-                # TODO:独立工具链支持
+                case "unknown":
+                    self._full_build_freestanding()
         else:
             self._partial_build()
 
