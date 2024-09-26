@@ -927,7 +927,7 @@ cd ~/gcc/build
 rm -rf *
 ../configure --disable-werror --disable-bootstrap --enable-nls --target=$TARGET --prefix=$PREFIX --enable-multilib --enable-languages=c,c++ --disable-shared
 make all-target-libgcc -j 20
-make install-strip-target-gcc -j 20
+make install-strip-target-libgcc -j 20
 ```
 
 ### 61.编译安装32位glibc
