@@ -7,7 +7,7 @@ from gcc_environment import environment
 
 def get_config() -> None:
     assert len(sys.argv) >= 3, "Too few args"
-    env = environment("")
+    env = environment()
     python_dir = env.lib_dir_list["python-embed"]
     result_list = {
         "--includes": f"-I{os.path.join(python_dir, 'include')}",

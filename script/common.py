@@ -175,9 +175,9 @@ class triplet_field:
     os: str  # 操作系统
     vendor: str  # 制造商
     abi: str  # abi/libc
-    num : int # 非unknown的字段数
+    num: int  # 非unknown的字段数
 
-    def __init__(self, triplet: str) -> None:
+    def __init__(self, triplet: str, normalize:bool = True) -> None:
         """解析平台名称
 
         Args:
@@ -199,6 +199,22 @@ class triplet_field:
                 self.os = field[1]
                 self.vendor = field[2]
                 self.abi = field[3]
+
+        # 正则化
+        if normalize:
+            if self.os == "none":
+                self.os = "unknown"
+
+    def weak_eq(self, other) -> bool:
+        """弱相等比较，允许vendor字段不同
+
+        Args:
+            other (triplet_field): 待比较对象
+
+        Returns:
+            bool: 是否相同
+        """
+        return self.arch == other.arch and self.os == other.os and self.abi == other.abi
 
 
 assert __name__ != "__main__", "Import this file instead of running it directly."
