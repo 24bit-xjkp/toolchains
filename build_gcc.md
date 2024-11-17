@@ -115,6 +115,18 @@ unset ORIGIN
 `export ORIGIN='$$ORIGIN'`和`LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64"`选项是用于设置gdb的rpath。由于编译时使用的gcc版本比系统自带的更高，故链接的libstdc++版本也更高。
 因而需要将rpath设置到编译出来的libstdc++所在的目录。
 
+<!-- TODO:检查问题是否修复 -->
+在GCC更新后将C语言的默认标准提升至C23，这导致`bool`相关的定义语句存在问题，需要对`/gcc/libgcc/unwind-arm-common.inc`中的语句进行修改：
+
+```c
+// gcc/libgcc/unwind-arm-common.inc
+/* Definitions for C++ runtime support routines.  We make these weak
+   declarations to avoid pulling in libsupc++ unnecessarily.  */
+#if __STDC_VERSION__ < 202311L
+typedef unsigned char bool;
+#endif
+```
+
 ### 6.创建.gdbinit
 
 由`libstdc++.so.6.0.33-gdb.py`配置pretty-printer，完成后转至[第7步](#7修改libstdc的python支持)：
