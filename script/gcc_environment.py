@@ -32,6 +32,7 @@ dll_name_list = {
     "unknown": (),
 }
 
+# 带newlib的独立环境需禁用的特性列表
 disable_hosted_option = (
     "--disable-threads",
     "--disable-libstdcxx-verbose",
@@ -42,6 +43,19 @@ disable_hosted_option = (
     "--disable-libquadmath",
     "--disable-libgomp",
     "--with-newlib",
+)
+# 无newlib的独立环境需禁用的特性列表
+disable_hosted_option_pure = (
+    "--disable-threads",
+    "--disable-hosted-libstdcxx",
+    "--disable-libstdcxx-verbose",
+    "--disable-shared",
+    "--without-headers",
+    "--disable-libvtv",
+    "--disable-libsanitizer",
+    "--disable-libssp",
+    "--disable-libquadmath",
+    "--disable-libgomp",
 )
 
 # 32位架构，其他32位架构需自行添加
@@ -376,6 +390,15 @@ def get_mingw_gdb_lib_options(env: environment) -> list[str]:
     prefix_selector = lambda lib: f"--with-{lib}=" if lib in ("gmp", "mpfr") else f"--with-lib{lib}-prefix="
     return [prefix_selector(lib) + f"{lib_prefix_list[lib]}" for lib in ("gmp", "mpfr", "expat")]
 
+def copy_pretty_printer(env: environment) -> None:
+    """从x86_64-linux-gnu本地工具链中复制pretty-printer到不带newlib的独立工具链"""
+    native_gcc = environment()
+    for dir in os.listdir(native_gcc.share_dir):
+        src_dir = os.path.join(native_gcc.share_dir, dir)
+        dst_dir = os.path.join(env.share_dir, dir)
+        if dir[0:3] == "gcc" and os.path.isdir(src_dir):
+            shutil.copytree(src_dir, dst_dir)
+            return
 
 class cross_environment:
     env: environment  # gcc环境
@@ -394,6 +417,7 @@ class cross_environment:
     need_multilib: bool  # 是否需要编译multilib
     need_gdb: bool  # 是否需要编译gdb
     need_gdbserver: bool  # 是否需要编译gdbserver
+    need_newlib: bool  # 是否需要编译newlib，仅对独立工具链有效
 
     def __init__(
         self,
@@ -403,6 +427,7 @@ class cross_environment:
         multilib: bool,
         gdb: bool,
         gdbserver: bool,
+        newlib: bool,
         modifier=None,
         home: str = "",
         num_cores: int = 0,
@@ -416,6 +441,7 @@ class cross_environment:
             multilib (bool): 是否启用multilib
             gdb (bool): 是否启用gdb
             gdbserver (bool): 是否启用gdbserver
+            newlib (bool): 是否启用newlib，仅对独立工具链有效
             modifier (_type_, optional): 平台相关的修改器. 默认为None.
             home (str, optional): 源代码树搜索主目录. 默认为"".
             num_cores (int, optional): 并发构建数. 默认为0.
@@ -431,7 +457,7 @@ class cross_environment:
             f"--prefix={self.env.prefix}",
             f"--host={self.env.host}",
         ]
-        self.need_multilib, self.need_gdb, self.need_gdbserver = multilib, gdb, gdbserver
+        self.need_multilib, self.need_gdb, self.need_gdbserver, self.need_newlib = multilib, gdb, gdbserver, newlib
 
         libc_option_list = {
             "linux": [f"--prefix={self.env.lib_prefix}", f"--host={self.env.target}", f"--build={self.env.build}", "--disable-werror"],
@@ -444,7 +470,7 @@ class cross_environment:
         gcc_option_list = {
             "linux": ["--disable-bootstrap"],
             "w64": ["--disable-sjlj-exceptions", "--enable-threads=win32"],
-            "unknown": [*disable_hosted_option],
+            "unknown": [*disable_hosted_option] if self.need_newlib else [*disable_hosted_option_pure],
         }
         self.gcc_option = [
             *gcc_option_list[self.target_os],
@@ -495,8 +521,11 @@ class cross_environment:
 
     def _after_build_gcc(self) -> None:
         """在编译完gcc后完成收尾工作"""
-        # 复制文件
-        self.env.copy_from_cross_toolchain()
+        # 从完整工具链复制文件
+        if not self.full_build:
+            self.env.copy_from_cross_toolchain()
+        if self.need_gdb and not self.need_newlib:
+            copy_pretty_printer(self.env)
 
         # 编译gdbserver
         if self.need_gdbserver:
@@ -614,23 +643,30 @@ class cross_environment:
         self.env.make()
         self.env.install()
 
-        # 编译安装gcc
-        self.env.enter_build_dir("gcc")
-        self.env.configure(*self.basic_option, *self.gcc_option)
-        self.env.make("all-gcc")
-        self.env.install("install-strip-gcc")
+        if self.need_newlib:
+            # 编译安装gcc
+            self.env.enter_build_dir("gcc")
+            self.env.configure(*self.basic_option, *self.gcc_option)
+            self.env.make("all-gcc")
+            self.env.install("install-strip-gcc")
 
-        # 编译安装newlib
-        self.env.enter_build_dir("newlib")
-        self.env.configure(*self.libc_option)
-        self.env.make()
-        self.env.install()
+            # 编译安装newlib
+            self.env.enter_build_dir("newlib")
+            self.env.configure(*self.libc_option)
+            self.env.make()
+            self.env.install()
 
-        # 编译安装完整gcc
-        self.env.enter_build_dir("gcc", False)
-        self.env.make()
-        self.env.install()
-        self.env.strip_debug_symbol()
+            # 编译安装完整gcc
+            self.env.enter_build_dir("gcc", False)
+            self.env.make()
+            self.env.install()
+            self.env.strip_debug_symbol()
+        else:
+            # 编译安装完整gcc
+            self.env.enter_build_dir("gcc")
+            self.env.configure(*self.basic_option, *self.gcc_option)
+            self.env.make()
+            self.env.install("install-strip")
 
         # 完成后续工作
         self._after_build_gcc()
