@@ -72,6 +72,13 @@ def build_gcc(
     env = cross(build, host, target, multilib, gdb, gdbserver, modifier, home, num_cores)
     env.build()
 
+def dump_support_platform() -> None:
+    print("Host support:")
+    for host in host_list:
+        print(f"\t{host}")
+    print("Target support:")
+    for target in target_list:
+        print(f"\t{target}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -83,7 +90,12 @@ if __name__ == "__main__":
     parser.add_argument("--gdbserver", type=bool, help="Whether to enable gdbserver support in GCC toolchain.", default=False)
     parser.add_argument("--home", type=str, help="The home directory to find source trees.", default="")
     parser.add_argument("--jobs", type=int, help="Number of concurrent jobs at build time. Set 0 to use 1.5 times of cpu cores.", default=0)
+    parser.add_argument("--dump", action="store_true", help="Print support platforms and exit.")
     args = parser.parse_args()
+
+    if args.dump:
+        dump_support_platform()
+        quit()
 
     build: str = args.build
     host: str = args.host
