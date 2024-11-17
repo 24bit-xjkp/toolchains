@@ -15,6 +15,9 @@ def register(fn):
     name: str = fn.__name__
     field_list = name.split("_")[:-1]
     name = "-".join(field_list)
+    # 特殊处理x86_64
+    if name.startswith("x86-64"):
+        name.replace("-", "_", 1)
     modifier_list[name] = fn
 
     @wraps(fn)
@@ -39,3 +42,12 @@ def loongarch64_loongnix_linux_gnu_modifier(env: gcc.cross_environment) -> None:
     env.adjust_glibc_arch = "loongarch64-loongnix"
     env.libc_option.append("--enable-obsolete-rpc")
     env.gcc_option.append("--disable-libsanitizer")
+
+@register
+def x86_64_w64_mingw32_modifier(env: gcc.cross_environment) -> None:
+    if not env.need_multilib:
+        env.libc_option += ["--disable-lib32", "--enable-lib64"]
+
+@register
+def i686_w64_mingw32_modifier(env: gcc.cross_environment) -> None:
+    env.libc_option += ["--disable-lib64", "--enable-lib32"]
