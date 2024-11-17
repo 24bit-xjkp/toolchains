@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import os
 import shutil
-from typing import LiteralString
 from common import *
 
 lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports", "python-embed", "glibc", "newlib")
@@ -71,7 +70,7 @@ class environment(basic_environment):
     host_field: triplet_field  # host平台各个域
     target_field: triplet_field  # target平台各个域
 
-    def __init__(self, build: str = "x86_64-linux-gnu", host: str = "", target: str = "") -> None:
+    def __init__(self, build: str = "x86_64-linux-gnu", host: str = "", target: str = "", home: str = "", num_cores: int = 0) -> None:
         self.build = build
         self.host = host if host != "" else build
         self.target = target if target != "" else self.host
@@ -87,7 +86,7 @@ class environment(basic_environment):
         self.cross_compiler = self.host != self.target
 
         name_without_version = (f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native") + "-gcc"
-        super().__init__("15.0.0", name_without_version)
+        super().__init__("15.0.0", name_without_version, home, num_cores)
 
         self.prefix = os.path.join(self.home_dir, self.name)
         self.lib_prefix = os.path.join(self.prefix, self.target) if self.cross_compiler else self.prefix
@@ -396,18 +395,49 @@ class cross_environment:
     need_gdb: bool  # 是否需要编译gdb
     need_gdbserver: bool  # 是否需要编译gdbserver
 
-    def __init__(self, host: str, target: str, multilib: bool, gdb: bool, gdbserver: bool, *modifiers) -> None:
-        self.env = environment(host=host, target=target)
+    def __init__(
+        self,
+        build: str,
+        host: str,
+        target: str,
+        multilib: bool,
+        gdb: bool,
+        gdbserver: bool,
+        modifier=None,
+        home: str = "",
+        num_cores: int = 0,
+    ) -> None:
+        """gcc交叉工具链对象
+
+        Args:
+            build (str): 构建平台
+            host (str): 宿主平台
+            target (str): 目标平台
+            multilib (bool): 是否启用multilib
+            gdb (bool): 是否启用gdb
+            gdbserver (bool): 是否启用gdbserver
+            modifier (_type_, optional): 平台相关的修改器. 默认为None.
+            home (str, optional): 源代码树搜索主目录. 默认为"".
+            num_cores (int, optional): 并发构建数. 默认为0.
+        """
+        self.env = environment(build, host, target, home, num_cores)
         self.host_os = self.env.host_field.os
         self.target_os = self.env.target_field.os
         self.target_arch = self.env.target_field.arch
-        self.basic_option = ["--disable-werror", " --enable-nls", f"--target={self.env.target}", f"--prefix={self.env.prefix}"]
+        self.basic_option = [
+            "--disable-werror",
+            " --enable-nls",
+            f"--target={self.env.target}",
+            f"--prefix={self.env.prefix}",
+            f"--host={self.env.host}",
+        ]
         self.need_multilib, self.need_gdb, self.need_gdbserver = multilib, gdb, gdbserver
 
         libc_option_list = {
-            "linux": [f"--prefix={self.env.lib_prefix}", f"--host={self.env.target}", f"--build={self.env.build}"],
-            "w64": [f"--host={self.env.target}", f"--prefix={self.env.lib_prefix}", "--with-default-msvcrt=ucrt"],
-            "unknown": [],
+            "linux": [f"--prefix={self.env.lib_prefix}", f"--host={self.env.target}", f"--build={self.env.build}", "--disable-werror"],
+            "w64": [f"--host={self.env.target}", f"--prefix={self.env.lib_prefix}", "--with-default-msvcrt=ucrt", "--disable-werror"],
+            # newlib会自动设置安装路径的子目录
+            "unknown": [f"--prefix={self.env.prefix}", f"--target={self.env.target}", f"--build={self.env.build}", "--disable-werror"],
         }
         self.libc_option = libc_option_list[self.target_os]
 
@@ -456,23 +486,18 @@ class cross_environment:
         self.full_build = self.host_os == "linux" or self.target_os == "linux" and self.target_arch in ("i686", "x86_64")
         # 编译不完整libgcc时所需的stubs.h所在路径
         self.glibc_phony_stubs_path = os.path.join(self.env.lib_prefix, "include", "gnu", "stubs.h")
-        match (self.env.target):
-            case "arm-linux-gnueabi":
-                self.adjust_glibc_arch = "arm-sf"
-            case "arm-linux-gnueabihf":
-                self.adjust_glibc_arch = "arm-hf"
-            case "loongarch64-loongnix-linux-gnu":
-                self.adjust_glibc_arch = "loongarch64-loongnix"
-            case _:
-                # 由相关函数自动推动架构名
-                self.adjust_glibc_arch = ""
+        # 由相关函数自动推动架构名
+        self.adjust_glibc_arch = ""
 
         # 允许调整配置选项
-        for modifier in modifiers:
+        if modifier:
             modifier(self)
 
     def _after_build_gcc(self) -> None:
         """在编译完gcc后完成收尾工作"""
+        # 复制文件
+        self.env.copy_from_cross_toolchain()
+
         # 编译gdbserver
         if self.need_gdbserver:
             self.env.solve_libgcc_limits()
@@ -492,7 +517,7 @@ class cross_environment:
                     shutil.copy(os.path.join(gcc.lib_prefix, "lib", dll), self.env.bin_dir)
 
         # 打包工具链
-        self.env.package(self.need_gdb, self.host_os == "w64")
+        self.env.package(self.need_gdb, self.need_gdb and self.host_os == "w64")
 
     def _full_build_linux(self) -> None:
         """完整自举target为linux的gcc"""
@@ -597,7 +622,7 @@ class cross_environment:
 
         # 编译安装newlib
         self.env.enter_build_dir("newlib")
-        self.env.configure(*self.basic_option)
+        self.env.configure(*self.libc_option)
         self.env.make()
         self.env.install()
 
@@ -629,6 +654,9 @@ class cross_environment:
 
     def build(self) -> None:
         """构建gcc工具链"""
+        # 编译gdb依赖库
+        if self.need_gdb and self.host_os == "w64":
+            build_mingw_gdb_requirements(self.env)
         if self.full_build:
             match (self.target_os):
                 case "linux":

@@ -124,19 +124,13 @@ class basic_environment:
     name: str  # < 工具链名
     bin_dir: str  # < 安装后可执行文件所在目录
 
-    def __init__(self, version: str, name_without_version: str) -> None:
+    def __init__(self, version: str, name_without_version: str, home: str = "", num_cores: int = 0) -> None:
         self.version = version
         self.major_version = self.version.split(".")[0]
         self.name_without_version = name_without_version
         self.name = self.name_without_version + self.major_version
-        self.home_dir = ""
-        for option in sys.argv:
-            if option.startswith("--home="):
-                self.home_dir = option[7:]
-                break
-        if self.home_dir == "":
-            self.home_dir = os.environ["HOME"]
-        self.num_cores = floor(psutil.cpu_count() * 1.5)
+        self.home_dir = home if home != "" else os.environ["HOME"]
+        self.num_cores = num_cores or floor(psutil.cpu_count() * 1.5)
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
         self.bin_dir = os.path.join(self.home_dir, self.name, "bin")
 
@@ -177,7 +171,7 @@ class triplet_field:
     abi: str  # abi/libc
     num: int  # 非unknown的字段数
 
-    def __init__(self, triplet: str, normalize:bool = True) -> None:
+    def __init__(self, triplet: str, normalize: bool = True) -> None:
         """解析平台名称
 
         Args:
@@ -199,6 +193,8 @@ class triplet_field:
                 self.os = field[1]
                 self.vendor = field[2]
                 self.abi = field[3]
+            case _:
+                assert False, f'Illegal triplet "{triplet}"'
 
         # 正则化
         if normalize:
