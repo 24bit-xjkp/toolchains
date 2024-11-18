@@ -5,7 +5,8 @@ includes("option.lua", "utility/target.lua")
 -- @param target 工具链目标
 -- @return string 描述文本
 function _get_toolchain_description(toolchain, target)
-    return format("A %s toolchain for ", toolchain) .. (target ~= "target" and target or "target detected by arch and plat")
+    return format("A %s toolchain for ", toolchain) ..
+    (target ~= "target" and target or "target detected by arch and plat")
 end
 
 -- @brief 注册clang工具链
@@ -19,7 +20,7 @@ function register_clang_toolchain(target, modifier)
         set_runtimes("c++_static", "c++_shared", "stdc++_static", "stdc++_shared")
 
         set_toolset("cc",      "clang")
-        set_toolset("cxx",     "clang++", "clang")
+        set_toolset("cxx",     "clang",   "clang++")
         set_toolset("ld",      "clang++", "clang")
         set_toolset("sh",      "clang++", "clang")
         set_toolset("as",      "clang")
@@ -29,11 +30,11 @@ function register_clang_toolchain(target, modifier)
         set_toolset("objcopy", "llvm-objcopy")
         set_toolset("mrc",     "llvm-rc")
 
-        on_check(function (toolchain)
+        on_check(function(toolchain)
             return import("lib.detect.find_program")("clang")
         end)
 
-        on_load(function (toolchain)
+        on_load(function(toolchain)
             import("utility.utility")
             if toolchain:is_plat("windows") then
                 toolchain:add("runtimes", "MT", "MTd", "MD", "MDd")
@@ -43,7 +44,6 @@ function register_clang_toolchain(target, modifier)
                 target, modifier = utility.get_target_modifier()
             end
 
-            toolchain:add("cxflags", utility.get_march_option(target, "clang"))
             local sysroot_option = utility.get_sysroot_option()
             for flag, option in pairs(sysroot_option) do
                 toolchain:add(flag, option)
@@ -51,10 +51,14 @@ function register_clang_toolchain(target, modifier)
 
             local rtlib_option = utility.get_rtlib_option()
             local unwind_option = utility.get_unwindlib_option()
+            local target_option = target ~= "native" and "--target=" .. target or nil
+            local march_option = utility.get_march_option(target, "clang")
             for _, flag in ipairs({ "cxflags", "ldflags", "shflags" }) do
-                toolchain:add(flag, target ~= "native" and "--target=" .. target or nil)
+                toolchain:add(flag, target_option)
                 toolchain:add(flag ~= "cxflags" and flag or nil, rtlib_option, unwind_option)
             end
+            toolchain:add("cxflags", march_option)
+            toolchain:add("asflags", target_option, march_option)
 
             modifier(toolchain)
         end)
@@ -76,7 +80,7 @@ function register_gcc_toolchain(target, modifier)
         set_runtimes("stdc++_static", "stdc++_shared")
         local prefix
 
-        on_check(function (toolchain)
+        on_check(function(toolchain)
             if target == "target" then
                 target, modifier = import("utility.utility").get_target_modifier()
             end
@@ -84,10 +88,10 @@ function register_gcc_toolchain(target, modifier)
             return import("lib.detect.find_program")(prefix .. "gcc")
         end)
 
-        on_load(function (toolchain)
+        on_load(function(toolchain)
             prefix = target == "native" and "" or target .. "-"
             toolchain:set("toolset", "cc",      prefix.."gcc")
-            toolchain:set("toolset", "cxx",     prefix.."g++", prefix.."gcc")
+            toolchain:set("toolset", "cxx",     prefix.."gcc", prefix.."g++")
             toolchain:set("toolset", "ld",      prefix.."g++", prefix.."gcc")
             toolchain:set("toolset", "sh",      prefix.."g++", prefix.."gcc")
             toolchain:set("toolset", "ar",      prefix.."ar")
