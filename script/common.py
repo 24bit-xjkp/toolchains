@@ -24,6 +24,18 @@ def run_command(command: str, ignore_error: bool = False) -> None:
         print(f'Command "{command}" failed with errno={errno}, but it is ignored.')
 
 
+def mkdir(path: str, remove_if_exist=True) -> None:
+    """创建目录
+
+    Args:
+        path (str): 要创建的目录
+        remove_if_exist (bool, optional): 是否先删除已存在的同名目录. 默认先删除已存在的同名目录.
+    """
+    if remove_if_exist and os.path.exists(path):
+        shutil.rmtree(path)
+    os.makedirs(path, exist_ok=True)
+
+
 def copy(src: str, dst: str, overwrite=True, follow_symlinks: bool = False) -> None:
     """复制文件或目录
 
@@ -33,6 +45,10 @@ def copy(src: str, dst: str, overwrite=True, follow_symlinks: bool = False) -> N
         overwrite (bool, optional): 是否覆盖已存在项. 默认为覆盖.
         follow_symlinks (bool, optional): 是否复制软链接指向的目标，而不是软链接本身. 默认为保留软链接.
     """
+    # 创建目标目录
+    dir = os.path.dirname(dst)
+    if dir != "":
+        mkdir(dir)
     if not overwrite and os.path.exists(dst):
         return
     if os.path.isdir(src):
@@ -98,18 +114,6 @@ def check_lib_dir(lib: str, lib_dir: str, do_assert=True) -> bool:
     else:
         assert os.path.exists(lib_dir), message
     return True
-
-
-def mkdir(path: str, remove_if_exist=True) -> None:
-    """创建目录
-
-    Args:
-        path (str): 要创建的目录
-        remove_if_exist (bool, optional): 是否先删除已存在的同名目录. 默认先删除已存在的同名目录.
-    """
-    if remove_if_exist and os.path.exists(path):
-        shutil.rmtree(path)
-    os.makedirs(path, exist_ok=True)
 
 
 class basic_environment:

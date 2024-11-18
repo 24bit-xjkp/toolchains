@@ -346,7 +346,7 @@ class environment(basic_environment):
             copy(os.path.join(cross_toolchain.lib_prefix, dir), os.path.join(self.lib_prefix, dir))
 
         # 从交叉工具链中复制libgcc到本工具链中
-        copy(os.path.join(cross_toolchain.prefix, "lib", "gcc"), os.path.join(self.prefix, "lib"))
+        copy(os.path.join(cross_toolchain.prefix, "lib", "gcc"), os.path.join(self.prefix, "lib", "gcc"))
 
         # 复制gdbserver
         src_path = os.path.join(cross_toolchain.bin_dir, "gdbserver")
