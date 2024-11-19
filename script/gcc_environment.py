@@ -3,6 +3,7 @@
 import os
 import shutil
 from common import *
+from typing import Optional, Callable
 
 lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports", "python-embed", "glibc", "newlib")
 dll_target_list = (
@@ -84,7 +85,15 @@ class environment(basic_environment):
     host_field: triplet_field  # host平台各个域
     target_field: triplet_field  # target平台各个域
 
-    def __init__(self, build: str = "x86_64-linux-gnu", host: str = "", target: str = "", home: str = "", num_cores: int = 0) -> None:
+    def __init__(
+            self,
+            build: str = "x86_64-linux-gnu",
+            host: str = "",
+            target: str = "",
+            home: str = "",
+            jobs: int = 0,
+            prefix_dir: str = os.environ["HOME"],
+    ) -> None:
         self.build = build
         self.host = host if host != "" else build
         self.target = target if target != "" else self.host
@@ -100,9 +109,9 @@ class environment(basic_environment):
         self.cross_compiler = self.host != self.target
 
         name_without_version = (f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native") + "-gcc"
-        super().__init__("15.0.0", name_without_version, home, num_cores)
+        super().__init__("15.0.0", name_without_version, home, jobs)
 
-        self.prefix = os.path.join(self.home_dir, self.name)
+        self.prefix = os.path.join(prefix_dir, self.name)
         self.lib_prefix = os.path.join(self.prefix, self.target) if self.cross_compiler else self.prefix
         self.symlink_list = []
         self.share_dir = os.path.join(self.prefix, "share")
@@ -196,7 +205,7 @@ class environment(basic_environment):
             target (tuple[str, ...]): 要编译的目标
         """
         targets = " ".join(("", *target))
-        run_command(f"make {targets} -j {self.num_cores}", ignore_error)
+        run_command(f"make {targets} -j {self.jobs}", ignore_error)
 
     def install(self, *target: str, ignore_error: bool = False) -> None:
         """自动对库进行安装
@@ -207,11 +216,11 @@ class environment(basic_environment):
         if target != ():
             targets = " ".join(("", *target))
         elif os.getcwd() == os.path.join(self.lib_dir_list["gcc"], "build"):
-            run_command(f"make install-strip -j {self.num_cores}", ignore_error)
+            run_command(f"make install-strip -j {self.jobs}", ignore_error)
             targets = " ".join(dll_target_list)
         else:
             targets = "install-strip"
-        run_command(f"make {targets} -j {self.num_cores}", ignore_error)
+        run_command(f"make {targets} -j {self.jobs}", ignore_error)
 
     def strip_debug_symbol(self) -> None:
         """剥离动态库的调试符号到独立的符号文件"""
@@ -428,9 +437,10 @@ class cross_environment:
         gdb: bool,
         gdbserver: bool,
         newlib: bool,
-        modifier=None,
-        home: str = "",
-        num_cores: int = 0,
+        modifier: Optional[Callable[["cross_environment"], None]],
+        home: str,
+        jobs: int,
+        prefix_dir: str,
     ) -> None:
         """gcc交叉工具链对象
 
@@ -441,12 +451,17 @@ class cross_environment:
             multilib (bool): 是否启用multilib
             gdb (bool): 是否启用gdb
             gdbserver (bool): 是否启用gdbserver
-            newlib (bool): 是否启用newlib，仅对独立工具链有效
+            newlib (bool): 是否启用newlib, 仅对独立工具链有效
             modifier (_type_, optional): 平台相关的修改器. 默认为None.
-            home (str, optional): 源代码树搜索主目录. 默认为"".
-            num_cores (int, optional): 并发构建数. 默认为0.
+            home (str): 源代码树搜索主目录. 默认为$HOME.
+            jobs (int): 并发构建数. 默认为cpu核心数*1.5再向下取整.
         """
-        self.env = environment(build, host, target, home, num_cores)
+        if not os.path.exists(home) or not os.path.isdir(home):
+            raise FileNotFoundError
+        if jobs < 1:
+            raise ValueError
+
+        self.env = environment(build, host, target, home, jobs, prefix_dir)
         self.host_os = self.env.host_field.os
         self.target_os = self.env.target_field.os
         self.target_arch = self.env.target_field.arch

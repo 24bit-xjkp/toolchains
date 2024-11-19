@@ -141,7 +141,7 @@ class environment(basic_environment):
                 self.stage = int(i[8:])
             else:
                 assert False, f'Unknown option: "{i}"'
-        self.llvm_option_list_1["LLVM_PARALLEL_LINK_JOBS"] = str(self.num_cores // 5)
+        self.llvm_option_list_1["LLVM_PARALLEL_LINK_JOBS"] = str(self.jobs // 5)
         # 非自举在第1阶段就编译clang-tools-extra
         if not self.bootstrap:
             self.llvm_option_list_1["LLVM_ENABLE_PROJECTS"] = '"clang;clang-tools-extra;lld"'
@@ -240,7 +240,7 @@ class environment(basic_environment):
             project (str): 目标项目
         """
         assert project in (*subproject_list, *lib_list)
-        run_command(f"ninja -C {self.build_dir[project]} -j{self.num_cores}")
+        run_command(f"ninja -C {self.build_dir[project]} -j{self.jobs}")
 
     def install(self, project: str) -> None:
         """安装项目
@@ -249,7 +249,7 @@ class environment(basic_environment):
             project (str): 目标项目
         """
         assert project in (*subproject_list, *lib_list)
-        run_command(f"ninja -C {self.build_dir[project]} install/strip -j{self.num_cores}")
+        run_command(f"ninja -C {self.build_dir[project]} install/strip -j{self.jobs}")
 
     def remove_build_dir(self, project: str) -> None:
         """移除构建目录

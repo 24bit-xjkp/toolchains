@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-from typing import Callable
+import os
+import math
+from typing import Callable, Optional
 from gcc_environment import cross_environment as cross
 from common import triplet_field
 import argparse
@@ -60,10 +62,11 @@ def build_gcc(
     multilib: bool,
     gdb: bool,
     gdbserver: bool,
-    newlib: bool = True,
-    modifier=None,
-    home: str = "",
-    num_cores: int = 0,
+    newlib: bool,
+    modifier: Optional[Callable[[cross], None]],
+    home: str,
+    jobs: int,
+    prefix_dir: str,
 ) -> None:
     """构建gcc工具链
 
@@ -74,12 +77,12 @@ def build_gcc(
         multilib (bool): 是否启用multilib
         gdb (bool): 是否启用gdb
         gdbserver (bool): 是否启用gdbserver
-        newlib (bool): 是否启用newlib，仅对独立工具链有效
+        newlib (bool): 是否启用newlib, 仅对独立工具链有效
         modifier (_type_, optional): 平台相关的修改器. 默认为None.
-        home (str, optional): 源代码树搜索主目录. 默认为"".
-        num_cores (int, optional): 并发构建数. 默认为0.
+        home (str): 源代码树搜索主目录. 默认为$HOME.
+        jobs (int): 并发构建数. 默认为cpu核心数*1.5再向下取整.
     """
-    env = cross(build, host, target, multilib, gdb, gdbserver, newlib, modifier, home, num_cores)
+    env = cross(build, host, target, multilib, gdb, gdbserver, newlib, modifier, home, jobs, prefix_dir)
     env.build()
 
 
@@ -97,13 +100,15 @@ if __name__ == "__main__":
     parser.add_argument("--build", type=str, help="The build platform of the GCC toolchain.", default="x86_64-linux-gnu")
     parser.add_argument("--host", type=str, help="The host platform of the GCC toolchain.", default="x86_64-linux-gnu")
     parser.add_argument("--target", type=str, help="The target platform of the GCC toolchain.")
-    parser.add_argument("--multilib", type=bool, help="Whether to enable multilib support in GCC toolchain.", default=False)
+    parser.add_argument("--multilib", action=argparse.BooleanOptionalAction, help="Whether to enable multilib support in GCC toolchain.")
     parser.add_argument("--gdb", type=bool, help="Whether to enable gdb support in GCC toolchain.", default=True)
     parser.add_argument("--gdbserver", type=bool, help="Whether to enable gdbserver support in GCC toolchain.", default=False)
-    parser.add_argument("--newlib", type=bool, help="Whether to enable newlib support in GCC freestanding toolchain.", default=True)
-    parser.add_argument("--home", type=str, help="The home directory to find source trees.", default="")
-    parser.add_argument("--jobs", type=int, help="Number of concurrent jobs at build time. Set 0 to use 1.5 times of cpu cores.", default=0)
+    parser.add_argument("--newlib", action=argparse.BooleanOptionalAction, help="Whether to enable newlib support in GCC freestanding toolchain.")
+    parser.add_argument("--home", type=str, help="The home directory to find source trees.", default=os.environ["HOME"])
+    parser.add_argument("--jobs", type=int, help="Number of concurrent jobs at build time. Use 1.5 times of cpu cores by default.",
+                        default=math.floor(os.cpu_count() * 1.5))
     parser.add_argument("--dump", action="store_true", help="Print support platforms and exit.")
+    parser.add_argument("--prefix-dir", type=str, help="The dir contains all the prefix dir.", default=os.environ["HOME"])
     args = parser.parse_args()
 
     if args.dump:
@@ -118,8 +123,16 @@ if __name__ == "__main__":
     gdbserver: bool = args.gdbserver
     newlib: bool = args.newlib
     home: str = args.home
-    num_cores: int = args.jobs
+    jobs: int = args.jobs
+    prefix_dir: str = args.prefix_dir
+
+    if not os.path.exists(prefix_dir):
+        os.makedirs(prefix_dir)
+    elif len(os.listdir(prefix_dir)) != 0:
+        _tmp = input(f"[toolchains] prefix-dir \"{prefix_dir}\" is not empty, Are you want to continue? y/n")
+        if _tmp.lower() != 'y':
+            exit(1)
 
     check_triplet(host, target)
     modifier = get_modifier(target)
-    build_gcc(build, host, target, multilib, gdb, gdbserver, newlib, modifier, home, num_cores)
+    build_gcc(build, host, target, multilib, gdb, gdbserver, newlib, modifier, home, jobs, prefix_dir)
