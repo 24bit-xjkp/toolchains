@@ -16,8 +16,7 @@ def register(fn):
     field_list = name.split("_")[:-1]
     name = "-".join(field_list)
     # 特殊处理x86_64
-    if name.startswith("x86-64"):
-        name.replace("-", "_", 1)
+    name.replace("x86-64", "x86_64")
     modifier_list[name] = fn
 
     @wraps(fn)

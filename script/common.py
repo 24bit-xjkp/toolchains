@@ -91,7 +91,7 @@ def check_lib_dir(lib: str, lib_dir: str, do_assert=True) -> bool:
     Returns:
         bool: 返回库是否存在
     """
-    message = f'Cannot find lib "{lib}" in directory "{lib_dir}"'
+    message = f'[toolchains] Cannot find lib "{lib}" in directory "{lib_dir}"'
     if not do_assert and not os.path.exists(lib_dir):
         print(message)
         return False
@@ -118,19 +118,19 @@ class basic_environment:
     version: str  # 版本号
     major_version: str  # 主版本号
     home_dir: str  # 源代码所在的目录，默认为$HOME
-    num_cores: int  # < 编译所用线程数
+    jobs: int  # < 编译所用线程数
     current_dir: str  # < toolchains项目所在目录
     name_without_version: str  # < 不带版本号的工具链名
     name: str  # < 工具链名
     bin_dir: str  # < 安装后可执行文件所在目录
 
-    def __init__(self, version: str, name_without_version: str, home: str = "", num_cores: int = 0) -> None:
+    def __init__(self, version: str, name_without_version: str, home: str, jobs: int) -> None:
         self.version = version
         self.major_version = self.version.split(".")[0]
         self.name_without_version = name_without_version
         self.name = self.name_without_version + self.major_version
-        self.home_dir = home if home != "" else os.environ["HOME"]
-        self.num_cores = num_cores or floor(psutil.cpu_count() * 1.5)
+        self.home_dir = home
+        self.jobs = jobs
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
         self.bin_dir = os.path.join(self.home_dir, self.name, "bin")
 
