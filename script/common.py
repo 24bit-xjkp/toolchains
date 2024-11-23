@@ -8,7 +8,7 @@ from math import floor
 
 
 def run_command(command: str, ignore_error: bool = False) -> None:
-    """运行指定命令，若不忽略错误，则在命令执行出错时抛出AssertionError，反之打印错误吗
+    """运行指定命令, 若不忽略错误, 则在命令执行出错时抛出RuntimeError, 反之打印错误码
 
     Args:
         command (str): 要运行的命令
@@ -16,12 +16,16 @@ def run_command(command: str, ignore_error: bool = False) -> None:
     """
 
     # 打印运行的命令
-    print(command)
+    print("[toolchains] run command: ", command)
     errno = os.system(command)
-    if not ignore_error:
-        assert errno == 0, f'Command "{command}" failed.'
-    elif errno != 0:
+
+    if errno == 0:
+        return
+
+    if ignore_error:
         print(f'Command "{command}" failed with errno={errno}, but it is ignored.')
+    else:
+        raise RuntimeError(f'Command "{command}" failed.')
 
 
 def mkdir(path: str, remove_if_exist=True) -> None:
