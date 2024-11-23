@@ -81,7 +81,29 @@ def build_gcc(
         modifier (_type_, optional): 平台相关的修改器. 默认为None.
         home (str): 源代码树搜索主目录. 默认为$HOME.
         jobs (int): 并发构建数. 默认为cpu核心数*1.5再向下取整.
+        prefix_dir (str): 存放prefix指定的目录的目录. 默认为$HOME.
     """
+    if not isinstance(build, str) or \
+            not isinstance(host, str) or \
+            not isinstance(target, str) or \
+            not isinstance(multilib, bool) or \
+            not isinstance(gdb, bool) or \
+            not isinstance(gdbserver, bool) or \
+            not isinstance(newlib, bool) or \
+            not isinstance(home, str) or \
+            not isinstance(jobs, int) or \
+            not isinstance(prefix_dir, str):
+        raise TypeError
+    if not os.path.exists(home):
+        raise FileNotFoundError(f"Home dir \"{home}\" does not exist.")
+
+    if not os.path.exists(prefix_dir):
+        os.makedirs(prefix_dir)
+    elif len(os.listdir(prefix_dir)) != 0:
+        _tmp = input(f"[toolchains] prefix-dir \"{prefix_dir}\" is not empty, are you want to continue? y/n")
+        if _tmp.lower() != 'y':
+            exit(1)
+
     env = cross(build, host, target, multilib, gdb, gdbserver, newlib, modifier, home, jobs, prefix_dir)
     env.build()
 
@@ -115,24 +137,18 @@ if __name__ == "__main__":
         dump_support_platform()
         quit()
 
-    build: str = args.build
-    host: str = args.host
-    target: str = args.target
-    multilib: bool = args.multilib
-    gdb: bool = args.gdb
-    gdbserver: bool = args.gdbserver
-    newlib: bool = args.newlib
-    home: str = args.home
-    jobs: int = args.jobs
-    prefix_dir: str = args.prefix_dir
-
-    if not os.path.exists(prefix_dir):
-        os.makedirs(prefix_dir)
-    elif len(os.listdir(prefix_dir)) != 0:
-        _tmp = input(f"[toolchains] prefix-dir \"{prefix_dir}\" is not empty, Are you want to continue? y/n")
-        if _tmp.lower() != 'y':
-            exit(1)
-
-    check_triplet(host, target)
-    modifier = get_modifier(target)
-    build_gcc(build, host, target, multilib, gdb, gdbserver, newlib, modifier, home, jobs, prefix_dir)
+    check_triplet(args.host, args.target)
+    modifier = get_modifier(args.target)
+    build_gcc(
+        args.build,
+        args.host,
+        args.target,
+        args.multilib,
+        args.gdb,
+        args.gdbserver,
+        args.newlib,
+        args.modifier,
+        args.home,
+        args.jobs,
+        args.prefix_dir,
+    )
