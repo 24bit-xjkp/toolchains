@@ -52,7 +52,7 @@ def copy(src: str, dst: str, overwrite=True, follow_symlinks: bool = False) -> N
     # 创建目标目录
     dir = os.path.dirname(dst)
     if dir != "":
-        mkdir(dir)
+        mkdir(dir, False)
     if not overwrite and os.path.exists(dst):
         return
     if os.path.isdir(src):
