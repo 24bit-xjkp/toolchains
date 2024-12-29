@@ -126,11 +126,11 @@ class basic_environment:
     version: str  # 版本号
     major_version: str  # 主版本号
     home_dir: str  # 源代码所在的目录，默认为$HOME
-    jobs: int  # < 编译所用线程数
-    current_dir: str  # < toolchains项目所在目录
-    name_without_version: str  # < 不带版本号的工具链名
-    name: str  # < 工具链名
-    bin_dir: str  # < 安装后可执行文件所在目录
+    jobs: int  # 编译所用线程数
+    current_dir: str  # toolchains项目所在目录
+    name_without_version: str  # 不带版本号的工具链名
+    name: str  # 工具链名
+    bin_dir: str  # 安装后可执行文件所在目录
 
     def __init__(self, version: str, name_without_version: str, home: str, jobs: int) -> None:
         self.version = version
@@ -149,7 +149,7 @@ class basic_environment:
             name (str, optional): 要压缩的目标名称，是相对于self.home_dir的路径. 默认为self.name.
         """
         os.chdir(self.home_dir)
-        name = self.name if name == "" else name
+        name = name or self.name
         run_command(f"tar -cf {name}.tar {name}")
         memory_MB = psutil.virtual_memory().available // 1048576 + 3072
         run_command(f"xz -fev9 -T 0 --memlimit={memory_MB}MiB {name}.tar")

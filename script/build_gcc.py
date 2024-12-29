@@ -83,25 +83,27 @@ def build_gcc(
         jobs (int): 并发构建数. 默认为cpu核心数*1.5再向下取整.
         prefix_dir (str): 存放prefix指定的目录的目录. 默认为$HOME.
     """
-    if not isinstance(build, str) or \
-            not isinstance(host, str) or \
-            not isinstance(target, str) or \
-            not isinstance(multilib, bool) or \
-            not isinstance(gdb, bool) or \
-            not isinstance(gdbserver, bool) or \
-            not isinstance(newlib, bool) or \
-            not isinstance(home, str) or \
-            not isinstance(jobs, int) or \
-            not isinstance(prefix_dir, str):
+    if (
+        not isinstance(build, str)
+        or not isinstance(host, str)
+        or not isinstance(target, str)
+        or not isinstance(multilib, bool)
+        or not isinstance(gdb, bool)
+        or not isinstance(gdbserver, bool)
+        or not isinstance(newlib, bool)
+        or not isinstance(home, str)
+        or not isinstance(jobs, int)
+        or not isinstance(prefix_dir, str)
+    ):
         raise TypeError
     if not os.path.exists(home):
-        raise FileNotFoundError(f"Home dir \"{home}\" does not exist.")
+        raise FileNotFoundError(f'Home dir "{home}" does not exist.')
 
     if not os.path.exists(prefix_dir):
         os.makedirs(prefix_dir)
     elif len(os.listdir(prefix_dir)) != 0:
-        _tmp = input(f"[toolchains] prefix-dir \"{prefix_dir}\" is not empty, are you want to continue? y/n")
-        if _tmp.lower() != 'y':
+        _tmp = input(f'[toolchains] prefix-dir "{prefix_dir}" is not empty, are you want to continue? y/n')
+        if _tmp.lower() != "y":
             exit(1)
 
     env = cross(build, host, target, multilib, gdb, gdbserver, newlib, modifier, home, jobs, prefix_dir)
@@ -118,17 +120,25 @@ def dump_support_platform() -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Build gcc toolchain to specific platform.", formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
     parser.add_argument("--build", type=str, help="The build platform of the GCC toolchain.", default="x86_64-linux-gnu")
     parser.add_argument("--host", type=str, help="The host platform of the GCC toolchain.", default="x86_64-linux-gnu")
     parser.add_argument("--target", type=str, help="The target platform of the GCC toolchain.")
     parser.add_argument("--multilib", action=argparse.BooleanOptionalAction, help="Whether to enable multilib support in GCC toolchain.")
     parser.add_argument("--gdb", type=bool, help="Whether to enable gdb support in GCC toolchain.", default=True)
     parser.add_argument("--gdbserver", type=bool, help="Whether to enable gdbserver support in GCC toolchain.", default=False)
-    parser.add_argument("--newlib", action=argparse.BooleanOptionalAction, help="Whether to enable newlib support in GCC freestanding toolchain.")
+    parser.add_argument(
+        "--newlib", action=argparse.BooleanOptionalAction, help="Whether to enable newlib support in GCC freestanding toolchain."
+    )
     parser.add_argument("--home", type=str, help="The home directory to find source trees.", default=os.environ["HOME"])
-    parser.add_argument("--jobs", type=int, help="Number of concurrent jobs at build time. Use 1.5 times of cpu cores by default.",
-                        default=math.floor(os.cpu_count() * 1.5))
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        help="Number of concurrent jobs at build time. Use 1.5 times of cpu cores by default.",
+        default=math.floor(os.cpu_count() * 1.5),  # type: ignore
+    )
     parser.add_argument("--dump", action="store_true", help="Print support platforms and exit.")
     parser.add_argument("--prefix-dir", type=str, help="The dir contains all the prefix dir.", default=os.environ["HOME"])
     args = parser.parse_args()

@@ -86,17 +86,17 @@ class environment(basic_environment):
     target_field: triplet_field  # target平台各个域
 
     def __init__(
-            self,
-            build: str = "x86_64-linux-gnu",
-            host: str = "",
-            target: str = "",
-            home: str = "",
-            jobs: int = 0,
-            prefix_dir: str = os.environ["HOME"],
+        self,
+        build: str = "x86_64-linux-gnu",
+        host: str = "",
+        target: str = "",
+        home: str = "",
+        jobs: int = 0,
+        prefix_dir: str = os.environ["HOME"],
     ) -> None:
         self.build = build
-        self.host = host if host != "" else build
-        self.target = target if target != "" else self.host
+        self.host = host or build
+        self.target = target or self.host
         # 鉴别工具链类别
         if self.build == self.host == self.target:
             self.toolchain_type = "native"
@@ -155,13 +155,6 @@ class environment(basic_environment):
         self.register_in_env()
         self.freestanding = self.target_field.abi in ("elf", "eabi")
 
-    def update(self) -> None:
-        """更新源代码"""
-        for lib in ("expat", "gcc", "binutils", "linux", "mingw", "pexports", "glibc"):
-            path = os.path.join(self.home_dir, lib)
-            os.chdir(path)
-            run_command("git pull")
-
     def enter_build_dir(self, lib: str, remove_files: bool = True) -> None:
         """进入构建目录
 
@@ -170,12 +163,12 @@ class environment(basic_environment):
         """
         assert lib in lib_list
         build_dir = self.lib_dir_list[lib]
-        need_make_build_dir = True  # < 是否需要建立build目录
+        need_make_build_dir = True  # 是否需要建立build目录
         match lib:
             case "python-embed" | "linux":
                 need_make_build_dir = False  # 跳过python-embed和linux，python-embed仅需要生成静态库，linux有独立的编译方式
             case "expat":
-                build_dir = os.path.join(build_dir, "expat", "build")  # < expat项目内嵌套了一层目录
+                build_dir = os.path.join(build_dir, "expat", "build")  # expat项目内嵌套了一层目录
             case _:
                 build_dir = os.path.join(build_dir, "build")
 
@@ -399,6 +392,7 @@ def get_mingw_gdb_lib_options(env: environment) -> list[str]:
     prefix_selector = lambda lib: f"--with-{lib}=" if lib in ("gmp", "mpfr") else f"--with-lib{lib}-prefix="
     return [prefix_selector(lib) + f"{lib_prefix_list[lib]}" for lib in ("gmp", "mpfr", "expat")]
 
+
 def copy_pretty_printer(env: environment) -> None:
     """从x86_64-linux-gnu本地工具链中复制pretty-printer到不带newlib的独立工具链"""
     native_gcc = environment()
@@ -408,6 +402,7 @@ def copy_pretty_printer(env: environment) -> None:
         if dir[0:3] == "gcc" and os.path.isdir(src_dir):
             shutil.copytree(src_dir, dst_dir)
             return
+
 
 class cross_environment:
     env: environment  # gcc环境

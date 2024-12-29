@@ -1,6 +1,5 @@
 from typing import Callable
 import gcc_environment as gcc
-from functools import wraps
 
 # 修改器列表
 modifier_list: dict[str, Callable[[gcc.cross_environment], None]] = {}
@@ -18,12 +17,7 @@ def register(fn):
     # 特殊处理x86_64
     name.replace("x86-64", "x86_64")
     modifier_list[name] = fn
-
-    @wraps(fn)
-    def wrapper(env: gcc.cross_environment) -> None:
-        fn(env)
-
-    return wrapper
+    return fn
 
 
 @register
