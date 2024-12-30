@@ -523,11 +523,15 @@ def auto_download(env: environment) -> None:
 
 
 def _check_depth(depth: int) -> None:
-    assert depth > 0, f"Invalid shallow clone depth: {depth}"
+    assert depth > 0, f"Invalid shallow clone depth: {depth}."
 
 
 def _check_retry(retry: int) -> None:
-    assert retry >= 0, f"Invalid retry times: {retry}"
+    assert retry >= 0, f"Invalid retry times: {retry}."
+
+
+def _check_home(home: str) -> None:
+    assert os.path.exists(home), f'The home dir "{home}" does not exist.'
 
 
 if __name__ == "__main__":
@@ -576,8 +580,10 @@ if __name__ == "__main__":
     parser.add_argument("--export", dest="export_file", type=str, help="Export settings to specific file.")
     parser.add_argument("--import", dest="import_file", type=str, help="Import settings from specific file.")
     args = parser.parse_args()
+    # 检查输入是否合法
     _check_depth(args.depth)
     _check_retry(args.retry)
+    _check_home(args.home)
 
     current_env = environment(
         args.glibc_version, args.home, args.clone_type, args.depth, args.ssh, args.extra_libs or [], args.retry, args.remote
@@ -586,8 +592,6 @@ if __name__ == "__main__":
         try:
             with open(args.import_file) as file:
                 import_config: dict = json.load(file)
-            _check_depth(import_config["shallow_clone_depth"])
-            _check_retry(import_config["network_try_times"])
         except Exception as e:
             raise RuntimeError(f'Import file "{args.import_file}" failed: {e}')
         current_config = current_env.__dict__
@@ -601,6 +605,10 @@ if __name__ == "__main__":
         if args.extra_libs == []:
             current_env.extra_lib_list = default_env.extra_lib_list
 
+    # 检查合并配置后环境是否正确
+    _check_depth(current_env.shallow_clone_depth)
+    _check_retry(current_env.network_try_times)
+    _check_home(current_env.home)
     if args.system:
         print(f"Please install following system libs: {" ".join(system_lib_list)}")
     elif args.auto:
