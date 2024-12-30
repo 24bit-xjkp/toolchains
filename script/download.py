@@ -7,7 +7,7 @@ import common
 import subprocess
 import enum
 import packaging.version as version
-
+import json
 
 class extra_lib_version(enum.Enum):
     python = "3.13.1"
@@ -95,7 +95,7 @@ class git_url:
         Args:
             prefer_ssh (bool): 是否倾向于使用ssh
         """
-        use_ssh = prefer_ssh and self.remote == "github.com"
+        use_ssh = prefer_ssh and self.remote in ("github.com", "gitee.com")
         return f"git@{self.remote}:{self.path}" if use_ssh else f"https://{self.remote}/{self.path}"
 
 
@@ -104,26 +104,26 @@ class environment:
     home: str  # 主目录
     clone_type: git_clone_type  # 是否使用部分克隆
     shallow_clone_depth: int  # 浅克隆深度
-    github_use_ssh: bool  # 使用ssh克隆托管在github上的代码
+    git_use_ssh: bool  # 使用ssh克隆git托管的代码
     extra_lib_list: list[str]  # 其他非git托管包
     network_try_times: int  # 进行网络操作时尝试的次数
     necessary_extra_lib_list: set[str] = {"python-embed", "gmp", "mpfr"}  # 必须的非git托管包
 
     def __init__(
         self,
-        glibc_version: str,
-        home: str,
-        clone_type: git_clone_type,
-        shallow_clone_depth: int,
-        github_use_ssh: bool,
-        extra_lib_list: list[str],
-        retry_times: int,
+        glibc_version: str = subprocess.getoutput("getconf GNU_LIBC_VERSION").split(" ")[1],
+        home: str = os.environ["HOME"],
+        clone_type: str = git_clone_type.partial.name,
+        shallow_clone_depth: int = 1,
+        git_use_ssh: bool = False,
+        extra_lib_list: list[str] = [],
+        retry_times: int = 5,
     ) -> None:
         self.glibc_version = glibc_version
         self.home = home
-        self.clone_type = clone_type
+        self.clone_type = git_clone_type[clone_type]
         self.shallow_clone_depth = shallow_clone_depth
-        self.github_use_ssh = github_use_ssh
+        self.git_use_ssh = git_use_ssh
         self.extra_lib_list = [*self.necessary_extra_lib_list, *extra_lib_list]
         self.network_try_times = retry_times + 1
 
@@ -194,7 +194,7 @@ git_lib_list: dict[str, git_url] = {
     "newlib": git_url("github.com", "bminor/newlib.git"),
     "llvm": git_url("github.com", "llvm/llvm-project.git"),
 }
-# TODO:处理libiconv
+
 extra_lib_list: dict[str, extra_lib] = {
     "python-embed": extra_lib(
         {
@@ -396,7 +396,7 @@ def download(env: environment) -> None:
     for lib, url_fields in git_lib_list.items():
         lib_dir = os.path.join(env.home, lib)
         if not os.path.exists(lib_dir):
-            url = url_fields.get_url(env.github_use_ssh)
+            url = url_fields.get_url(env.git_use_ssh)
             extra_options: list[str] = extra_git_options_list[lib](env) if lib in extra_git_options_list else []
             match (env.clone_type):
                 case git_clone_type.partial:
@@ -484,24 +484,37 @@ def auto_download(env: environment) -> None:
     update(env)
 
 
+def _check_depth(depth: int) -> None:
+    assert depth > 0, f"Invalid shallow clone depth: {depth}"
+
+
+def _check_retry(retry: int) -> None:
+    assert retry >= 0, f"Invalid retry times: {retry}"
+
+
 if __name__ == "__main__":
-    default_glibc_version = subprocess.getoutput("getconf GNU_LIBC_VERSION").split(" ")[1]
+    default_env = environment()
+
     parser = argparse.ArgumentParser(
-        description="Download or update needy libs for building clang and gcc.", formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        description="Download or update needy libs for building gcc and llvm.", formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("--glibc_version", type=str, help="The version of glibc of target platform.", default=default_glibc_version)
-    parser.add_argument("--home", type=str, help="The home directory to find source trees.", default=os.environ["HOME"])
+    parser.add_argument("--glibc_version", type=str, help="The version of glibc of target platform.", default=default_env.glibc_version)
+    parser.add_argument("--home", type=str, help="The home directory to find source trees.", default=default_env.home)
     parser.add_argument(
         "--clone_type",
         type=str,
         help="How to clone the git repository.",
-        default=git_clone_type.partial._name_,
+        default=default_env.clone_type.name,
         choices=git_clone_type._member_names_,
     )
-    parser.add_argument("--depth", type=int, help="The depth of shallow clone.", default=1)
-    parser.add_argument("--ssh", type=bool, help="Whether to use ssh when cloning git repositories from github.", default=False)
+    parser.add_argument("--depth", type=int, help="The depth of shallow clone.", default=default_env.shallow_clone_depth)
+    parser.add_argument(
+        "--ssh", type=bool, help="Whether to use ssh when cloning git repositories from github.", default=default_env.git_use_ssh
+    )
     parser.add_argument("--extra_libs", nargs="*", action="extend", help="Extra non-git libs to install.", choices=optional_extra_lib_list)
-    parser.add_argument("--retry", type=int, help="The number of retries when a network operation failed.", default=5)
+    parser.add_argument(
+        "--retry", type=int, help="The number of retries when a network operation failed.", default=default_env.network_try_times - 1
+    )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
         "--update",
@@ -515,20 +528,41 @@ if __name__ == "__main__":
         help="Download missing libs, then update installed libs. This may take more time because of twice check.",
     )
     group.add_argument("--system", action="store_true", help="Print needy system libs and exit.")
+    parser.add_argument("--export", dest="export_file", type=str, help="Export settings to specific file.")
+    parser.add_argument("--import", dest="import_file", type=str, help="Import settings from specific file.")
     args = parser.parse_args()
+    _check_depth(args.depth)
+    _check_retry(args.retry)
+
+    current_env = environment(args.glibc_version, args.home, args.clone_type, args.depth, args.ssh, args.extra_libs or [], args.retry)
+    if args.import_file:
+        try:
+            with open(args.import_file) as file:
+                import_config = json.load(file)
+            _check_depth(import_config["shallow_clone_depth"])
+            _check_retry(import_config["network_try_times"])
+        except Exception as e:
+            raise RuntimeError(f'Import file "{args.import_file}" failed: {e}')
+        current_config = current_env.__dict__
+        default_config = default_env.__dict__
+        current_env.__dict__ = {key: (import_config[key] if value == default_config[key] else value) for key, value in current_config.items()}
+        # 若extra_libs被用户设置为空则将当前extra_libs恢复为默认
+        if args.extra_libs == []:
+            current_env.extra_lib_list = default_env.extra_lib_list
 
     if args.system:
         print(f"Please install following system libs: {" ".join(system_lib_list)}")
-        quit()
-    assert args.depth > 0, f"Invalid shallow clone depth: {args.depth}"
-    assert args.retry >= 0, f"Invalid retry times: {args.retry}"
-
-    env = environment(
-        args.glibc_version, args.home, git_clone_type[args.clone_type], args.depth, args.ssh, args.extra_libs or [], args.retry
-    )
-    if args.auto:
-        auto_download(env)
+    elif args.auto:
+        auto_download(current_env)
     elif args.update:
-        update(env)
+        update(current_env)
     elif args.download:
-        download(env)
+        download(current_env)
+
+    if args.export_file:
+        try:
+            with open(args.export_file, "w") as file:
+                json.dump(current_env.__dict__, file, indent=4)
+            print(f'[toolchains] Settings have been written to file "{args.export_file}"')
+        except Exception as e:
+            raise RuntimeError(f"Export settings failed: {e}")
