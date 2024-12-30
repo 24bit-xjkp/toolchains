@@ -506,13 +506,13 @@ if __name__ == "__main__":
     group.add_argument(
         "--update",
         action="store_true",
-        help="Update git libs and python embed package. All libs should be installed before update.",
+        help="Update installed libs. All libs should be installed before update.",
     )
     group.add_argument("--download", action="store_true", help="Download missing libs. This would not update existing libs.")
     group.add_argument(
         "--auto",
         action="store_true",
-        help="Download missing libs, then update git libs and python embed package. This may take more time because of twice check.",
+        help="Download missing libs, then update installed libs. This may take more time because of twice check.",
     )
     group.add_argument("--system", action="store_true", help="Print needy system libs and exit.")
     args = parser.parse_args()
