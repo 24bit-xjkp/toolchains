@@ -9,6 +9,7 @@ import enum
 import packaging.version as version
 import json
 
+
 class extra_lib_version(enum.Enum):
     python = "3.13.1"
     iconv = "1.18"
@@ -81,6 +82,14 @@ class git_clone_type(enum.IntEnum):
     full = enum.auto()  # 完全克隆
 
 
+class git_prefer_remote(enum.IntEnum):
+    """git远程托管平台"""
+
+    github = enum.auto()
+    nju = enum.auto()
+    tuna = enum.auto()
+
+
 class git_url:
     remote: str  # 托管平台
     path: str  # git路径
@@ -95,7 +104,7 @@ class git_url:
         Args:
             prefer_ssh (bool): 是否倾向于使用ssh
         """
-        use_ssh = prefer_ssh and self.remote in ("github.com", "gitee.com")
+        use_ssh = prefer_ssh and self.remote == "github.com"
         return f"git@{self.remote}:{self.path}" if use_ssh else f"https://{self.remote}/{self.path}"
 
 
@@ -107,6 +116,7 @@ class environment:
     git_use_ssh: bool  # 使用ssh克隆git托管的代码
     extra_lib_list: list[str]  # 其他非git托管包
     network_try_times: int  # 进行网络操作时尝试的次数
+    git_remote: git_prefer_remote
     necessary_extra_lib_list: set[str] = {"python-embed", "gmp", "mpfr"}  # 必须的非git托管包
 
     def __init__(
@@ -118,6 +128,7 @@ class environment:
         git_use_ssh: bool = False,
         extra_lib_list: list[str] = [],
         retry_times: int = 5,
+        git_remote: str = git_prefer_remote.github.name,
     ) -> None:
         self.glibc_version = glibc_version
         self.home = home
@@ -126,6 +137,7 @@ class environment:
         self.git_use_ssh = git_use_ssh
         self.extra_lib_list = [*self.necessary_extra_lib_list, *extra_lib_list]
         self.network_try_times = retry_times + 1
+        self.git_remote = git_prefer_remote[git_remote]
 
 
 class extra_lib:
@@ -181,7 +193,7 @@ system_lib_list: list[str] = [
     "libxml2-dev",
     "zlib1g-dev",
 ]
-git_lib_list: dict[str, git_url] = {
+github_lib_list: dict[str, git_url] = {
     "gcc": git_url("github.com", "gcc-mirror/gcc.git"),
     "binutils": git_url("github.com", "bminor/binutils-gdb.git"),
     "mingw": git_url("github.com", "mirror/mingw-w64.git"),
@@ -194,6 +206,32 @@ git_lib_list: dict[str, git_url] = {
     "newlib": git_url("github.com", "bminor/newlib.git"),
     "llvm": git_url("github.com", "llvm/llvm-project.git"),
 }
+nju_lib_list: dict[str, git_url] = {
+    **github_lib_list,
+    "gcc": git_url("mirror.nju.edu.cn", "git/gcc.git"),
+    "binutils": git_url("mirror.nju.edu.cn", "git/binutils-gdb.git"),
+    "glibc": git_url("mirror.nju.edu.cn", "git/glibc.git"),
+    "linux": git_url("mirror.nju.edu.cn", "git/linux.git"),
+    "llvm": git_url("mirror.nju.edu.cn", "git/llvm-project.git"),
+}
+tuna_lib_list: dict[str, git_url] = {
+    **github_lib_list,
+    "gcc": git_url("mirrors.tuna.tsinghua.edu.cn", "git/gcc.git"),
+    "binutils": git_url("mirrors.tuna.tsinghua.edu.cn", "git/binutils-gdb.git"),
+    "glibc": git_url("mirrors.tuna.tsinghua.edu.cn", "git/glibc.git"),
+    "linux": git_url("mirrors.tuna.tsinghua.edu.cn", "git/linux.git"),
+    "llvm": git_url("mirrors.tuna.tsinghua.edu.cn", "git/llvm-project.git"),
+}
+
+
+def get_git_lib_list(env: environment) -> dict[str, git_url]:
+    git_lib_list: dict[git_prefer_remote, dict[str, git_url]] = {
+        git_prefer_remote.github: github_lib_list,
+        git_prefer_remote.nju: nju_lib_list,
+        git_prefer_remote.tuna: tuna_lib_list,
+    }
+    return git_lib_list[env.git_remote]
+
 
 extra_lib_list: dict[str, extra_lib] = {
     "python-embed": extra_lib(
@@ -393,7 +431,7 @@ def download(env: environment) -> None:
         env (environment): 源代码下载环境
     """
     # 下载git托管的源代码
-    for lib, url_fields in git_lib_list.items():
+    for lib, url_fields in get_git_lib_list(env).items():
         lib_dir = os.path.join(env.home, lib)
         if not os.path.exists(lib_dir):
             url = url_fields.get_url(env.git_use_ssh)
@@ -440,7 +478,7 @@ def update(env: environment) -> None:
         env (environment): 源代码下载环境
     """
     # 更新git托管的源代码
-    for lib in git_lib_list:
+    for lib in get_git_lib_list(env):
         lib_dir = os.path.join(env.home, lib)
         assert os.path.exists(lib_dir), f"Cannot find lib: {lib}"
         for _ in range(env.network_try_times):
@@ -515,6 +553,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--retry", type=int, help="The number of retries when a network operation failed.", default=default_env.network_try_times - 1
     )
+    parser.add_argument(
+        "--remote",
+        type=str,
+        help="The git remote preferred to use. The preferred remote will be used to accelerate git operation when possible.",
+        default=default_env.git_remote.name,
+        choices=git_prefer_remote._member_names_,
+    )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
         "--update",
@@ -534,18 +579,24 @@ if __name__ == "__main__":
     _check_depth(args.depth)
     _check_retry(args.retry)
 
-    current_env = environment(args.glibc_version, args.home, args.clone_type, args.depth, args.ssh, args.extra_libs or [], args.retry)
+    current_env = environment(
+        args.glibc_version, args.home, args.clone_type, args.depth, args.ssh, args.extra_libs or [], args.retry, args.remote
+    )
     if args.import_file:
         try:
             with open(args.import_file) as file:
-                import_config = json.load(file)
+                import_config: dict = json.load(file)
             _check_depth(import_config["shallow_clone_depth"])
             _check_retry(import_config["network_try_times"])
         except Exception as e:
             raise RuntimeError(f'Import file "{args.import_file}" failed: {e}')
         current_config = current_env.__dict__
         default_config = default_env.__dict__
-        current_env.__dict__ = {key: (import_config[key] if value == default_config[key] else value) for key, value in current_config.items()}
+        current_env.__dict__ = {
+            # 若import_config中没有则使用default_config中的值，以便在environment类更新后原配置文件可以正确加载
+            key: (import_config.get(key, default_config[key]) if value == default_config[key] else value)
+            for key, value in current_config.items()
+        }
         # 若extra_libs被用户设置为空则将当前extra_libs恢复为默认
         if args.extra_libs == []:
             current_env.extra_lib_list = default_env.extra_lib_list
