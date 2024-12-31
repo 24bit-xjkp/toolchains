@@ -25,6 +25,7 @@ def build_origin_sysroot() -> None:
     if cross_target in scripts.canadian_cross_script_list:
         script_list.append(cross_target)
     for script in script_list:
+        # TODO:弃用动态加载脚本获取gcc环境的方式
         gcc = import_module(script).env
         if not os.path.exists(gcc.prefix):
             print(f"Cannot find gcc in {gcc.prefix}")
