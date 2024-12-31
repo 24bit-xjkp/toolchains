@@ -27,7 +27,6 @@ target_list = (
 
 class configure(common.basic_configure):
     build: str  # 构建平台
-    multilib: bool  # 是否构建multilib
     gdb: bool  # 是否构建gdb
     gdbserver: bool  # 是否构建gdbserver
     newlib: bool  # 是否构建newlib
@@ -37,7 +36,6 @@ class configure(common.basic_configure):
     def __init__(
         self,
         build: str = "x86_64-linux-gnu",
-        multilib: bool = False,
         gdb: bool = True,
         gdbserver: bool = True,
         newlib: bool = True,
@@ -47,7 +45,6 @@ class configure(common.basic_configure):
     ) -> None:
         super().__init__(home)
         self.build = build
-        self.multilib = multilib
         self.gdb = gdb
         self.gdbserver = gdbserver
         self.newlib = newlib
@@ -132,12 +129,6 @@ if __name__ == "__main__":
     parser.add_argument("--build", type=str, help="The build platform of the GCC toolchain.", default=default_config.build)
     parser.add_argument("--host", type=str, help="The host platform of the GCC toolchain.", default="x86_64-linux-gnu")
     parser.add_argument("--target", type=str, help="The target platform of the GCC toolchain.")
-    parser.add_argument(
-        "--multilib",
-        action=argparse.BooleanOptionalAction,
-        help="Whether to enable multilib support in GCC toolchain.",
-        default=default_config.multilib,
-    )
     parser.add_argument(
         "--gdb", action=argparse.BooleanOptionalAction, help="Whether to enable gdb support in GCC toolchain.", default=default_config.gdb
     )

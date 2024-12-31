@@ -253,27 +253,6 @@ class environment(common.basic_environment):
                 os.path.join(self.bin_dir, file),
             )
 
-    def symlink_multilib(self) -> None:
-        """为编译带有multilib支持的交叉编译器创建软链接，如将lib/32链接到lib32"""
-        multilib_list = {}
-        for multilib in os.listdir(self.lib_prefix):
-            if multilib != "lib" and multilib.startswith("lib") and multilib[3:].isdigit():
-                multilib_list[multilib] = multilib[3:]
-        lib_path = os.path.join(self.lib_prefix, "lib")
-        cwd = os.getcwd()
-        os.chdir(lib_path)
-        for multilib, suffix in multilib_list.items():
-            if os.path.exists(suffix):
-                os.unlink(suffix)
-            os.symlink(os.path.join("..", multilib), suffix, True)
-            self.symlink_list.append(os.path.join(lib_path, suffix))
-        os.chdir(cwd)
-
-    def delete_symlink(self) -> None:
-        """删除编译交叉编译器所需的软链接，在完成编译后不再需要这些软链接"""
-        for symlink in self.symlink_list:
-            os.unlink(symlink)
-
     def package(self, need_gdbinit: bool = True, need_python_embed_package: bool = False) -> None:
         """打包工具链
 
@@ -418,7 +397,6 @@ class cross_environment:
     full_build: bool  # 是否进行完整自举流程
     glibc_phony_stubs_path: str  # glibc占位文件所在路径
     adjust_glibc_arch: str  # 调整glibc链接器脚本时使用的架构名
-    need_multilib: bool  # 是否需要编译multilib
     need_gdb: bool  # 是否需要编译gdb
     need_gdbserver: bool  # 是否需要编译gdbserver
     need_newlib: bool  # 是否需要编译newlib，仅对独立工具链有效
@@ -428,7 +406,6 @@ class cross_environment:
         build: str,
         host: str,
         target: str,
-        multilib: bool,
         gdb: bool,
         gdbserver: bool,
         newlib: bool,
@@ -443,7 +420,6 @@ class cross_environment:
             build (str): 构建平台
             host (str): 宿主平台
             target (str): 目标平台
-            multilib (bool): 是否启用multilib
             gdb (bool): 是否启用gdb
             gdbserver (bool): 是否启用gdbserver
             newlib (bool): 是否启用newlib, 仅对独立工具链有效
@@ -467,7 +443,7 @@ class cross_environment:
             f"--prefix={self.env.prefix}",
             f"--host={self.env.host}",
         ]
-        self.need_multilib, self.need_gdb, self.need_gdbserver, self.need_newlib = multilib, gdb, gdbserver, newlib
+        self.need_gdb, self.need_gdbserver, self.need_newlib = gdb, gdbserver, newlib
 
         libc_option_list = {
             "linux": [f"--prefix={self.env.lib_prefix}", f"--host={self.env.target}", f"--build={self.env.build}", "--disable-werror"],
@@ -485,7 +461,7 @@ class cross_environment:
         self.gcc_option = [
             *gcc_option_list[self.target_os],
             "--enable-languages=c,c++",
-            "--enable-multilib" if multilib else "--disable-multilib",
+            "--disable-multilib",
         ]
 
         gdb_option_list = {
@@ -625,14 +601,12 @@ class cross_environment:
         self.env.configure(*self.libc_option)
         self.env.make()
         self.env.install()
-        self.env.symlink_multilib()
 
         # 编译完整的gcc
         self.env.enter_build_dir("gcc")
         self.env.configure(*self.basic_option, *self.gcc_option)
         self.env.make()
         self.env.install()
-        self.env.delete_symlink()
         self.env.strip_debug_symbol()
 
         # 编译pexports

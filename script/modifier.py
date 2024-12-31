@@ -38,8 +38,7 @@ def loongarch64_loongnix_linux_gnu_modifier(env: gcc.cross_environment) -> None:
 
 @register
 def x86_64_w64_mingw32_modifier(env: gcc.cross_environment) -> None:
-    if not env.need_multilib:
-        env.libc_option += ["--disable-lib32", "--enable-lib64"]
+    env.libc_option += ["--disable-lib32", "--enable-lib64"]
 
 @register
 def i686_w64_mingw32_modifier(env: gcc.cross_environment) -> None:
