@@ -88,10 +88,10 @@ class environment(basic_environment):
     def __init__(
         self,
         build: str = "x86_64-linux-gnu",
-        host: str = "",
-        target: str = "",
-        home: str = "",
-        jobs: int = 0,
+        host: None | str = None,
+        target: None | str = None,
+        home: str = os.environ["HOME"],
+        jobs: int = 1,
         prefix_dir: str = os.environ["HOME"],
     ) -> None:
         self.build = build
@@ -121,12 +121,12 @@ class environment(basic_environment):
         self.host_field = triplet_field(self.host)
         self.target_field = triplet_field(self.target)
         for lib in lib_list:
-            lib_dir = os.path.join(self.home_dir, lib)
+            lib_dir = os.path.join(self.home, lib)
             match lib:
                 # 支持使用厂商修改过的源代码
                 case "glibc" | "linux" if self.target_field.vendor != "unknown":
                     vendor = self.target_field.vendor[1]
-                    custom_lib_dir = os.path.join(self.home_dir, f"{lib}-{vendor}")
+                    custom_lib_dir = os.path.join(self.home, f"{lib}-{vendor}")
                     if check_lib_dir(lib, custom_lib_dir, False):
                         lib_dir = custom_lib_dir
                     else:
@@ -139,7 +139,7 @@ class environment(basic_environment):
         self.dll_name_list = dll_name_list[self.target_field.os]
 
         self.python_config_path = os.path.join(self.current_dir, "python_config.sh")
-        self.host_32_bit = host.startswith(arch_32_bit_list)
+        self.host_32_bit = self.host.startswith(arch_32_bit_list)
         lib_name = f'lib{"32" if self.host_32_bit else "64"}'
         self.rpath_dir = os.path.join(self.prefix, lib_name)
         lib_name = os.path.join("'$ORIGIN'", "..", lib_name)
@@ -365,7 +365,7 @@ def get_mingw_lib_prefix_list(env: environment) -> dict[str, str]:
     Returns:
         dict[str,str]: {包名:安装路径}
     """
-    return {lib: os.path.join(env.home_dir, lib, "install") for lib in ("gmp", "expat", "mpfr")}
+    return {lib: os.path.join(env.home, lib, "install") for lib in ("gmp", "expat", "mpfr")}
 
 
 def build_mingw_gdb_requirements(env: environment) -> None:

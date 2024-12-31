@@ -41,7 +41,6 @@ def gnu_to_llvm(target: str) -> str:
         return target
 
 
-
 class environment(basic_environment):
     host: str  # host平台
     build: str  # build平台
@@ -123,7 +122,7 @@ class environment(basic_environment):
 
     def _set_prefix(self) -> None:
         """设置安装路径"""
-        self.prefix["llvm"] = os.path.join(self.home_dir, self.name) if self.stage == 1 else os.path.join(self.home_dir, f"{self.name}-new")
+        self.prefix["llvm"] = os.path.join(self.home, self.name) if self.stage == 1 else os.path.join(self.home, f"{self.name}-new")
         self.prefix["runtimes"] = os.path.join(self.prefix["llvm"], "install")
         self.compiler_rt_dir = os.path.join(self.prefix["llvm"], "lib", "clang", self.major_version, "lib")
 
@@ -150,18 +149,18 @@ class environment(basic_environment):
             target_field = target.split("-")
             self.system_list[target] = "Linux" if "linux" in target_field else "Windows"
         for lib in lib_list:
-            self.prefix[lib] = os.path.join(self.home_dir, lib, "install")
+            self.prefix[lib] = os.path.join(self.home, lib, "install")
         # 设置源目录和构建目录
         for project in subproject_list:
-            self.source_dir[project] = os.path.join(self.home_dir, "llvm", project)
-            self.build_dir[project] = os.path.join(self.home_dir, "llvm", f"build-{self.host}-{project}")
+            self.source_dir[project] = os.path.join(self.home, "llvm", project)
+            self.build_dir[project] = os.path.join(self.home, "llvm", f"build-{self.host}-{project}")
             check_lib_dir(project, self.source_dir[project])
         for lib in lib_list:
-            self.source_dir[lib] = os.path.join(self.home_dir, lib)
+            self.source_dir[lib] = os.path.join(self.home, lib)
             self.build_dir[lib] = os.path.join(self.source_dir[lib], "build")
             check_lib_dir(lib, self.source_dir[lib])
         # 设置sysroot目录
-        self.sysroot_dir = os.path.join(self.home_dir, "sysroot")
+        self.sysroot_dir = os.path.join(self.home, "sysroot")
         # 第2阶段不编译运行库
         if "LLVM_ENABLE_RUNTIMES" in self.llvm_option_list_2:
             del self.llvm_option_list_2["LLVM_ENABLE_RUNTIMES"]
@@ -178,7 +177,7 @@ class environment(basic_environment):
                 "ZLIB_INCLUDE_DIR": f'"{os.path.join(self.prefix["zlib"], "include")}"',
                 "ZLIB_LIBRARY": zlib,
                 "ZLIB_LIBRARY_RELEASE": zlib,
-                "LLVM_NATIVE_TOOL_DIR": f'"{os.path.join(self.home_dir, f'{self.build}-clang{self.major_version}', "bin")}"',
+                "LLVM_NATIVE_TOOL_DIR": f'"{os.path.join(self.home, f'{self.build}-clang{self.major_version}', "bin")}"',
             }
         # 将自身注册到环境变量中
         self.register_in_env()
@@ -307,11 +306,13 @@ class environment(basic_environment):
         """复制工具链所需库"""
         src_prefix = os.path.join(self.sysroot_dir, self.host, "lib")
         dst_prefix = os.path.join(self.prefix["llvm"], "bin" if self.system_list[self.host] == "Windows" else "lib")
-        native_dir = os.path.join(self.home_dir, f"{self.build}-clang{self.major_version}")
+        native_dir = os.path.join(self.home, f"{self.build}-clang{self.major_version}")
         native_bin_dir = os.path.join(native_dir, "bin")
         native_compiler_rt_dir = os.path.join(native_dir, "lib", "clang", self.major_version, "lib")
         # 复制libc++和libunwind运行库
-        for file in filter(lambda file: file.startswith(("libc++", "libunwind")) and not file.endswith((".a", ".json")), os.listdir(src_prefix)):
+        for file in filter(
+            lambda file: file.startswith(("libc++", "libunwind")) and not file.endswith((".a", ".json")), os.listdir(src_prefix)
+        ):
             copy(os.path.join(src_prefix, file), os.path.join(dst_prefix, file))
         # 复制公用libc++和libunwind头文件
         src_prefix = os.path.join(native_bin_dir, "..", "include")
@@ -332,7 +333,7 @@ class environment(basic_environment):
 
     def change_name(self) -> None:
         """修改多阶段自举时的安装目录名"""
-        name = os.path.join(self.home_dir, self.name)
+        name = os.path.join(self.home, self.name)
         # clang->clang-old
         # clang-new->clang
         if not os.path.exists(f"{name}-old") and self.bootstrap:

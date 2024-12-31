@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 import os
 import math
-from typing import Callable, Optional
+from typing import Callable
 from gcc_environment import cross_environment as cross
-from common import triplet_field
+import common
 import argparse
 from modifier import modifier_list
 
@@ -25,6 +25,40 @@ target_list = (
 )
 
 
+class configure(common.basic_configure):
+    build: str  # 构建平台
+    multilib: bool  # 是否构建multilib
+    gdb: bool  # 是否构建gdb
+    gdbserver: bool  # 是否构建gdbserver
+    newlib: bool  # 是否构建newlib
+    jobs: int  # 并发数
+    prefix_dir: str  # 工具链安装根目录
+
+    def __init__(
+        self,
+        build: str = "x86_64-linux-gnu",
+        multilib: bool = False,
+        gdb: bool = True,
+        gdbserver: bool = True,
+        newlib: bool = True,
+        home: str = os.environ["HOME"],
+        jobs: int = math.floor((os.cpu_count() or 1) * 1.5),
+        prefix_dir: str = os.environ["HOME"],
+    ) -> None:
+        super().__init__(home)
+        self.build = build
+        self.multilib = multilib
+        self.gdb = gdb
+        self.gdbserver = gdbserver
+        self.newlib = newlib
+        self.jobs = jobs
+        self.prefix_dir = prefix_dir
+
+    def check(self) -> None:
+        common._check_home(self.home)
+        assert self.jobs > 0, f"Invalid jobs: {args.jobs}."
+
+
 def check_triplet(host: str, target: str) -> None:
     """检查输入triplet是否合法
 
@@ -32,14 +66,19 @@ def check_triplet(host: str, target: str) -> None:
         host (str): 宿主平台
         target (str): 目标平台
     """
-    for input_triplet, triplet_list in ((host, host_list), (target, target_list)):
-        input_triplet_field = triplet_field(input_triplet)
+    for input_triplet, triplet_list, name in ((host, host_list, "Host"), (target, target_list, "Target")):
+        input_triplet_field = common.triplet_field(input_triplet)
         for support_triplet in triplet_list:
-            support_triplet_field = triplet_field(support_triplet)
+            support_triplet_field = common.triplet_field(support_triplet)
             if input_triplet_field.weak_eq(support_triplet_field):
                 break
         else:
-            assert False, f'{"Host" if input_triplet == host else "Target"} "{input_triplet}" is not support.'
+            assert False, f'{name} "{input_triplet}" is not support.'
+
+
+def _check_input(args: argparse.Namespace) -> None:
+    assert args.jobs > 0, f"Invalid jobs: {args.jobs}."
+    check_triplet(args.host, target_list[0] if args.dump else args.target)
 
 
 def get_modifier(target: str) -> Callable[[cross], None] | None:
@@ -51,66 +90,30 @@ def get_modifier(target: str) -> Callable[[cross], None] | None:
     Returns:
         Callable | None: 修改器
     """
-    if target in modifier_list:
-        return modifier_list[target]
+    return modifier_list.get(target)
 
 
-def build_gcc(
-    build: str,
+def build_specific_gcc(
+    config: configure,
     host: str,
     target: str,
-    multilib: bool,
-    gdb: bool,
-    gdbserver: bool,
-    newlib: bool,
-    modifier: Optional[Callable[[cross], None]],
-    home: str,
-    jobs: int,
-    prefix_dir: str,
+    modifier: None | Callable[[cross], None],
 ) -> None:
     """构建gcc工具链
 
     Args:
-        build (str): 构建平台
+        config (configure): 编译环境
         host (str): 宿主平台
         target (str): 目标平台
-        multilib (bool): 是否启用multilib
-        gdb (bool): 是否启用gdb
-        gdbserver (bool): 是否启用gdbserver
-        newlib (bool): 是否启用newlib, 仅对独立工具链有效
-        modifier (_type_, optional): 平台相关的修改器. 默认为None.
-        home (str): 源代码树搜索主目录. 默认为$HOME.
-        jobs (int): 并发构建数. 默认为cpu核心数*1.5再向下取整.
-        prefix_dir (str): 存放prefix指定的目录的目录. 默认为$HOME.
+        modifier (Callable[[cross], None], optional): 平台相关的修改器. 默认为None.
     """
-    if (
-        not isinstance(build, str)
-        or not isinstance(host, str)
-        or not isinstance(target, str)
-        or not isinstance(multilib, bool)
-        or not isinstance(gdb, bool)
-        or not isinstance(gdbserver, bool)
-        or not isinstance(newlib, bool)
-        or not isinstance(home, str)
-        or not isinstance(jobs, int)
-        or not isinstance(prefix_dir, str)
-    ):
-        raise TypeError
-    if not os.path.exists(home):
-        raise FileNotFoundError(f'Home dir "{home}" does not exist.')
-
-    if not os.path.exists(prefix_dir):
-        os.makedirs(prefix_dir)
-    elif len(os.listdir(prefix_dir)) != 0:
-        _tmp = input(f'[toolchains] prefix-dir "{prefix_dir}" is not empty, are you want to continue? y/n')
-        if _tmp.lower() != "y":
-            exit(1)
-
-    env = cross(build, host, target, multilib, gdb, gdbserver, newlib, modifier, home, jobs, prefix_dir)
+    env = cross(host=host, target=target, modifier=modifier, **vars(config))
     env.build()
 
 
 def dump_support_platform() -> None:
+    """打印所有受支持的平台"""
+
     print("Host support:")
     for host in host_list:
         print(f"\t{host}")
@@ -120,45 +123,54 @@ def dump_support_platform() -> None:
 
 
 if __name__ == "__main__":
+    default_config = configure()
+
     parser = argparse.ArgumentParser(
         description="Build gcc toolchain to specific platform.", formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("--build", type=str, help="The build platform of the GCC toolchain.", default="x86_64-linux-gnu")
+    configure.add_argument(parser)
+    parser.add_argument("--build", type=str, help="The build platform of the GCC toolchain.", default=default_config.build)
     parser.add_argument("--host", type=str, help="The host platform of the GCC toolchain.", default="x86_64-linux-gnu")
     parser.add_argument("--target", type=str, help="The target platform of the GCC toolchain.")
-    parser.add_argument("--multilib", action=argparse.BooleanOptionalAction, help="Whether to enable multilib support in GCC toolchain.")
-    parser.add_argument("--gdb", type=bool, help="Whether to enable gdb support in GCC toolchain.", default=True)
-    parser.add_argument("--gdbserver", type=bool, help="Whether to enable gdbserver support in GCC toolchain.", default=False)
     parser.add_argument(
-        "--newlib", action=argparse.BooleanOptionalAction, help="Whether to enable newlib support in GCC freestanding toolchain."
+        "--multilib",
+        action=argparse.BooleanOptionalAction,
+        help="Whether to enable multilib support in GCC toolchain.",
+        default=default_config.multilib,
     )
-    parser.add_argument("--home", type=str, help="The home directory to find source trees.", default=os.environ["HOME"])
+    parser.add_argument(
+        "--gdb", action=argparse.BooleanOptionalAction, help="Whether to enable gdb support in GCC toolchain.", default=default_config.gdb
+    )
+    parser.add_argument(
+        "--gdbserver",
+        action=argparse.BooleanOptionalAction,
+        help="Whether to enable gdbserver support in GCC toolchain.",
+        default=default_config.gdbserver,
+    )
+    parser.add_argument(
+        "--newlib",
+        action=argparse.BooleanOptionalAction,
+        help="Whether to enable newlib support in GCC freestanding toolchain.",
+        default=default_config.newlib,
+    )
     parser.add_argument(
         "--jobs",
         type=int,
         help="Number of concurrent jobs at build time. Use 1.5 times of cpu cores by default.",
-        default=math.floor(os.cpu_count() * 1.5),  # type: ignore
+        default=default_config.jobs,
     )
+    parser.add_argument("--prefix-dir", type=str, help="The dir contains all the prefix dir.", default=default_config.prefix_dir)
     parser.add_argument("--dump", action="store_true", help="Print support platforms and exit.")
-    parser.add_argument("--prefix-dir", type=str, help="The dir contains all the prefix dir.", default=os.environ["HOME"])
     args = parser.parse_args()
+    _check_input(args)
+
+    current_config = configure.parse_args(args)
+    current_config.load_config(args)
+    current_config.check()
 
     if args.dump:
         dump_support_platform()
-        quit()
+    else:
+        build_specific_gcc(current_config, args.host, args.target, get_modifier(args.target))
 
-    check_triplet(args.host, args.target)
-    modifier = get_modifier(args.target)
-    build_gcc(
-        args.build,
-        args.host,
-        args.target,
-        args.multilib,
-        args.gdb,
-        args.gdbserver,
-        args.newlib,
-        args.modifier,
-        args.home,
-        args.jobs,
-        args.prefix_dir,
-    )
+    current_config.save_config(args)

@@ -7,7 +7,8 @@ import shutil
 env = gcc.environment(host="x86_64-w64-mingw32")
 lib_install_dir_list: dict[str, str] = {}
 for lib in ("gmp", "expat", "iconv", "mpfr"):
-    lib_install_dir_list[lib] = os.path.join(env.home_dir, lib, "install")
+    lib_install_dir_list[lib] = os.path.join(env.home, lib, "install")
+
 
 def copy_lib(env: gcc.environment = env) -> None:
     """从x86_64-w64-mingw32交叉工具链中复制运行库"""

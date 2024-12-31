@@ -153,7 +153,7 @@ class basic_environment:
 
     version: str  # 版本号
     major_version: str  # 主版本号
-    home_dir: str  # 源代码所在的目录，默认为$HOME
+    home: str  # 源代码所在的目录
     jobs: int  # 编译所用线程数
     current_dir: str  # toolchains项目所在目录
     name_without_version: str  # 不带版本号的工具链名
@@ -165,18 +165,18 @@ class basic_environment:
         self.major_version = self.version.split(".")[0]
         self.name_without_version = name_without_version
         self.name = self.name_without_version + self.major_version
-        self.home_dir = home
+        self.home = home
         self.jobs = jobs
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
-        self.bin_dir = os.path.join(self.home_dir, self.name, "bin")
+        self.bin_dir = os.path.join(self.home, self.name, "bin")
 
-    def compress(self, name: str = "") -> None:
+    def compress(self, name: None | str = None) -> None:
         """压缩构建完成的工具链
 
         Args:
-            name (str, optional): 要压缩的目标名称，是相对于self.home_dir的路径. 默认为self.name.
+            name (str, optional): 要压缩的目标名称，是相对于self.home的路径. 默认为self.name.
         """
-        os.chdir(self.home_dir)
+        os.chdir(self.home)
         name = name or self.name
         run_command(f"tar -cf {name}.tar {name}")
         memory_MB = psutil.virtual_memory().available // 1048576 + 3072
@@ -188,13 +188,13 @@ class basic_environment:
 
     def register_in_bashrc(self) -> None:
         """注册安装路径到用户配置文件"""
-        with open(os.path.join(self.home_dir, ".bashrc"), "a") as bashrc_file:
+        with open(os.path.join(self.home, ".bashrc"), "a") as bashrc_file:
             bashrc_file.write(f"export PATH={self.bin_dir}:$PATH\n")
 
     def copy_readme(self) -> None:
         """复制工具链说明文件"""
         readme_path = os.path.join(self.current_dir, "..", "readme", f"{self.name_without_version}.md")
-        target_path = os.path.join(os.path.join(self.home_dir, self.name), "README.md")
+        target_path = os.path.join(os.path.join(self.home, self.name), "README.md")
         copy(readme_path, target_path)
 
 
@@ -279,6 +279,7 @@ class basic_configure:
 
     @classmethod
     def parse_args(cls, args: argparse.Namespace):
+        _check_home(args.home)
         command_dry_run.set(args.dry_run)
         args_list = vars(args)
         parma_list: list = []
