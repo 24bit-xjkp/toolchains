@@ -3,29 +3,57 @@
 import os
 import psutil
 import shutil
-import sys
-from math import floor
+import json
+import argparse
+import inspect
+import itertools
+import subprocess
 
 
-def run_command(command: str, ignore_error: bool = False) -> None:
+class command_dry_run:
+    """是否只显示命令而不实际执行"""
+
+    _dry_run: bool = False
+
+    @classmethod
+    def get(cls) -> bool:
+        return cls._dry_run
+
+    @classmethod
+    def set(cls, dry_run: bool) -> None:
+        cls._dry_run = dry_run
+
+
+def run_command(
+    command: str, ignore_error: bool = False, dry_run: None | bool = None, echo: bool = True
+) -> None | subprocess.CompletedProcess[bytes]:
     """运行指定命令, 若不忽略错误, 则在命令执行出错时抛出RuntimeError, 反之打印错误码
 
     Args:
         command (str): 要运行的命令
         ignore_error (bool, optional): 是否忽略错误. 默认不忽略错误.
+        dry_run (bool, optional): 是否只打印命令而不实际执行，默认使用全局状态
+        echo (bool, optional): 是否回显命令输出，默认为回显.设置为不回显时会捕获命令的标准输出和标准错误
+
+    Raises:
+        RuntimeError: 命令执行失败且ignore_error为False时抛出异常
+
+    Returns:
+        None | subprocess.CompletedProcess[bytes]: 在命令正常执行结束后返回执行结果
     """
 
     # 打印运行的命令
     print("[toolchains] run command: ", command)
-    errno = os.system(command)
-
-    if errno == 0:
+    if dry_run or command_dry_run.get():
         return
-
-    if ignore_error:
-        print(f'Command "{command}" failed with errno={errno}, but it is ignored.')
-    else:
-        raise RuntimeError(f'Command "{command}" failed.')
+    try:
+        result = subprocess.run(command, capture_output=not echo, shell=True, check=True)
+    except subprocess.CalledProcessError as e:
+        if ignore_error:
+            print(f'Command "{command}" failed with errno={e.returncode}, but it is ignored.')
+        else:
+            raise RuntimeError(f'Command "{command}" failed.')
+    return result
 
 
 def mkdir(path: str, remove_if_exist=True) -> None:
@@ -209,7 +237,7 @@ class triplet_field:
             if self.os == "none":
                 self.os = "unknown"
 
-    def weak_eq(self, other) -> bool:
+    def weak_eq(self, other: "triplet_field") -> bool:
         """弱相等比较，允许vendor字段不同
 
         Args:
@@ -219,6 +247,105 @@ class triplet_field:
             bool: 是否相同
         """
         return self.arch == other.arch and self.os == other.os and self.abi == other.abi
+
+
+def _check_home(home: str) -> None:
+    assert os.path.exists(home), f'The home dir "{home}" does not exist.'
+
+
+class basic_configure:
+    home: str  # 源码树根目录
+
+    def __init__(self, home: str = os.environ["HOME"]) -> None:
+        self.home = home
+
+    @staticmethod
+    def add_argument(parser: argparse.ArgumentParser) -> None:
+        """为argparse添加--home、--export和--import选项
+
+        Args:
+            parser (argparse.ArgumentParser): 命令行解析器
+        """
+        parser.add_argument("--home", type=str, help="The home directory to find source trees.", default=os.environ["HOME"])
+        parser.add_argument("--export", dest="export_file", type=str, help="Export settings to specific file.")
+        parser.add_argument("--import", dest="import_file", type=str, help="Import settings from specific file.")
+        parser.add_argument(
+            "--dry-run",
+            dest="dry_run",
+            action=argparse.BooleanOptionalAction,
+            help="Preview the commands without actually executing them.",
+            default=False,
+        )
+
+    @classmethod
+    def parse_args(cls, args: argparse.Namespace):
+        command_dry_run.set(args.dry_run)
+        args_list = vars(args)
+        parma_list: list = []
+        for parma in itertools.islice(inspect.signature(cls.__init__).parameters.keys(), 1, None):
+            assert parma in args_list, f"The parma {parma} is not in args. Every parma except self should be able to find in args."
+            parma_list.append(args_list[parma])
+        return cls(*parma_list)
+
+    def save_config(self, args: argparse.Namespace) -> None:
+        """将配置保存到文件，使用json格式
+
+        Args:
+            config (object): 要保存的对象
+            args (argparse.Namespace): 用户输入参数
+
+        Raises:
+            RuntimeError: 保存失败抛出异常
+        """
+        export_file: str | None = args.export_file
+        if export_file:
+            try:
+                with open(export_file, "w") as file:
+                    json.dump(vars(self), file, indent=4)
+                print(f'[toolchains] Settings have been written to file "{export_file}"')
+            except Exception as e:
+                raise RuntimeError(f"Export settings failed: {e}")
+
+    def load_config(self, args: argparse.Namespace) -> None:
+        """从配置文件中加载配置，然后合并加载的配置和用户输入的配置
+
+        Args:
+            current_config (object): 当前用户输入的配置
+            args (argparse.Namespace): 用户输入参数
+
+        Raises:
+            RuntimeError: 加载失败抛出异常
+        """
+        import_file: str | None = args.import_file
+        if import_file:
+            try:
+                with open(import_file) as file:
+                    import_config_list = json.load(file)
+                if not isinstance(import_config_list, dict):
+                    raise RuntimeError(f'Invalid configure file "{import_file}".')
+            except Exception as e:
+                raise RuntimeError(f'Import file "{import_file}" failed: {e}')
+            current_config_list = vars(self)
+            default_config_list = vars(type(self)())
+            self.__dict__ = {
+                # 若import_config中没有则使用default_config中的值，以便在配置类更新后原配置文件可以正确加载
+                key: (import_config_list.get(key, default_config_list[key]) if value == default_config_list[key] else value)
+                for key, value in current_config_list.items()
+            }
+
+    def reset_list_if_empty(self, list_name: str, arg_name: str, args: argparse.Namespace) -> None:
+        """在用户输入指定列表类型选项，但没有指定表项时将该选项变为默认选项
+           用于允许用户清空从配置文件中加载的列表类型选项
+
+        Args:
+            list_name (str): 列表成员名称
+            arg_name (str): 用户输入对应参数的名称
+            args (argparse.Namespace): 用户输入参数
+        """
+        if not isinstance(getattr(self, list_name), list):
+            raise TypeError
+        if args.import_file and getattr(args, arg_name) == []:
+            setattr(self, list_name, getattr(type(self)(), list_name))
 
 
 assert __name__ != "__main__", "Import this file instead of running it directly."
