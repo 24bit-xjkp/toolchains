@@ -1,1 +1,2 @@
 psutil>=5.9.0
+packaging >= 21.0
