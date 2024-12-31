@@ -7,10 +7,9 @@ import common
 import subprocess
 import enum
 import packaging.version as version
-import json
 
 
-class extra_lib_version(enum.Enum):
+class extra_lib_version(enum.StrEnum):
     python = "3.13.1"
     iconv = "1.18"
     loongnix = "4.19.190"
@@ -19,7 +18,7 @@ class extra_lib_version(enum.Enum):
 
     def save_version(self, dir: str) -> None:
         with open(os.path.join(dir, ".version"), "w") as file:
-            file.write(self.value)
+            file.write(self)
 
     def check_version(self, dir: str) -> int:
         """检查包版本
@@ -33,7 +32,7 @@ class extra_lib_version(enum.Enum):
         try:
             with open(os.path.join(dir, ".version")) as file:
                 current_version = version.Version(file.readline())
-                target_version = version.Version(self.value)
+                target_version = version.Version(self)
                 if current_version > target_version:
                     return 1
                 elif current_version == target_version:
@@ -74,20 +73,20 @@ def _check_version_echo(lib: str, result: int) -> bool:
         return True
 
 
-class git_clone_type(enum.IntEnum):
+class git_clone_type(enum.StrEnum):
     """git克隆类型"""
 
-    partial = enum.auto()  # 部分克隆
-    shallow = enum.auto()  # 浅克隆
-    full = enum.auto()  # 完全克隆
+    partial = "partial"  # 部分克隆
+    shallow = "shallow"  # 浅克隆
+    full = "full"  # 完全克隆
 
 
-class git_prefer_remote(enum.IntEnum):
+class git_prefer_remote(enum.StrEnum):
     """git远程托管平台"""
 
-    github = enum.auto()
-    nju = enum.auto()
-    tuna = enum.auto()
+    github = "github"
+    nju = "nju"
+    tuna = "tuna"
 
 
 class git_url:
@@ -108,14 +107,13 @@ class git_url:
         return f"git@{self.remote}:{self.path}" if use_ssh else f"https://{self.remote}/{self.path}"
 
 
-class environment:
+class configure(common.basic_configure):
     glibc_version: str  # glibc版本号
-    home: str  # 主目录
     clone_type: git_clone_type  # 是否使用部分克隆
     shallow_clone_depth: int  # 浅克隆深度
     git_use_ssh: bool  # 使用ssh克隆git托管的代码
     extra_lib_list: list[str]  # 其他非git托管包
-    network_try_times: int  # 进行网络操作时尝试的次数
+    network_try_times: int  # 进行网络操作时重试的次数
     git_remote: git_prefer_remote
     necessary_extra_lib_list: set[str] = {"python-embed", "gmp", "mpfr"}  # 必须的非git托管包
 
@@ -123,21 +121,26 @@ class environment:
         self,
         glibc_version: str = subprocess.getoutput("getconf GNU_LIBC_VERSION").split(" ")[1],
         home: str = os.environ["HOME"],
-        clone_type: str = git_clone_type.partial.name,
-        shallow_clone_depth: int = 1,
-        git_use_ssh: bool = False,
-        extra_lib_list: list[str] = [],
-        retry_times: int = 5,
-        git_remote: str = git_prefer_remote.github.name,
+        clone_type: str = git_clone_type.partial,
+        depth: int = 1,
+        ssh: bool = False,
+        extra_libs: list[str] = [],
+        retry: int = 5,
+        remote: str = git_prefer_remote.github,
     ) -> None:
+        super().__init__(home)
         self.glibc_version = glibc_version
-        self.home = home
         self.clone_type = git_clone_type[clone_type]
-        self.shallow_clone_depth = shallow_clone_depth
-        self.git_use_ssh = git_use_ssh
-        self.extra_lib_list = [*self.necessary_extra_lib_list, *extra_lib_list]
-        self.network_try_times = retry_times + 1
-        self.git_remote = git_prefer_remote[git_remote]
+        self.shallow_clone_depth = depth
+        self.git_use_ssh = ssh
+        self.extra_lib_list = [*self.necessary_extra_lib_list, *(extra_libs or [])]
+        self.network_try_times = retry + 1
+        self.git_remote = git_prefer_remote[remote]
+
+    def check(self) -> None:
+        common._check_home(self.home)
+        assert self.shallow_clone_depth > 0, f"Invalid shallow clone depth: {self.shallow_clone_depth}."
+        assert self.network_try_times >= 1, f"Invalid network try times: {self.network_try_times}."
 
 
 class extra_lib:
@@ -150,7 +153,7 @@ class extra_lib:
         self.path_to_check = path_to_check
         self.version_dir = version_dir
 
-    def check_exist(self, env: environment) -> bool:
+    def check_exist(self, env: configure) -> bool:
         """检查包是否存在
 
         Args:
@@ -224,7 +227,7 @@ tuna_lib_list: dict[str, git_url] = {
 }
 
 
-def get_git_lib_list(env: environment) -> dict[str, git_url]:
+def get_git_lib_list(env: configure) -> dict[str, git_url]:
     git_lib_list: dict[git_prefer_remote, dict[str, git_url]] = {
         git_prefer_remote.github: github_lib_list,
         git_prefer_remote.nju: nju_lib_list,
@@ -236,8 +239,8 @@ def get_git_lib_list(env: environment) -> dict[str, git_url]:
 extra_lib_list: dict[str, extra_lib] = {
     "python-embed": extra_lib(
         {
-            "python-embed.zip": f"https://www.python.org/ftp/python/{extra_lib_version.python.value}/python-{extra_lib_version.python.value}-embed-amd64.zip",
-            "python_source.tar.xz": f"https://www.python.org/ftp/python/{extra_lib_version.python.value}/Python-{extra_lib_version.python.value}.tar.xz",
+            "python-embed.zip": f"https://www.python.org/ftp/python/{extra_lib_version.python}/python-{extra_lib_version.python}-embed-amd64.zip",
+            "python_source.tar.xz": f"https://www.python.org/ftp/python/{extra_lib_version.python}/Python-{extra_lib_version.python}.tar.xz",
         },
         ["python-embed"],
         "python-embed",
@@ -251,20 +254,20 @@ extra_lib_list: dict[str, extra_lib] = {
         "linux-loongnix",
     ),
     "iconv": extra_lib(
-        {"iconv.tar.gz": f"https://ftp.gnu.org/pub/gnu/libiconv/libiconv-{extra_lib_version.iconv.value}.tar.gz"},
+        {"iconv.tar.gz": f"https://ftp.gnu.org/pub/gnu/libiconv/libiconv-{extra_lib_version.iconv}.tar.gz"},
         [os.path.join("binutils", "gdb", "libiconv")],
         os.path.join("binutils", "gdb", "libiconv"),
     ),
-    "gmp": extra_lib({"gmp.tar.xz": f"https://gmplib.org/download/gmp/gmp-{extra_lib_version.gmp.value}.tar.xz"}, ["gmp"], "gmp"),
-    "mpfr": extra_lib({"mpfr.tar.xz": f"https://www.mpfr.org/mpfr-current/mpfr-{extra_lib_version.mpfr.value}.tar.xz"}, ["mpfr"], "mpfr"),
+    "gmp": extra_lib({"gmp.tar.xz": f"https://gmplib.org/download/gmp/gmp-{extra_lib_version.gmp}.tar.xz"}, ["gmp"], "gmp"),
+    "mpfr": extra_lib({"mpfr.tar.xz": f"https://www.mpfr.org/mpfr-current/mpfr-{extra_lib_version.mpfr}.tar.xz"}, ["mpfr"], "mpfr"),
 }
-optional_extra_lib_list: set[str] = {lib for lib in extra_lib_list} - environment.necessary_extra_lib_list
-extra_git_options_list: dict[str, Callable[["environment"], Any]] = {}
-after_download_list: dict[str, Callable[["environment"], Any]] = {}
+optional_extra_lib_list: set[str] = {lib for lib in extra_lib_list} - configure.necessary_extra_lib_list
+extra_git_options_list: dict[str, Callable[["configure"], Any]] = {}
+after_download_list: dict[str, Callable[["configure"], Any]] = {}
 _globals_dict = globals()
 
 
-def register(fn: Callable[["environment"], Any]):
+def register(fn: Callable[["configure"], Any]):
     """注册函数到指定表中，对于函数key_table，有table[key]=key_table
 
     Args:
@@ -283,21 +286,21 @@ def register(fn: Callable[["environment"], Any]):
 
 
 @register
-def expat_after_download(env: environment) -> None:
+def expat_after_download(env: configure) -> None:
     os.chdir(os.path.join(env.home, "expat", "expat"))
     common.run_command("./buildconf.sh")
     os.chdir(env.home)
 
 
 @register
-def pexports_after_download(env: environment) -> None:
+def pexports_after_download(env: configure) -> None:
     os.chdir(os.path.join(env.home, "pexports"))
     common.run_command("autoreconf -if")
     os.chdir(env.home)
 
 
 @register
-def python_after_download(env: environment) -> None:
+def python_after_download(env: configure) -> None:
     python_version = extra_lib_version.python
     python_embed_zip = os.path.join(env.home, "python-embed.zip")
     python_source_txz = os.path.join(env.home, "python_source.tar.xz")
@@ -311,7 +314,7 @@ def python_after_download(env: environment) -> None:
     common.remove(python_embed_zip)
     # 解压源代码包
     common.run_command(f"tar -xaf {python_source_txz}")
-    os.rename(f"Python-{python_version.value}", python_source)
+    os.rename(f"Python-{python_version}", python_source)
     common.remove(python_source_txz)
 
     # 复制头文件
@@ -325,7 +328,7 @@ def python_after_download(env: environment) -> None:
 
 
 @register
-def loongnix_after_download(env: environment) -> None:
+def loongnix_after_download(env: configure) -> None:
     linux_tgz = os.path.join(env.home, "linux-loongnix.tar.gz")
     glibc_tgz = os.path.join(env.home, "glibc-loongnix.tar.gz")
     linux_dir = os.path.join(env.home, "linux-loongnix")
@@ -345,7 +348,7 @@ def loongnix_after_download(env: environment) -> None:
 
 
 @register
-def iconv_after_download(env: environment) -> None:
+def iconv_after_download(env: configure) -> None:
     iconv_version = extra_lib_version.iconv
     gdb_dir = os.path.join(env.home, "binutils", "gdb")
     iconv_tgz = os.path.join(env.home, "iconv.tar.gz")
@@ -353,65 +356,66 @@ def iconv_after_download(env: environment) -> None:
     # 删除已安装包
     common.remove_if_exists(iconv_dir)
     common.run_command(f"tar -xaf {iconv_tgz} -C {gdb_dir}")
-    os.rename(os.path.join(gdb_dir, f"libiconv-{iconv_version.value}"), iconv_dir)
+    os.rename(os.path.join(gdb_dir, f"libiconv-{iconv_version}"), iconv_dir)
     common.remove(iconv_tgz)
     iconv_version.save_version(iconv_dir)
 
 
 @register
-def gmp_after_download(env: environment) -> None:
+def gmp_after_download(env: configure) -> None:
     gmp_version = extra_lib_version.gmp
     gmp_dir = os.path.join(env.home, "gmp")
     gmp_txz = os.path.join(env.home, "gmp.tar.xz")
     # 删除已安装包
     common.remove_if_exists(gmp_dir)
     common.run_command(f"tar -xaf {gmp_txz} -C {env.home}")
-    os.rename(os.path.join(env.home, f"gmp-{gmp_version.value}"), gmp_dir)
+    os.rename(os.path.join(env.home, f"gmp-{gmp_version}"), gmp_dir)
     common.remove(gmp_txz)
     gmp_version.save_version(gmp_dir)
 
 
 @register
-def mpfr_after_download(env: environment) -> None:
+def mpfr_after_download(env: configure) -> None:
     mpfr_version = extra_lib_version.mpfr
     mpfr_dir = os.path.join(env.home, "mpfr")
     mpfr_txz = os.path.join(env.home, "mpfr.tar.xz")
     # 删除已安装包
     common.remove_if_exists(mpfr_dir)
     common.run_command(f"tar -xaf {mpfr_txz} -C {env.home}")
-    os.rename(os.path.join(env.home, f"mpfr-{mpfr_version.value}"), mpfr_dir)
+    os.rename(os.path.join(env.home, f"mpfr-{mpfr_version}"), mpfr_dir)
     common.remove(mpfr_txz)
     mpfr_version.save_version(mpfr_dir)
 
 
 @register
-def glibc_extra_git_options(env: environment) -> list[str]:
+def glibc_extra_git_options(env: configure) -> list[str]:
     return [f"-b release/{env.glibc_version}/master"]
 
 
-def download_gcc_contrib(env: environment) -> None:
+def download_gcc_contrib(env: configure) -> None:
     """下载gcc的依赖包
 
     Args:
         env (environment): 源代码下载环境
     """
-    os.chdir(os.path.join(env.home, "gcc"))
+    if not common.command_dry_run.get():
+        os.chdir(os.path.join(env.home, "gcc"))
     common.run_command("contrib/download_prerequisites")
     os.chdir(env.home)
 
 
-def after_download_specific_lib(env: environment, lib: str) -> None:
+def after_download_specific_lib(env: configure, lib: str) -> None:
     """执行下载后的回调函数
 
     Args:
         env (environment): 源代码下载环境
         lib_downloaded (list[str]): 已下载的包
     """
-    if lib in after_download_list:
+    if lib in after_download_list and not common.command_dry_run.get():
         after_download_list[lib](env)
 
 
-def download_specific_extra_lib(env: environment, lib: str) -> None:
+def download_specific_extra_lib(env: configure, lib: str) -> None:
     """下载指定的非git托管包
 
     Args:
@@ -421,10 +425,10 @@ def download_specific_extra_lib(env: environment, lib: str) -> None:
     assert lib in extra_lib_list, f"Unknown extra lib: {lib}"
     extra_lib_v = extra_lib_list[lib]
     for lib, url in extra_lib_v.url_list.items():
-        common.run_command(f"wget {url} -O {os.path.join(env.home, lib)}")
+        common.run_command(f"wget {url} -c -t {env.network_try_times} -O {os.path.join(env.home, lib)}")
 
 
-def download(env: environment) -> None:
+def download(env: configure) -> None:
     """下载不存在的源代码，不会更新已有源代码
 
     Args:
@@ -461,8 +465,8 @@ def download(env: environment) -> None:
         if not extra_lib_list[lib].check_exist(env):
             download_specific_extra_lib(env, lib)
             after_download_specific_lib(env, lib)
-    else:
-        _exist_echo(lib)
+        else:
+            _exist_echo(lib)
     for lib in ("gmp", "mpfr", "isl", "mpc"):
         if not os.path.exists(os.path.join(env.home, "gcc", lib)):
             download_gcc_contrib(env)
@@ -471,7 +475,7 @@ def download(env: environment) -> None:
         _exist_echo("gcc_contrib")
 
 
-def update(env: environment) -> None:
+def update(env: configure) -> None:
     """更新所有源代码，要求所有包均已下载
 
     Args:
@@ -482,26 +486,27 @@ def update(env: environment) -> None:
         lib_dir = os.path.join(env.home, lib)
         assert os.path.exists(lib_dir), f"Cannot find lib: {lib}"
         for _ in range(env.network_try_times):
-            result = subprocess.run(["git", "-C", lib_dir, "fetch", "--dry-run"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            if result.returncode == 0:
+            try:
+                result = common.run_command(f"git -C {lib_dir} fetch --dry-run", echo=False)
                 break
-            else:
+            except Exception:
                 print(f"[toolchains] Fetch {lib} failed, retrying.")
         else:
-            raise RuntimeError(f"[toolchains] Fetch {lib} failed.")
+            raise RuntimeError(f"Fetch {lib} failed.")
 
-        if result.stderr.strip():
-            for _ in range(env.network_try_times):
-                try:
-                    common.run_command(f"git -C {lib_dir} pull")
-                    break
-                except Exception:
-                    print(f"[toolchains] Pull {lib} failed, retrying.")
+        if not common.command_dry_run.get():
+            if result.stderr.strip():  # type: ignore
+                for _ in range(env.network_try_times):
+                    try:
+                        common.run_command(f"git -C {lib_dir} pull")
+                        break
+                    except Exception:
+                        print(f"[toolchains] Pull {lib} failed, retrying.")
+                else:
+                    raise RuntimeError(f"Pull {lib} failed.")
+                after_download_specific_lib(env, lib)
             else:
-                raise RuntimeError(f"[toolchains] Pull {lib} failed.")
-            after_download_specific_lib(env, lib)
-        else:
-            _up_to_date_echo(lib)
+                _up_to_date_echo(lib)
 
     # 更新非git包
     for lib in env.extra_lib_list:
@@ -512,7 +517,7 @@ def update(env: environment) -> None:
             after_download_specific_lib(env, lib)
 
 
-def auto_download(env: environment) -> None:
+def auto_download(env: configure) -> None:
     """首先下载缺失的包，然后更新已有的包
 
     Args:
@@ -522,38 +527,41 @@ def auto_download(env: environment) -> None:
     update(env)
 
 
-def _check_depth(depth: int) -> None:
+def _check_input(home: str, depth: int, retry: int) -> None:
+    """检查输入是否正确"""
+    common._check_home(home)
     assert depth > 0, f"Invalid shallow clone depth: {depth}."
-
-
-def _check_retry(retry: int) -> None:
-    assert retry >= 0, f"Invalid retry times: {retry}."
-
-
-def _check_home(home: str) -> None:
-    assert os.path.exists(home), f'The home dir "{home}" does not exist.'
+    assert retry >= 0, f"Invalid network try times: {retry}."
 
 
 if __name__ == "__main__":
-    default_env = environment()
+    default_env = configure()
 
     parser = argparse.ArgumentParser(
         description="Download or update needy libs for building gcc and llvm.", formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("--glibc_version", type=str, help="The version of glibc of target platform.", default=default_env.glibc_version)
-    parser.add_argument("--home", type=str, help="The home directory to find source trees.", default=default_env.home)
+    configure.add_argument(parser)
     parser.add_argument(
-        "--clone_type",
+        "--glibc", dest="glibc_version", type=str, help="The version of glibc of target platform.", default=default_env.glibc_version
+    )
+    parser.add_argument(
+        "--clone-type",
         type=str,
         help="How to clone the git repository.",
-        default=default_env.clone_type.name,
-        choices=git_clone_type._member_names_,
+        default=default_env.clone_type,
+        choices=git_clone_type,
     )
     parser.add_argument("--depth", type=int, help="The depth of shallow clone.", default=default_env.shallow_clone_depth)
     parser.add_argument(
         "--ssh", type=bool, help="Whether to use ssh when cloning git repositories from github.", default=default_env.git_use_ssh
     )
-    parser.add_argument("--extra_libs", nargs="*", action="extend", help="Extra non-git libs to install.", choices=optional_extra_lib_list)
+    parser.add_argument(
+        "--extra-libs",
+        nargs="*",
+        action="extend",
+        help="Extra non-git libs to install.",
+        choices=optional_extra_lib_list,
+    )
     parser.add_argument(
         "--retry", type=int, help="The number of retries when a network operation failed.", default=default_env.network_try_times - 1
     )
@@ -561,8 +569,8 @@ if __name__ == "__main__":
         "--remote",
         type=str,
         help="The git remote preferred to use. The preferred remote will be used to accelerate git operation when possible.",
-        default=default_env.git_remote.name,
-        choices=git_prefer_remote._member_names_,
+        default=default_env.git_remote,
+        choices=git_prefer_remote,
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
@@ -577,38 +585,16 @@ if __name__ == "__main__":
         help="Download missing libs, then update installed libs. This may take more time because of twice check.",
     )
     group.add_argument("--system", action="store_true", help="Print needy system libs and exit.")
-    parser.add_argument("--export", dest="export_file", type=str, help="Export settings to specific file.")
-    parser.add_argument("--import", dest="import_file", type=str, help="Import settings from specific file.")
     args = parser.parse_args()
     # 检查输入是否合法
-    _check_depth(args.depth)
-    _check_retry(args.retry)
-    _check_home(args.home)
+    _check_input(args.home, args.depth, args.retry)
 
-    current_env = environment(
-        args.glibc_version, args.home, args.clone_type, args.depth, args.ssh, args.extra_libs or [], args.retry, args.remote
-    )
-    if args.import_file:
-        try:
-            with open(args.import_file) as file:
-                import_config: dict = json.load(file)
-        except Exception as e:
-            raise RuntimeError(f'Import file "{args.import_file}" failed: {e}')
-        current_config = current_env.__dict__
-        default_config = default_env.__dict__
-        current_env.__dict__ = {
-            # 若import_config中没有则使用default_config中的值，以便在environment类更新后原配置文件可以正确加载
-            key: (import_config.get(key, default_config[key]) if value == default_config[key] else value)
-            for key, value in current_config.items()
-        }
-        # 若extra_libs被用户设置为空则将当前extra_libs恢复为默认
-        if args.extra_libs == []:
-            current_env.extra_lib_list = default_env.extra_lib_list
+    current_env = configure.parse_args(args)
+    current_env.load_config(args)
+    current_env.reset_list_if_empty("extra_lib_list", "extra_libs", args)
 
     # 检查合并配置后环境是否正确
-    _check_depth(current_env.shallow_clone_depth)
-    _check_retry(current_env.network_try_times)
-    _check_home(current_env.home)
+    current_env.check()
     if args.system:
         print(f"Please install following system libs: {" ".join(system_lib_list)}")
     elif args.auto:
@@ -618,10 +604,4 @@ if __name__ == "__main__":
     elif args.download:
         download(current_env)
 
-    if args.export_file:
-        try:
-            with open(args.export_file, "w") as file:
-                json.dump(current_env.__dict__, file, indent=4)
-            print(f'[toolchains] Settings have been written to file "{args.export_file}"')
-        except Exception as e:
-            raise RuntimeError(f"Export settings failed: {e}")
+    current_env.save_config(args)
