@@ -51,7 +51,7 @@ def get_current_glib_version() -> str | None:
     Returns:
         str | None: 当前平台glibc版本，获取失败返回None
     """
-    result = common.run_command("getconf GNU_LIBC_VERSION", ignore_error=True, capture=True, echo=False)
+    result = common.run_command("getconf GNU_LIBC_VERSION", ignore_error=True, capture=True, echo=False, dry_run=False)
     if result:
         return result.stdout.strip().split(" ", 1)[1]
     else:
@@ -110,12 +110,12 @@ class git_prefer_remote(enum.StrEnum):
 
 class extra_lib:
     url_list: dict[str, str]  # 各个资源列表，dict[下载后文件名, url]
-    path_to_check: list[str]  # 检查包是否存在时使用的路径列表
+    install_dir: list[str]  # 安装路径
     version_dir: str  # 包含版本文件的目录
 
-    def __init__(self, url_list: dict[str, str], path_to_check: list[str], version_dir: str) -> None:
+    def __init__(self, url_list: dict[str, str], install_dir: list[str], version_dir: str) -> None:
         self.url_list = url_list
-        self.path_to_check = path_to_check
+        self.install_dir = install_dir
         self.version_dir = version_dir
 
     def check_exist(self, config: "configure") -> bool:
@@ -124,7 +124,7 @@ class extra_lib:
         Args:
             config (environment): 源代码下载环境
         """
-        for path in self.path_to_check:
+        for path in self.install_dir:
             if not os.path.exists(os.path.join(config.home, path)):
                 return False
         else:
@@ -251,6 +251,7 @@ class all_lib_list:
     }
     necessary_extra_lib_list: typing.Final[set[str]] = {"python-embed", "gmp", "mpfr"}  # 必须的非git托管包
     optional_extra_lib_list: typing.Final[set[str]] = {lib for lib in extra_lib_list} - necessary_extra_lib_list  # 可选的非git托管包
+    all_lib_list: typing.Final[list[str]] = [*git_lib_list_github, *extra_lib_list, "gcc_contrib"] # 所有受支持的包
 
     @classmethod
     def get_prefer_git_lib_list(cls, config: "configure") -> dict[str, git_url]:

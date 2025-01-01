@@ -349,7 +349,7 @@ class basic_configure:
     home: str  # 源码树根目录
 
     def __init__(self, home: str = os.environ["HOME"]) -> None:
-        self.home = home
+        self.home = os.path.abspath(home)
 
     @staticmethod
     def add_argument(parser: argparse.ArgumentParser) -> None:

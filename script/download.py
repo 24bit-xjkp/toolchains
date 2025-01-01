@@ -156,6 +156,67 @@ def auto_download(config: configure) -> None:
     update(config)
 
 
+def get_system_lib_list() -> list[str]:
+    """获取系统包列表
+
+    Returns:
+        list[str]: 系统包列表
+    """
+    return all_lib_list.system_lib_list
+
+
+def remove_specific_lib(config: configure, lib: str) -> None:
+    """删除指定包
+
+    Args:
+        config (configure): 源代码下载环境
+        lib (str): 要删除的包
+
+    Raises:
+        RuntimeError: 删除未知包时抛出异常
+    """
+
+    assert lib in all_lib_list.all_lib_list, f"Unknown lib {lib}."
+    if lib in all_lib_list.extra_lib_list:
+        install_item: list[str] = all_lib_list.extra_lib_list[lib].install_dir
+    elif lib in all_lib_list.git_lib_list_github:
+        install_item = [os.path.join(config.home, lib)]
+    elif lib == "gcc_contrib":
+        gcc_dir = os.path.join(config.home, "gcc")
+        if not os.path.exists(gcc_dir):
+            print(f"[toolchains] Lib {lib} does not exist, skip remove.")
+            return
+        install_item = [
+            os.path.join(gcc_dir, item)
+            for item in filter(lambda x: x.startswith(("gettext", "gmp", "mpc", "mpfr", "isl")), os.listdir(gcc_dir))
+        ]
+
+    removed = False
+    for dir in install_item:
+        try:
+            if os.path.exists(dir):
+                common.remove(dir)
+                removed = True
+        except Exception as e:
+            raise RuntimeError(f"Remove lib {lib} failed: {e}")
+    if not removed:
+        print(f"[toolchains] Lib {lib} does not exist, skip remove.")
+
+
+def remove(config: configure, libs: list[str]) -> None:
+    """删除指定包
+
+    Args:
+        config (configure): 源代码下载环境
+        libs (list[str]): 要删除的包列表
+
+    Raises:
+        RuntimeError: 删除未知包时抛出异常
+    """
+    for lib in libs:
+        remove_specific_lib(config, lib)
+
+
 def _check_input(args: argparse.Namespace) -> None:
     """检查输入是否正确"""
     assert args.glibc_version, f"Invalid glibc version: {args.glibc_version}"
@@ -163,11 +224,17 @@ def _check_input(args: argparse.Namespace) -> None:
     assert args.retry >= 0, f"Invalid network try times: {args.retry}."
 
 
-def get_system_lib_list() -> list[str]:
-    return all_lib_list.system_lib_list
-
-
-__all__ = ["download_gcc_contrib", "download_specific_extra_lib", "download", "update", "auto_download", "get_system_lib_list", "configure"]
+__all__ = [
+    "download_gcc_contrib",
+    "download_specific_extra_lib",
+    "download",
+    "update",
+    "auto_download",
+    "get_system_lib_list",
+    "configure",
+    "remove_specific_lib",
+    "remove",
+]
 
 if __name__ == "__main__":
     default_config = configure()
@@ -192,8 +259,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--extra-libs",
-        nargs="*",
         action="extend",
+        nargs="*",
         help="Extra non-git libs to install.",
         choices=all_lib_list.optional_extra_lib_list,
     )
@@ -220,6 +287,13 @@ if __name__ == "__main__":
         help="Download missing libs, then update installed libs. This may take more time because of twice check.",
     )
     group.add_argument("--system", action="store_true", help="Print needy system libs and exit.")
+    group.add_argument(
+        "--remove",
+        action="extend",
+        nargs="*",
+        help="Remove installed libs. Use without specific lib name to remove all installed libs.",
+        choices=all_lib_list.all_lib_list,
+    )
     args = parser.parse_args()
     # 检查输入是否合法
     _check_input(args)
@@ -238,5 +312,7 @@ if __name__ == "__main__":
         update(current_config)
     elif args.download:
         download(current_config)
+    elif args.remove is not None:
+        remove(current_config, args.remove or all_lib_list.all_lib_list)
 
     current_config.save_config(args)
