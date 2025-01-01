@@ -173,7 +173,7 @@ class environment(common.basic_environment):
         if need_make_build_dir:
             common.mkdir(build_dir, remove_files)
 
-        common.chdir(build_dir)
+        _ = common.chdir_guard(build_dir)
         # 添加构建gdb所需的环境变量
         if lib == "binutils":
             os.environ["ORIGIN"] = "$$ORIGIN"

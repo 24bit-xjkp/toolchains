@@ -42,10 +42,8 @@ def download_gcc_contrib(config: configure) -> None:
     Args:
         config (environment): 源代码下载环境
     """
-    if not common.command_dry_run.get():
-        os.chdir(os.path.join(config.home, "gcc"))
+    _ = common.chdir_guard(os.path.join(config.home, "gcc"))
     common.run_command("contrib/download_prerequisites")
-    os.chdir(config.home)
 
 
 def download_specific_extra_lib(config: configure, lib: str) -> None:
