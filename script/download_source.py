@@ -53,7 +53,7 @@ def get_current_glib_version() -> str | None:
     """
     result = common.run_command("getconf GNU_LIBC_VERSION", ignore_error=True, capture=True, echo=False)
     if result:
-        return result.stdout.split(" ", 1)[1]
+        return result.stdout.strip().split(" ", 1)[1]
     else:
         return None
 
@@ -79,10 +79,12 @@ class git_clone_type(enum.StrEnum):
 class git_url:
     remote: str  # 托管平台
     path: str  # git路径
+    default_protocol: str  # 非ssh下默认的网络协议
 
-    def __init__(self, remote: str, path: str) -> None:
+    def __init__(self, remote: str, path: str, default_protocol: str = "https") -> None:
         self.remote = remote
         self.path = path
+        self.default_protocol = default_protocol
 
     def get_url(self, prefer_ssh: bool) -> str:
         """获取git仓库的url
@@ -91,15 +93,19 @@ class git_url:
             prefer_ssh (bool): 是否倾向于使用ssh
         """
         use_ssh = prefer_ssh and self.remote == "github.com"
-        return f"git@{self.remote}:{self.path}" if use_ssh else f"https://{self.remote}/{self.path}"
+        return f"git@{self.remote}:{self.path}" if use_ssh else f"{self.default_protocol}://{self.remote}/{self.path}"
 
 
 class git_prefer_remote(enum.StrEnum):
     """git远程托管平台"""
 
     github = "github"
+    native = "native"
     nju = "nju"
     tuna = "tuna"
+    bfsu = "bfsu"
+    nyist = "nyist"
+    cernet = "cernet"
 
 
 class extra_lib:
@@ -167,6 +173,16 @@ class all_lib_list:
         "newlib": git_url("github.com", "bminor/newlib.git"),
         "llvm": git_url("github.com", "llvm/llvm-project.git"),
     }
+    git_lib_list_native: typing.Final[dict[str, git_url]] = {
+        **git_lib_list_github,
+        "gcc": git_url("gcc.gnu.org", "git/gcc.git", "git"),
+        "binutils": git_url("sourceware.org", "git/binutils-gdb.git"),
+        "mingw": git_url("git.code.sf.net", "p/mingw-w64/mingw-w64 mingw-w64-mingw-w64.git", "git"),
+        "glibc": git_url("sourceware.org", "git/glibc.git"),
+        "pexports": git_url("git.osdn.net", "gitroot/mingw/pexports.git", "git"),
+        "libxml2": git_url("gitlab.gnome.org", "GNOME/libxml2.git"),
+        "newlib": git_url("sourceware.org", "git/newlib-cygwin.git"),
+    }
     git_lib_list_nju: typing.Final[dict[str, git_url]] = {
         **git_lib_list_github,
         "gcc": git_url("mirror.nju.edu.cn", "git/gcc.git"),
@@ -183,6 +199,31 @@ class all_lib_list:
         "linux": git_url("mirrors.tuna.tsinghua.edu.cn", "git/linux.git"),
         "llvm": git_url("mirrors.tuna.tsinghua.edu.cn", "git/llvm-project.git"),
     }
+    git_lib_list_bfsu: typing.Final[dict[str, git_url]] = {
+        **git_lib_list_github,
+        "gcc": git_url("mirrors.bfsu.edu.cn", "git/gcc.git"),
+        "binutils": git_url("mirrors.bfsu.edu.cn", "git/binutils-gdb.git"),
+        "glibc": git_url("mirrors.bfsu.edu.cn", "git/glibc.git"),
+        "linux": git_url("mirrors.bfsu.edu.cn", "git/linux.git"),
+        "llvm": git_url("mirrors.bfsu.edu.cn", "git/llvm-project.git"),
+    }
+    git_lib_list_nyist: typing.Final[dict[str, git_url]] = {
+        **git_lib_list_github,
+        "gcc": git_url("mirror.nyist.edu.cn", "git/gcc.git"),
+        "binutils": git_url("mirror.nyist.edu.cn", "git/binutils-gdb.git"),
+        "glibc": git_url("mirror.nyist.edu.cn", "git/glibc.git"),
+        "linux": git_url("mirror.nyist.edu.cn", "git/linux.git"),
+        "llvm": git_url("mirror.nyist.edu.cn", "git/llvm-project.git"),
+    }
+    git_lib_list_cernet: typing.Final[dict[str, git_url]] = {
+        **git_lib_list_github,
+        "gcc": git_url("mirrors.cernet.edu.cn", "gcc.git"),
+        "binutils": git_url("mirrors.cernet.edu.cn", "binutils-gdb.git"),
+        "glibc": git_url("mirrors.cernet.edu.cn", "glibc.git"),
+        "linux": git_url("mirrors.cernet.edu.cn", "linux.git"),
+        "llvm": git_url("mirrors.cernet.edu.cn", "llvm-project.git"),
+    }
+
     extra_lib_list: typing.Final[dict[str, extra_lib]] = {
         "python-embed": extra_lib(
             {
