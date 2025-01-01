@@ -173,11 +173,11 @@ class environment(common.basic_environment):
         if need_make_build_dir:
             common.mkdir(build_dir, remove_files)
 
-        print(build_dir)
-        os.chdir(build_dir)
+        common.chdir(build_dir)
         # 添加构建gdb所需的环境变量
         if lib == "binutils":
             os.environ["ORIGIN"] = "$$ORIGIN"
+            os.environ["PYTHON_EMBED_PACKAGE"] = self.lib_dir_list["python-embed"]  # mingw下编译带python支持的gdb需要
 
     def configure(self, *option: str) -> None:
         """自动对库进行配置
@@ -613,7 +613,7 @@ class cross_environment:
         self.env.make()
         self.env.install()
         # 添加target前缀
-        os.rename(os.path.join(self.env.bin_dir, "pexports"), os.path.join(self.env.bin_dir, f"{self.env.target}-pexports"))
+        common.rename(os.path.join(self.env.bin_dir, "pexports"), os.path.join(self.env.bin_dir, f"{self.env.target}-pexports"))
         # 完成后续工作
         self._after_build_gcc()
 
