@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
+import functools
 import os
 import psutil
 import shutil
@@ -8,6 +9,7 @@ import argparse
 import inspect
 import itertools
 import subprocess
+from collections.abc import Callable
 
 
 class command_dry_run:
@@ -24,16 +26,49 @@ class command_dry_run:
         cls._dry_run = dry_run
 
 
+def _support_dry_run[**P, R](echo_fn: Callable[..., str] | None = None) -> Callable[[Callable[P, R]], Callable[P, R | None]]:
+    """根据dry_run参数和command_dry_run中的全局状态确定是否只回显命令而不执行，若fn没有dry_run参数则只会使用全局状态
+
+    Args:
+        echo_fn (Callable[..., str] | None, optional): 回调函数，返回要显示的命令字符串，所有参数需要能在主函数的参数列表中找到，默认为None
+    """
+
+    def decorator(fn: Callable[P, R]) -> Callable[P, R | None]:
+        signature = inspect.signature(fn)
+
+        @functools.wraps(fn)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R | None:
+            bound_args = signature.bind(*args, **kwargs)
+            if echo_fn:
+                param_list: list = []
+                for key in inspect.signature(echo_fn).parameters.keys():
+                    assert (
+                        key in bound_args.arguments
+                    ), f"The param {key} of echo_fn is not in the param list of fn. Every param of echo_fn should be able to find in the param list of fn."
+                    param_list.append(bound_args.arguments[key])
+                print(echo_fn(*param_list))
+            dry_run: bool | None = bound_args.arguments.get("dry_run")
+            assert isinstance(dry_run, bool | None), f"The param dry_run must be a bool or None."
+            if dry_run is None and command_dry_run.get() or dry_run:
+                return
+            return fn(*bound_args.args, **bound_args.kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+@_support_dry_run(lambda command: f"[toolchains] Run command: {command}")
 def run_command(
-    command: str, ignore_error: bool = False, dry_run: None | bool = None, echo: bool = True
-) -> None | subprocess.CompletedProcess[bytes]:
+    command: str, ignore_error: bool = False, echo: bool = True, dry_run: bool | None = None
+) -> subprocess.CompletedProcess[bytes] | None:
     """运行指定命令, 若不忽略错误, 则在命令执行出错时抛出RuntimeError, 反之打印错误码
 
     Args:
         command (str): 要运行的命令
         ignore_error (bool, optional): 是否忽略错误. 默认不忽略错误.
-        dry_run (bool, optional): 是否只打印命令而不实际执行，默认使用全局状态
         echo (bool, optional): 是否回显命令输出，默认为回显.设置为不回显时会捕获命令的标准输出和标准错误
+        dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
 
     Raises:
         RuntimeError: 命令执行失败且ignore_error为False时抛出异常
@@ -42,10 +77,6 @@ def run_command(
         None | subprocess.CompletedProcess[bytes]: 在命令正常执行结束后返回执行结果
     """
 
-    # 打印运行的命令
-    print("[toolchains] run command: ", command)
-    if dry_run or command_dry_run.get():
-        return
     try:
         result = subprocess.run(command, capture_output=not echo, shell=True, check=True)
     except subprocess.CalledProcessError as e:
@@ -56,26 +87,30 @@ def run_command(
     return result
 
 
-def mkdir(path: str, remove_if_exist=True) -> None:
+@_support_dry_run(lambda path: f"[toolchains] Create directory {path}.")
+def mkdir(path: str, remove_if_exist=True, dry_run: bool | None = None) -> None:
     """创建目录
 
     Args:
         path (str): 要创建的目录
         remove_if_exist (bool, optional): 是否先删除已存在的同名目录. 默认先删除已存在的同名目录.
+        dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
     if remove_if_exist and os.path.exists(path):
         shutil.rmtree(path)
     os.makedirs(path, exist_ok=True)
 
 
-def copy(src: str, dst: str, overwrite=True, follow_symlinks: bool = False) -> None:
+@_support_dry_run(lambda src, dst: f"[toolchains] Copy {src} -> {dst}.")
+def copy(src: str, dst: str, overwrite=True, follow_symlinks: bool = False, dry_run: bool | None = None) -> None:
     """复制文件或目录
 
-    Args:
+    Args:-> Callable[[Callable[P, R]], functools._Wrapped[P, R, P, R | None]]
         src (str): 源路径
         dst (str): 目标路径
         overwrite (bool, optional): 是否覆盖已存在项. 默认为覆盖.
         follow_symlinks (bool, optional): 是否复制软链接指向的目标，而不是软链接本身. 默认为保留软链接.
+        dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
     # 创建目标目录
     dir = os.path.dirname(dst)
@@ -93,7 +128,8 @@ def copy(src: str, dst: str, overwrite=True, follow_symlinks: bool = False) -> N
         shutil.copyfile(src, dst, follow_symlinks=follow_symlinks)
 
 
-def copy_if_exist(src: str, dst: str, overwrite=True, follow_symlinks: bool = False) -> None:
+@_support_dry_run(lambda src, dst: f"[toolchains] Copy {src} -> {dst} if src exists.")
+def copy_if_exist(src: str, dst: str, overwrite=True, follow_symlinks: bool = False, dry_run: bool | None = None) -> None:
     """如果文件或目录存在则复制文件或目录
 
     Args:
@@ -101,16 +137,19 @@ def copy_if_exist(src: str, dst: str, overwrite=True, follow_symlinks: bool = Fa
         dst (str): 目标路径
         overwrite (bool, optional): 是否覆盖已存在项. 默认为覆盖.
         follow_symlinks (bool, optional): 是否复制软链接指向的目标，而不是软链接本身. 默认为保留软链接.
+        dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
     if os.path.exists(src):
         copy(src, dst, overwrite, follow_symlinks)
 
 
-def remove(path: str) -> None:
+@_support_dry_run(lambda path: f"[toolchains] Remove {path}.")
+def remove(path: str, dry_run: bool | None = None) -> None:
     """删除指定路径
 
     Args:
         path (str): 要删除的路径
+        dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
     if os.path.isdir(path):
         shutil.rmtree(path)
@@ -118,14 +157,58 @@ def remove(path: str) -> None:
         os.remove(path)
 
 
-def remove_if_exists(path: str) -> None:
+@_support_dry_run(lambda path: f"[toolchains] Remove {path} if path exists.")
+def remove_if_exists(path: str, dry_run: bool | None = None) -> None:
     """如果指定路径存在则删除指定路径
 
     Args:
         path (str): 要删除的路径
+        dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
     if os.path.exists(path):
         remove(path)
+
+
+@_support_dry_run(lambda path: f"[toolchains] Enter directory {path}.")
+def chdir(path: str, dry_run: bool | None = None) -> str:
+    """将工作目录设置为指定路径
+
+    Args:
+        path (str): 要进入的路径
+        dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
+
+    Returns:
+        str: 之前的工作目录
+    """
+    cwd = os.getcwd()
+    os.chdir(path)
+    return cwd
+
+
+@_support_dry_run(lambda src, dst: f"[toolchains] Rename {src} -> {dst}.")
+def rename(src: str, dst: str, dry_run: bool | None = None) -> None:
+    """重命名指定路径
+
+    Args:
+        src (str): 源路径
+        dst (str): 目标路径
+        dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
+    """
+    os.rename(src, dst)
+
+
+class chdir_guard:
+    """在构造时进入指定工作目录并在析构时回到原工作目录"""
+
+    cwd: str
+    dry_run: bool | None
+
+    def __init__(self, path: str, dry_run: bool | None = None) -> None:
+        self.dry_run = dry_run
+        self.cwd = chdir(path, dry_run) or ""
+
+    def __del__(self) -> None:
+        chdir(self.cwd, self.dry_run)
 
 
 def check_lib_dir(lib: str, lib_dir: str, do_assert=True) -> bool:
@@ -170,7 +253,7 @@ class basic_environment:
         self.current_dir = os.path.abspath(os.path.dirname(__file__))
         self.bin_dir = os.path.join(self.home, self.name, "bin")
 
-    def compress(self, name: None | str = None) -> None:
+    def compress(self, name: str | None = None) -> None:
         """压缩构建完成的工具链
 
         Args:
