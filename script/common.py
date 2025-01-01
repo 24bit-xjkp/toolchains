@@ -24,11 +24,11 @@ class command_dry_run:
         cls._dry_run = dry_run
 
 
-def _support_dry_run[**P, R](echo_fn: Callable[..., str] | None = None) -> Callable[[Callable[P, R]], Callable[P, R | None]]:
+def _support_dry_run[**P, R](echo_fn: Callable[..., str | None] | None = None) -> Callable[[Callable[P, R]], Callable[P, R | None]]:
     """根据dry_run参数和command_dry_run中的全局状态确定是否只回显命令而不执行，若fn没有dry_run参数则只会使用全局状态
 
     Args:
-        echo_fn (Callable[..., str] | None, optional): 回调函数，返回要显示的命令字符串，所有参数需要能在主函数的参数列表中找到，默认为None
+        echo_fn (Callable[..., str | None] | None, optional): 回调函数，返回要显示的命令字符串或None，无回调或返回None时不显示命令，所有参数需要能在主函数的参数列表中找到，默认为无回调.
     """
 
     def decorator(fn: Callable[P, R]) -> Callable[P, R | None]:
@@ -37,6 +37,7 @@ def _support_dry_run[**P, R](echo_fn: Callable[..., str] | None = None) -> Calla
         @functools.wraps(fn)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R | None:
             bound_args = signature.bind(*args, **kwargs)
+            bound_args.apply_defaults()
             if echo_fn:
                 param_list: list = []
                 for key in inspect.signature(echo_fn).parameters.keys():
@@ -44,7 +45,9 @@ def _support_dry_run[**P, R](echo_fn: Callable[..., str] | None = None) -> Calla
                         key in bound_args.arguments
                     ), f"The param {key} of echo_fn is not in the param list of fn. Every param of echo_fn should be able to find in the param list of fn."
                     param_list.append(bound_args.arguments[key])
-                print(echo_fn(*param_list))
+                echo = echo_fn(*param_list)
+                if echo is not None:
+                    print(echo)
             dry_run: bool | None = bound_args.arguments.get("dry_run")
             assert isinstance(dry_run, bool | None), f"The param dry_run must be a bool or None."
             if dry_run is None and command_dry_run.get() or dry_run:
@@ -56,32 +59,40 @@ def _support_dry_run[**P, R](echo_fn: Callable[..., str] | None = None) -> Calla
     return decorator
 
 
-@_support_dry_run(lambda command: f"[toolchains] Run command: {command}")
+@_support_dry_run(lambda command, echo: f"[toolchains] Run command: {command}" if echo else None)
 def run_command(
-    command: str, ignore_error: bool = False, echo: bool = True, dry_run: bool | None = None
-) -> subprocess.CompletedProcess[bytes] | None:
+    command: str, ignore_error: bool = False, capture: bool = False, echo: bool = True, dry_run: bool | None = None
+) -> subprocess.CompletedProcess[str] | None:
     """运行指定命令, 若不忽略错误, 则在命令执行出错时抛出RuntimeError, 反之打印错误码
 
     Args:
         command (str): 要运行的命令
         ignore_error (bool, optional): 是否忽略错误. 默认不忽略错误.
-        echo (bool, optional): 是否回显命令输出，默认为回显.设置为不回显时会捕获命令的标准输出和标准错误
+        capture (bool, optional): 是否捕获命令输出，默认为不捕获.
+        echo (bool, optional): 是否回显信息，设置为False将不回显任何信息，包括错误提示，默认为回显.
         dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
 
     Raises:
         RuntimeError: 命令执行失败且ignore_error为False时抛出异常
 
     Returns:
-        None | subprocess.CompletedProcess[bytes]: 在命令正常执行结束后返回执行结果
+        None | subprocess.CompletedProcess[str]: 在命令正常执行结束后返回执行结果，否则返回None
     """
 
+    if capture:
+        pipe = subprocess.PIPE  # capture为True，不论是否回显都需要捕获输出
+    elif echo:
+        pipe = None  # 回显而不捕获输出则正常输出
+    else:
+        pipe = subprocess.DEVNULL  # 不回显又不捕获输出则丢弃输出
     try:
-        result = subprocess.run(command, capture_output=not echo, shell=True, check=True)
+        result = subprocess.run(command, stdout=pipe, stderr=pipe, shell=True, check=True, text=True)
     except subprocess.CalledProcessError as e:
-        if ignore_error:
-            print(f'Command "{command}" failed with errno={e.returncode}, but it is ignored.')
-        else:
+        if not ignore_error:
             raise RuntimeError(f'Command "{command}" failed.')
+        elif echo:
+            print(f'Command "{command}" failed with errno={e.returncode}, but it is ignored.')
+            return None
     return result
 
 
