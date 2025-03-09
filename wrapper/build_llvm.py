@@ -6,6 +6,6 @@ import pathlib
 import sys
 
 sys.path.append(str(pathlib.Path(__file__).parent.parent))
-from toolchains.download import main
+from toolchains.build_llvm import main
 
 sys.exit(main())
