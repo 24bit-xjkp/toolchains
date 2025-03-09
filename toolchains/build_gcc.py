@@ -94,9 +94,9 @@ def main() -> int:
     # 添加build相关选项
     configure.add_argument(build_parse)
     action = build_parse.add_argument("--host", type=str, help="The host platform of the GCC toolchain.", default=default_config.build)
-    setattr(action, "completer", common.triplet_completer(support_platform_list.host_list))
+    common.register_completer(action, common.triplet_completer(support_platform_list.host_list))
     action = build_parse.add_argument("--target", type=str, help="The target platform of the GCC toolchain.", default=default_config.build)
-    setattr(action, "completer", common.triplet_completer(support_platform_list.target_list))
+    common.register_completer(action, common.triplet_completer(support_platform_list.target_list))
     build_parse.add_argument(
         "--gdb", action=argparse.BooleanOptionalAction, help="Whether to enable gdb support in GCC toolchain.", default=default_config.gdb
     )

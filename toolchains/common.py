@@ -25,6 +25,45 @@ import colorama
 support_os_list = ("linux", "w64", "none")
 
 
+@functools.cache
+def is_module_available(module_name: str) -> bool:
+    """判断指定模块是否存在
+
+    Args:
+        module_name (str): 模块名称
+
+    Returns:
+        bool: 指定模块是否存在
+    """
+
+    return importlib.util.find_spec(module_name) is not None
+
+
+def support_argcomplete(parser: argparse.ArgumentParser) -> None:
+    """在argcomplete存在时添加补全支持
+
+    Args:
+        parser (argparse.ArgumentParser): 命令解析器
+    """
+
+    if is_module_available("argcomplete"):
+        import argcomplete
+
+        argcomplete.autocomplete(parser)
+
+
+def register_completer(action:argparse.Action, completer: Callable[..., list[str]]) -> None:
+    """在argcomplete存在时注册补全器
+
+    Args:
+        action (argparse.Action): 要注册补全器的选项
+        completer (object): 待注册的补全器
+    """
+
+    if is_module_available("argcomplete"):
+        setattr(action, "completer", completer)
+
+
 class message_type(IntEnum):
     """toolchains项目显示消息的前缀
 
@@ -1222,14 +1261,14 @@ class basic_configure:
             "If home is imported as a relative path from configure file, it will be converted to an absolute path relative to the directory of the configure file",
             default=str(basic_configure().home),
         )
-        setattr(action, "completer", dir_completer)
+        register_completer(action, dir_completer)
         action = parser.add_argument(
             "--export",
             dest="export_file",
             type=str,
             help="Export settings to specific file. The origin home path is saved to the configure file.",
         )
-        setattr(action, "completer", files_completer(".json"))
+        register_completer(action, files_completer(".json"))
         action = parser.add_argument(
             "--import",
             dest="import_file",
@@ -1238,7 +1277,7 @@ class basic_configure:
             "If the home in configure file is a a relative path, "
             "it will be converted to an absolute path relative to the directory of the configure file.",
         )
-        setattr(action, "completer", files_completer(".json"))
+        register_completer(action, files_completer(".json"))
         parser.add_argument(
             "--dry-run",
             dest="dry_run",
@@ -1502,7 +1541,7 @@ class basic_configure_with_prefix_build(basic_configure):
             "If prefix is imported as a relative path from configure file, it will be converted to an absolute path relative to the directory of the configure file",
             default=default_config.prefix_dir,
         )
-        setattr(action, "completer", dir_completer)
+        register_completer(action, dir_completer)
 
 
 class basic_build_configure(basic_configure_with_prefix_build):
@@ -1691,26 +1730,6 @@ def keyboard_interpret_received() -> typing.NoReturn:
         typing.NoReturn: 该函数永不返回
     """
     raise RuntimeError(toolchains_error("Keyboard interpret received."))
-
-
-def _is_module_available(module_name: str) -> bool:
-    """判断指定模块是否存在
-
-    Args:
-        module_name (str): 模块名称
-
-    Returns:
-        bool: 指定模块是否存在
-    """
-
-    return importlib.util.find_spec(module_name) is not None
-
-
-def support_argcomplete(parser: argparse.ArgumentParser) -> None:
-    if _is_module_available("argcomplete"):
-        import argcomplete
-
-        argcomplete.autocomplete(parser)
 
 
 assert __name__ != "__main__", "Import this file instead of running it directly."
