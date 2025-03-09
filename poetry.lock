@@ -38,9 +38,10 @@ trio = ["trio (>=0.26.1)"]
 name = "argcomplete"
 version = "3.6.0"
 description = "Bash tab completion for argparse"
-optional = false
+optional = true
 python-versions = ">=3.8"
 groups = ["main"]
+markers = "extra == \"complete\""
 files = [
     {file = "argcomplete-3.6.0-py3-none-any.whl", hash = "sha256:4e3e4e10beb20e06444dbac0ac8dda650cb6349caeefe980208d3c548708bedd"},
     {file = "argcomplete-3.6.0.tar.gz", hash = "sha256:2e4e42ec0ba2fff54b0d244d0b1623e86057673e57bafe72dda59c64bd5dee8b"},
@@ -2308,7 +2309,10 @@ cffi = {version = ">=1.11", markers = "platform_python_implementation == \"PyPy\
 [package.extras]
 cffi = ["cffi (>=1.11)"]
 
+[extras]
+complete = ["argcomplete"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12.0"
-content-hash = "5c9a2dfed83a6732388276a1d8e5bc0721c3ab2167065225c5b48eacb75978cd"
+content-hash = "bd5e8c2b76054ac1ad9ecff16f6b1a9629b48f308f574c25dba3f87871c50f97"

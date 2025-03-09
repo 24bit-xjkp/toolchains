@@ -1693,4 +1693,24 @@ def keyboard_interpret_received() -> typing.NoReturn:
     raise RuntimeError(toolchains_error("Keyboard interpret received."))
 
 
+def _is_module_available(module_name: str) -> bool:
+    """判断指定模块是否存在
+
+    Args:
+        module_name (str): 模块名称
+
+    Returns:
+        bool: 指定模块是否存在
+    """
+
+    return importlib.util.find_spec(module_name) is not None
+
+
+def support_argcomplete(parser: argparse.ArgumentParser) -> None:
+    if _is_module_available("argcomplete"):
+        import argcomplete
+
+        argcomplete.autocomplete(parser)
+
+
 assert __name__ != "__main__", "Import this file instead of running it directly."

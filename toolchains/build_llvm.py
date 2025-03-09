@@ -5,7 +5,6 @@
 import argparse
 import typing
 
-import argcomplete
 
 from . import common
 from .build_llvm_source import *
@@ -57,7 +56,7 @@ def main() -> int:
     )
     sysroot_config.add_argument(sysroot_parser)
 
-    argcomplete.autocomplete(parser)
+    common.support_argcomplete(parser)
     errno = 0
     args = parser.parse_args()
     try:

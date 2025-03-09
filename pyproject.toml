@@ -14,7 +14,8 @@ authors = [
 readme = "README.md"
 license = "MIT"
 requires-python = "^3.12.0"
-dependencies = ["packaging>=21.0", "colorama>=0.4.6", "argcomplete (>=3.5.3,<4.0.0)"]
+dependencies = ["packaging>=21.0", "colorama>=0.4.6"]
+optional-dependencies = { complete = ["argcomplete (>=3.5.3,<4.0.0)"] }
 
 [project.urls]
 repository = "https://github.com/24bit-xjkp/toolchains"
@@ -53,7 +54,7 @@ line_length = 140
 [tool.mypy]
 strict = true
 pretty = true
-files = ["script/*.py", "toolchains/*.py"]
+files = ["script/*.py", "toolchains/*.py", "test/*.py"]
 
 [tool.pytest.ini_options]
 addopts = "-v --maxfail=3"

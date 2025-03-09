@@ -4,7 +4,6 @@
 
 import argparse
 
-import argcomplete
 
 from . import common
 from .build_gcc_source import *
@@ -120,7 +119,7 @@ def main() -> int:
         default=default_config.nls,
     )
 
-    argcomplete.autocomplete(parser)
+    common.support_argcomplete(parser)
     errno = 0
     args = parser.parse_args()
     try:

@@ -7,7 +7,6 @@ import os
 import pathlib
 import tempfile
 
-import argcomplete
 
 from . import common
 from .download_source import *
@@ -353,7 +352,7 @@ def main() -> int:
         choices=all_lib_list.all_lib_list,
     )
 
-    argcomplete.autocomplete(parser)
+    common.support_argcomplete(parser)
     errno = 0
     args = parser.parse_args()
     try:
