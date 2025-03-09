@@ -86,6 +86,9 @@ def download(config: configure) -> None:
                 try:
                     common.run_command(f"git clone {url} {common.command_quiet.get_option()} {extra_option} --no-checkout {lib_dir}")
                     break
+                except KeyboardInterrupt:
+                    common.remove_if_exists(lib_dir)
+                    common.keyboard_interpret_received()
                 except:
                     common.remove_if_exists(lib_dir)
                     common.toolchains_print(common.toolchains_warning(f"Clone {lib} failed, retrying."))
@@ -96,8 +99,10 @@ def download(config: configure) -> None:
                 try:
                     common.run_command(f"git -C {lib_dir} checkout HEAD")
                     break
+                except KeyboardInterrupt:
+                    common.keyboard_interpret_received()
                 except:
-                    common.toolchains_print(common.toolchains_warning(f"Clone {lib} failed, retrying."))
+                    common.toolchains_print(common.toolchains_warning(f"Checkout {lib} failed, retrying."))
             else:
                 raise RuntimeError(common.toolchains_error(f"Checkout {lib} failed."))
             after_download_list.after_download_specific_lib(config, lib)
@@ -138,27 +143,30 @@ def update(config: configure) -> None:
                 try:
                     common.run_command(f"git -C {lib_dir} fetch --dry-run", capture=(file, file))
                     break
-                except Exception:
+                except KeyboardInterrupt:
+                    common.keyboard_interpret_received()
+                except:
                     common.toolchains_print(common.toolchains_warning(f"Fetch {lib} failed, retrying."))
                     file.truncate(0)
                     file.seek(0, os.SEEK_SET)
             else:
                 raise RuntimeError(common.toolchains_error(f"Fetch {lib} failed."))
 
-            if not common.command_dry_run.get():
-                if file.tell():
-                    for _ in range(config.network_try_times):
-                        try:
-                            common.run_command(f"git -C {lib_dir} pull {common.command_quiet.get_option()}")
-                            break
-                        except Exception:
-                            common.toolchains_print(common.toolchains_warning(f"Pull {lib} failed, retrying."))
-                    else:
-                        raise RuntimeError(common.toolchains_error(f"Pull {lib} failed."))
-                    after_download_list.after_download_specific_lib(config, lib)
-                    common.status_counter.add_success()
+            if file.tell():
+                for _ in range(config.network_try_times):
+                    try:
+                        common.run_command(f"git -C {lib_dir} pull {common.command_quiet.get_option()}")
+                        break
+                    except KeyboardInterrupt:
+                        common.keyboard_interpret_received()
+                    except:
+                        common.toolchains_print(common.toolchains_warning(f"Pull {lib} failed, retrying."))
                 else:
-                    _up_to_date_echo(lib)
+                    raise RuntimeError(common.toolchains_error(f"Pull {lib} failed."))
+                after_download_list.after_download_specific_lib(config, lib)
+                common.status_counter.add_success()
+            else:
+                _up_to_date_echo(lib)
 
     # 更新非git包
     for lib in config.extra_lib_list:

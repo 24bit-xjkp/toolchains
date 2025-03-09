@@ -1681,4 +1681,16 @@ class toolchain_type(IntFlag):
 arg_formatter = argparse.ArgumentDefaultsHelpFormatter
 
 
+def keyboard_interpret_received() -> typing.NoReturn:
+    """收到键盘ctrl-c后增加错误计数并退出
+
+    Raises:
+        RuntimeError: 收到ctrl-c
+
+    Returns:
+        typing.NoReturn: 该函数永不返回
+    """
+    raise RuntimeError(toolchains_error("Keyboard interpret received."))
+
+
 assert __name__ != "__main__", "Import this file instead of running it directly."
