@@ -458,17 +458,18 @@ def run_command(
     return result
 
 
-def _mkdir_echo(path: Path) -> str:
+def _mkdir_echo(path: Path, remove_if_exist: bool) -> str:
     """创建目录时回显信息
 
     Args:
         path (Path): 要创建的目录路径
+        remove_if_exist (bool): 是否先删除已存在的同名目录.
 
     Returns:
         str: 回显信息
     """
 
-    return toolchains_info(f"Create directory {path}.")
+    return toolchains_info(f"Create directory {path}{'' if remove_if_exist else ' if not exist'}.")
 
 
 @support_dry_run(_mkdir_echo)
@@ -1492,9 +1493,7 @@ class basic_configure_with_prefix_build(basic_configure):
 
         super().add_argument(parser)
         default_config = basic_configure_with_prefix_build()
-        parser.add_argument(
-            "--build", type=str, help=f"The build platform of the toolchain.", default=default_config.build
-        )
+        parser.add_argument("--build", type=str, help=f"The build platform of the toolchain.", default=default_config.build)
         action = parser.add_argument(
             "--prefix",
             dest="prefix_dir",

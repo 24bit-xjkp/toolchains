@@ -105,13 +105,13 @@ class environment(common.basic_environment):
         self.rpath_dir = self.prefix / lib_name
         lib_path = Path("'$ORIGIN'") / ".." / lib_name
         self.rpath_option = f"-Wl,-rpath={lib_path}"
+        self.host_field = common.triplet_field(self.host, True)
+        self.target_field = common.triplet_field(self.target, True)
 
         if simple:
             return
 
         self.lib_dir_list = {}
-        self.host_field = common.triplet_field(self.host, True)
-        self.target_field = common.triplet_field(self.target, True)
         for lib in lib_list:
             lib_dir = self.home / lib
             match lib:
