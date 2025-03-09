@@ -87,12 +87,10 @@ __all__ = [
 def main() -> int:
     default_config = configure()
 
-    parser = argparse.ArgumentParser(
-        description="Build GCC toolchain to specific platform.", formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
+    parser = argparse.ArgumentParser(description="Build GCC toolchain to specific platform.")
     subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands.")
-    build_parse = subparsers.add_parser("build", help="Build the GCC toolchain.")
-    subparsers.add_parser("dump", help="Print support platforms and exit.")
+    build_parse = subparsers.add_parser("build", help="Build the GCC toolchain.", formatter_class=common.arg_formatter)
+    subparsers.add_parser("dump", help="Print support platforms and exit.", formatter_class=common.arg_formatter)
 
     # 添加build相关选项
     configure.add_argument(build_parse)

@@ -1678,4 +1678,7 @@ class toolchain_type(IntFlag):
         return result
 
 
+arg_formatter = argparse.ArgumentDefaultsHelpFormatter
+
+
 assert __name__ != "__main__", "Import this file instead of running it directly."

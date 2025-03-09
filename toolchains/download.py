@@ -278,19 +278,25 @@ def main() -> int:
 
     default_config = configure()
 
-    parser = argparse.ArgumentParser(
-        description="Download or update needy libs for building gcc and llvm.", formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
+    parser = argparse.ArgumentParser(description="Download or update needy libs for building gcc and llvm.")
 
     subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands.")
-    update_parser = subparsers.add_parser("update", help="Update installed libs. All libs should be installed before update.")
-    download_parser = subparsers.add_parser("download", help="Download missing libs. This would not update existing libs.")
-    auto_parser = subparsers.add_parser(
-        "auto", help="Download missing libs, then update installed libs. This may take more time because of twice check."
+    update_parser = subparsers.add_parser(
+        "update", help="Update installed libs. All libs should be installed before update.", formatter_class=common.arg_formatter
     )
-    subparsers.add_parser("system", help="Print needy system libs and exit.")
+    download_parser = subparsers.add_parser(
+        "download", help="Download missing libs. This would not update existing libs.", formatter_class=common.arg_formatter
+    )
+    auto_parser = subparsers.add_parser(
+        "auto",
+        help="Download missing libs, then update installed libs. This may take more time because of twice check.",
+        formatter_class=common.arg_formatter,
+    )
+    subparsers.add_parser("system", help="Print needy system libs and exit.", formatter_class=common.arg_formatter)
     remove_parser = subparsers.add_parser(
-        "remove", help="Remove installed libs. Use without specific lib name to remove all installed libs."
+        "remove",
+        help="Remove installed libs. Use without specific lib name to remove all installed libs.",
+        formatter_class=common.arg_formatter,
     )
 
     # 添加公共选项
