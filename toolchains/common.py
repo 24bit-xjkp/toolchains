@@ -861,7 +861,6 @@ class triplet_field:
         fields = triplet.split("-")
         self.arch = fields[0]
         self.num = len(fields)
-        message = toolchains_error(f'Illegal triplet "{triplet}"')
         match (self.num):
             case 2:
                 self.os = "unknown"
@@ -880,9 +879,9 @@ class triplet_field:
                 self.os = fields[2]
                 self.abi = fields[3]
             case _:
-                raise RuntimeError(message)
+                raise RuntimeError(toolchains_error(f'Illegal triplet "{triplet}"'))
 
-        assert self.arch and self.vendor and self.os and self.abi, message
+        assert self.arch and self.vendor and self.os and self.abi, toolchains_error(f'Illegal triplet "{triplet}"')
 
         # 正则化
         if normalize:
@@ -1219,7 +1218,7 @@ class basic_configure:
             "--home",
             type=str,
             help="The home directory to find source trees. "
-            "If home is inputted as a relative path, it will be converted to an absolute path relative to the cwd."
+            "If home is inputted as a relative path, it will be converted to an absolute path relative to the cwd. "
             "If home is imported as a relative path from configure file, it will be converted to an absolute path relative to the directory of the configure file",
             default=str(basic_configure().home),
         )
