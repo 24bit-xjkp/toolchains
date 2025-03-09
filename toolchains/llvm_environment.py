@@ -157,7 +157,7 @@ class environment(common.basic_environment):
         #         self.stage = int(i[8:])
         #     else:
         #         assert False, f'Unknown option: "{i}"'
-        self.llvm_option_list_1["LLVM_PARALLEL_LINK_JOBS"] = str(self.jobs // 5)
+        self.llvm_option_list_1["LLVM_PARALLEL_LINK_JOBS"] = str(self.jobs // 6)
         # 非自举在第1阶段就编译clang-tools-extra
         if not self.bootstrap:
             self.llvm_option_list_1["LLVM_ENABLE_PROJECTS"] = '"clang;clang-tools-extra;lld"'

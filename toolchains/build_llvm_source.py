@@ -29,9 +29,9 @@ def generate_target_list_from_gcc() -> tuple[list[str], list[str]]:
     for target in gcc_support_platform_list.target_list:
         toolchain_type = common.toolchain_type.classify_toolchain(phony_triplet, phony_triplet, target)
         if toolchain_type.contain(common.toolchain_type.freestanding):
-            hosted_list.append(target)
-        else:
             freestanding_list.append(target)
+        else:
+            hosted_list.append(target)
 
     return hosted_list, freestanding_list
 
@@ -74,4 +74,7 @@ class configure(common.basic_build_configure):
         super().__init__()
 
 
-__all__ = ["modifier_list", "support_platform_list", "configure", "environment"]
+sysroot_config = common.basic_configure_with_prefix_build
+
+
+__all__ = ["modifier_list", "support_platform_list", "configure", "environment", "sysroot_config"]
