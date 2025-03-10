@@ -82,6 +82,7 @@ class environment(common.basic_environment):
         jobs: int,
         prefix_dir: Path,
         compress_level: int,
+        long_distance_match: int,
         simple: bool = False,
     ) -> None:
         self.build = build
@@ -93,7 +94,7 @@ class environment(common.basic_environment):
         self.cross_compiler = self.toolchain_type.contain(common.toolchain_type.cross | common.toolchain_type.canadian_cross)
 
         name_without_version = (f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native") + "-gcc"
-        super().__init__(build, "15.0.1", name_without_version, home, jobs, prefix_dir, compress_level)
+        super().__init__(build, "15.0.1", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match)
 
         self.prefix = self.prefix_dir / self.name
         self.lib_prefix = self.prefix / self.target if not self.toolchain_type.contain(common.toolchain_type.canadian) else self.prefix
@@ -429,6 +430,7 @@ class build_environment:
         prefix_dir: Path,
         nls: bool,
         compress_level: int,
+        long_distance_match: int,
     ) -> None:
         """gcc交叉工具链对象
 
@@ -444,9 +446,10 @@ class build_environment:
             prefix_dir (Path): 安装根目录
             nls (bool): 是否启用nls
             compress_level (int): zstd压缩等级
+            long_distance_match (int): 长距离匹配窗口大小
         """
 
-        self.env = environment(build, host, target, home, jobs, prefix_dir, compress_level)
+        self.env = environment(build, host, target, home, jobs, prefix_dir, compress_level, long_distance_match)
         self.host_os = self.env.host_field.os
         self.target_os = self.env.target_field.os
         self.target_arch = self.env.target_field.arch

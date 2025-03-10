@@ -52,7 +52,7 @@ def support_argcomplete(parser: argparse.ArgumentParser) -> None:
         argcomplete.autocomplete(parser)
 
 
-def register_completer(action:argparse.Action, completer: Callable[..., list[str]]) -> None:
+def register_completer(action: argparse.Action, completer: Callable[..., list[str]]) -> None:
     """在argcomplete存在时注册补全器
 
     Args:
@@ -832,9 +832,18 @@ class basic_environment:
     prefix_dir: Path  # 安装路径
     bin_dir: Path  # 安装后可执行文件所在目录
     compress_level: int  # zstd压缩等级
+    long_distance_match: int  # 长距离匹配窗口大小
 
     def __init__(
-        self, build: str, version: str, name_without_version: str, home: Path, jobs: int, prefix_dir: Path, compress_level: int
+        self,
+        build: str,
+        version: str,
+        name_without_version: str,
+        home: Path,
+        jobs: int,
+        prefix_dir: Path,
+        compress_level: int,
+        long_distance_match: int,
     ) -> None:
         self.build = build
         self.version = version
@@ -848,6 +857,7 @@ class basic_environment:
         self.prefix_dir = prefix_dir
         self.bin_dir = self.prefix_dir / self.name / "bin"
         self.compress_level = compress_level
+        self.long_distance_match = long_distance_match
 
     def compress(self, name: str | None = None) -> None:
         """压缩构建完成的工具链
@@ -859,7 +869,7 @@ class basic_environment:
         chdir(self.prefix_dir)
         name = name or self.name
         run_command(f"tar -cf {name}.tar {name}")
-        run_command(f"zstd --ultra --rm -{self.compress_level} -T{self.jobs} -f {name}.tar")
+        run_command(f"zstd --ultra --long={self.long_distance_match} --rm -{self.compress_level} -T{self.jobs} -f {name}.tar")
 
     def register_in_env(self) -> None:
         """注册安装路径到环境变量"""
@@ -1550,27 +1560,30 @@ class basic_build_configure(basic_configure_with_prefix_build):
     jobs: int
     _origin_prefix_dir: str
     compress_level: int
+    long_distance_match: int
 
     def __init__(
         self,
-        jobs: int | None = None,
+        jobs: int = (os.cpu_count() or 1) + 2,
         compress_level: int = 17,
+        long_distance_match: int = 31,
     ) -> None:
         """初始化工具链构建配置
 
         Args:
-            jobs (int | None, optional): 构建时的并发数. 默认为当前平台cpu核心数的1.5倍.
+            jobs (int, optional): 构建时的并发数. 默认为当前平台cpu核心数的1.5倍.
             compress_level (int, optional): zstd压缩等级(1~22). 默认为17级
+            long_distance_match (int): 长距离匹配窗口大小. 默认为31
         """
 
         super().__init__()
-        self.jobs = jobs or (os.cpu_count() or 1) + 2
-        self.register_encode_name_map("prefix_dir", "_origin_prefix_dir")
+        self.jobs = jobs
         self.compress_level = compress_level
+        self.long_distance_match = long_distance_match
 
     @classmethod
     def add_argument(cls, parser: argparse.ArgumentParser) -> None:
-        """为argparse添加--jobs和--compress选项
+        """为argparse添加--jobs、--compress和--long选项
 
         Args:
             parser (argparse.ArgumentParser): 命令行解析器
@@ -1591,6 +1604,13 @@ class basic_build_configure(basic_configure_with_prefix_build):
             type=int,
             help="The compress level of zstd when packing. Support 1~22.",
             default=default_config.compress_level,
+        )
+        parser.add_argument(
+            "--long",
+            dest="long_distance_match",
+            type=int,
+            help="The long distance match windows of zstd when packing.",
+            default=default_config.long_distance_match,
         )
 
     def check(self) -> None:

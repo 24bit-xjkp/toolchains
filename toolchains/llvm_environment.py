@@ -133,6 +133,7 @@ class environment(common.basic_environment):
         jobs: int,
         prefix_dir: Path,
         compress_level: int,
+        long_distance_match: int,
     ) -> None:
         """llvm构建环境
 
@@ -143,11 +144,12 @@ class environment(common.basic_environment):
             jobs (int): 并发构建数
             prefix_dir (str): 安装根目录
             compress_level (int): zstd压缩等级
+            long_distance_match (int): 长距离匹配窗口大小
         """
         self.build = build
         self.host = host or self.build
         name_without_version = f"{self.host}-clang"
-        super().__init__(build, "21.0.0", name_without_version, home, jobs, prefix_dir, compress_level)
+        super().__init__(build, "21.0.0", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match)
         # 设置prefix
         self._set_prefix()
         # for i in sys.argv[1:]:
