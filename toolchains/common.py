@@ -839,18 +839,23 @@ class compress_environment:
         self.compress_level = compress_level
         self.long_distance_match = long_distance_match
 
-    def compress_path(self, path: str, output_dir: Path | None = None) -> None:
+    def compress_path(self, path: str, output_dir: Path | None = None, chdir: bool = True) -> None:
         """压缩指定目标
 
         Args:
             path (str): 要压缩的目标路径，是相对于self.prefix_dir的路径.
-            output_dir (Path | None, optional): 压缩后文件输出路径. 默认为self.prefix_dir
+            output_dir (Path | None, optional): 压缩后文件输出路径. 默认为self.prefix_dir.
+            chdir (bool, optional): 是否切换工作目录. 默认为切换到self.prefix_dir下.
         """
 
         with tempfile.TemporaryFile() as tmp:
             toolchains_print(toolchains_info(f"Packing {path}"))
-            with libarchive.fd_writer(tmp.fileno(), "pax") as tar, chdir_guard(self.prefix_dir):
-                tar.add_files(path)
+            with libarchive.fd_writer(tmp.fileno(), "pax") as tar:
+                if chdir:
+                    with chdir_guard(self.prefix_dir):
+                        tar.add_files(path)
+                else:
+                    tar.add_files(path)
             tmp.seek(0)
             zst_file = f"{path}.tar.zst"
             toolchains_print(toolchains_info(f"Compressing {zst_file}"))
@@ -862,23 +867,29 @@ class compress_environment:
             with (output_dir / zst_file).open("wb") as zst:
                 compressor.copy_stream(tmp, zst)
 
-    def decompress_path(self, path: str, output_dir: Path | None = None) -> None:
+    def decompress_path(self, path: str, output_dir: Path | None = None, chdir: bool = True) -> None:
         """解压缩指定目标
 
         Args:
             path (str): 要解压缩的压缩包(.tar.zst)，是相对于self.prefix_dir的路径.
             output_dir (Path | None, optional): 解压后工具链输出路径. 默认为self.prefix_dir
+            chdir (bool, optional): 是否切换工作目录. 默认为切换到output_dir下.
         """
 
         with tempfile.TemporaryFile() as tmp:
             zst_file = self.prefix_dir / path
-            toolchains_print(toolchains_info(f"Compressing {zst_file}"))
+            toolchains_print(toolchains_info(f"Decompressing {zst_file}"))
             decompressor = zstandard.ZstdDecompressor(max_window_size=1 << self.long_distance_match)
             with zst_file.open("rb") as zst:
                 decompressor.copy_stream(zst, tmp)
             tmp.seek(0)
             toolchains_print(toolchains_info(f"Unpacking {path}"))
-            with chdir_guard(output_dir or self.prefix_dir):
+            output_dir = output_dir or self.prefix_dir
+            remove_if_exists(output_dir / zst_file.name.split(".")[0])
+            if chdir:
+                with chdir_guard(output_dir):
+                    libarchive.extract_fd(tmp.fileno())
+            else:
                 libarchive.extract_fd(tmp.fileno())
 
 
@@ -1594,7 +1605,7 @@ class basic_prefix_configure(basic_configure):
             base_path (Path, optional): 将prefix转化为绝对路径时使用的基路径
         """
 
-        super().__init__(**kwargs)
+        super().__init__(base_path=base_path, **kwargs)
         self._origin_prefix_dir = prefix_dir
         self.register_encode_name_map("prefix_dir", "_origin_prefix_dir")
         self.prefix_dir = resolve_path(prefix_dir, base_path)
@@ -1864,7 +1875,7 @@ def toolchains_package(file: Path) -> bool:
     """
 
     file = file.resolve()
-    return file.is_file() and file.suffix == ".tar.zst" and any(name in file.name for name in ("gcc", "clang", "sysroot"))
+    return file.is_file() and file.suffixes == [".tar", ".zst"] and any(name in file.name for name in ("gcc", "clang", "sysroot"))
 
 
 def toolchains_dir(dir: Path) -> bool:
