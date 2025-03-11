@@ -226,7 +226,6 @@ class all_lib_list:
         "gcc",
         "g++",
         "tar",
-        "zstd",
         "unzip",
         "libgmp-dev",
         "libmpfr-dev",

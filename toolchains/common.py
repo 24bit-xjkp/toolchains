@@ -20,6 +20,9 @@ from pathlib import Path
 from typing import Self
 
 import colorama
+import libarchive  # type: ignore
+import tempfile
+import zstandard
 
 # 受支持的os列表
 support_os_list = ("linux", "w64", "none")
@@ -816,23 +819,74 @@ def check_lib_dir(lib: str, lib_dir: Path, do_assert: bool = True, dry_run: bool
     return True
 
 
-class basic_environment:
+class compress_environment:
+    """打包压缩时使用的环境"""
+
+    jobs: int  # 编译所用线程数
+    prefix_dir: Path  # 安装路径
+    compress_level: int  # zstd压缩等级
+    long_distance_match: int  # 长距离匹配窗口大小
+
+    def __init__(
+        self,
+        jobs: int,
+        prefix_dir: Path,
+        compress_level: int,
+        long_distance_match: int,
+    ) -> None:
+        self.jobs = jobs
+        self.prefix_dir = prefix_dir
+        self.compress_level = compress_level
+        self.long_distance_match = long_distance_match
+
+    def compress_path(self, path: str) -> None:
+        """压缩指定目标
+
+        Args:
+            path (str): 要压缩的目标路径，是相对于self.prefix_dir的路径.
+        """
+
+        with tempfile.TemporaryFile() as tmp:
+            with libarchive.fd_writer(tmp.fileno(), "pax") as tar, chdir_guard(self.prefix_dir):
+                tar.add_files(path)
+            tmp.seek(0)
+            params = zstandard.ZstdCompressionParameters(
+                compression_level=self.compress_level, window_log=self.long_distance_match, enable_ldm=True, threads=self.jobs
+            )
+            compressor = zstandard.ZstdCompressor(compression_params=params)
+            with (self.prefix_dir / f"{path}.tar.zst").open("wb") as zst:
+                compressor.copy_stream(tmp, zst)
+
+    def decompress_path(self, path: str) -> None:
+        """解压缩指定目标
+
+        Args:
+            path (str): 要解压缩的压缩包(.tar.zst)，是相对于self.prefix_dir的路径.
+        """
+
+        with tempfile.TemporaryFile() as tmp:
+            decompressor = zstandard.ZstdDecompressor(max_window_size=1 << self.long_distance_match)
+            with (self.prefix_dir / path).open("rb") as zst:
+                decompressor.copy_stream(zst, tmp)
+            tmp.seek(0)
+            with chdir_guard(self.prefix_dir):
+                libarchive.extract_fd(tmp.fileno())
+
+
+
+class basic_environment(compress_environment):
     """gcc和llvm共用基本环境"""
 
     build: str  # build平台
     version: str  # 版本号
     major_version: str  # 主版本号
     home: Path  # 源代码所在的目录
-    jobs: int  # 编译所用线程数
     root_dir: Path  # toolchains项目所在目录
     script_dir: Path  # script所在目录
     readme_dir: Path  # readme所在目录
     name_without_version: str  # 不带版本号的工具链名
     name: str  # 工具链名
-    prefix_dir: Path  # 安装路径
     bin_dir: Path  # 安装后可执行文件所在目录
-    compress_level: int  # zstd压缩等级
-    long_distance_match: int  # 长距离匹配窗口大小
 
     def __init__(
         self,
@@ -845,19 +899,16 @@ class basic_environment:
         compress_level: int,
         long_distance_match: int,
     ) -> None:
+        super().__init__(jobs, prefix_dir, compress_level, long_distance_match)
         self.build = build
         self.version = version
         self.major_version = self.version.split(".")[0]
         self.name_without_version = name_without_version
         self.name = self.name_without_version + self.major_version
         self.home = home
-        self.jobs = jobs
         self.root_dir = Path(__file__).parent.resolve()
         self.script_dir = self.root_dir.parent / "script"
-        self.prefix_dir = prefix_dir
         self.bin_dir = self.prefix_dir / self.name / "bin"
-        self.compress_level = compress_level
-        self.long_distance_match = long_distance_match
 
     def compress(self, name: str | None = None) -> None:
         """压缩构建完成的工具链
@@ -866,10 +917,7 @@ class basic_environment:
             name (str, optional): 要压缩的目标名称，是相对于self.prefix_dir的路径. 默认为self.name.
         """
 
-        chdir(self.prefix_dir)
-        name = name or self.name
-        run_command(f"tar -cf {name}.tar {name}")
-        run_command(f"zstd --ultra --long={self.long_distance_match} --rm -{self.compress_level} -T{self.jobs} -f {name}.tar")
+        self.compress_path(name or self.name)
 
     def register_in_env(self) -> None:
         """注册安装路径到环境变量"""
