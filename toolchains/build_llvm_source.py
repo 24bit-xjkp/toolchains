@@ -74,7 +74,7 @@ class configure(common.basic_build_configure):
         super().__init__()
 
 
-sysroot_config = common.basic_configure_with_prefix_build
+sysroot_config = common.basic_prefix_build_configure
 
 
 __all__ = ["modifier_list", "support_platform_list", "configure", "environment", "sysroot_config"]

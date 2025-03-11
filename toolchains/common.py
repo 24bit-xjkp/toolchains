@@ -873,7 +873,6 @@ class compress_environment:
                 libarchive.extract_fd(tmp.fileno())
 
 
-
 class basic_environment(compress_environment):
     """gcc和llvm共用基本环境"""
 
@@ -1316,7 +1315,7 @@ class basic_configure:
             type=str,
             help="The home directory to find source trees. "
             "If home is inputted as a relative path, it will be converted to an absolute path relative to the cwd. "
-            "If home is imported as a relative path from configure file, it will be converted to an absolute path relative to the directory of the configure file",
+            "If home is imported as a relative path from configure file, it will be converted to an absolute path relative to the directory of the configure file.",
             default=str(basic_configure().home),
         )
         register_completer(action, dir_completer)
@@ -1397,17 +1396,12 @@ class basic_configure:
             Self: 解码得到的对象
         """
 
-        # 先处理子类，因为子类调用了基类的默认构造，会覆盖基类的成员
-        result: Self = cls.__new__(cls)
-        current_cls = cls
-        while current_cls != object:
-            param_list: dict[str, typing.Any] = {}
+        param_list: dict[str, typing.Any] = {}
+        for current_cls in cls.mro():
             for key in itertools.islice(inspect.signature(current_cls.__init__).parameters.keys(), 1, None):
                 if key in input_list:
                     param_list[key] = input_list[key]
-            current_cls.__init__(result, **param_list)
-            current_cls = current_cls.__bases__[0]
-        return result
+        return cls(**param_list)
 
     @classmethod
     def _get_default_param_list(cls) -> dict[str, typing.Any]:
@@ -1418,14 +1412,12 @@ class basic_configure:
         """
 
         result: dict[str, typing.Any] = {}
-        current_cls = cls
-        while current_cls != object:
+        for current_cls in cls.mro():
             current_result: dict[str, typing.Any] = {
                 param.name: param.default
                 for param in itertools.islice(inspect.signature(current_cls.__init__).parameters.values(), 1, None)
             }
             result.update(current_result)
-            current_cls = current_cls.__bases__[0]
 
         return result
 
@@ -1451,12 +1443,11 @@ class basic_configure:
             status_counter.set_quiet(True)
         args_list = vars(args)
         input_list: dict[str, typing.Any] = {}
-        current_cls = cls
-        while current_cls != basic_configure:
-            for param in itertools.islice(inspect.signature(current_cls.__init__).parameters.keys(), 1, None):
-                if param in args_list:
-                    input_list[param] = args_list[param]
-            current_cls = current_cls.__bases__[0]
+        for current_cls in cls.mro():
+            for param in filter(
+                lambda param: param in args_list, itertools.islice(inspect.signature(current_cls.__init__).parameters.keys(), 1, None)
+            ):
+                input_list[param] = args_list[param]
         input_list["home"] = args.home
         input_list["base_path"] = Path.cwd()
 
@@ -1477,8 +1468,7 @@ class basic_configure:
         """
 
         output_list: dict[str, typing.Any] = {}
-        current_cls = type(self)
-        while current_cls != object:
+        for current_cls in type(self).mro():
             for key in itertools.islice(inspect.signature(current_cls.__init__).parameters.keys(), 1, None):
                 mapped_key = self.encode_name_map.get(key, key)  # 进行参数名->属性名映射，映射失败则直接使用参数名
                 value = getattr(self, mapped_key, None)
@@ -1498,7 +1488,6 @@ class basic_configure:
                     # 正常转化
                     case _:
                         output_list[key] = value
-            current_cls = current_cls.__bases__[0]
         return output_list
 
     def encode(self) -> dict[str, typing.Any]:
@@ -1552,29 +1541,21 @@ def get_default_build_platform() -> str | None:
     return result.stdout.strip() if result else None
 
 
-class basic_configure_with_prefix_build(basic_configure):
-    """带有prefix和build选项的基本配置"""
+class basic_prefix_configure(basic_configure):
+    """设置安装路径的基本配置"""
 
-    build: str | None
-    _origin_prefix_dir: str
     prefix_dir: Path
+    _origin_prefix_dir: str
 
-    def __init__(
-        self,
-        build: str | None = get_default_build_platform(),
-        prefix_dir: str = str(Path.home()),
-        base_path: Path = Path.cwd(),
-    ) -> None:
+    def __init__(self, prefix_dir: str = str(Path.home()), base_path: Path = Path.cwd(), **kwargs) -> None:
         """初始化工具链构建配置
 
         Args:
-            build (str | None, optional): 构建平台. 默认为gcc -dumpmachine输出的结果，即当前平台.
             prefix_dir (str, optional): 工具链安装根目录. 默认为用户主目录.
             base_path (Path, optional): 将prefix转化为绝对路径时使用的基路径
         """
 
-        super().__init__()
-        self.build = build
+        super().__init__(**kwargs)
         self._origin_prefix_dir = prefix_dir
         self.register_encode_name_map("prefix_dir", "_origin_prefix_dir")
         self.prefix_dir = resolve_path(prefix_dir, base_path)
@@ -1588,43 +1569,37 @@ class basic_configure_with_prefix_build(basic_configure):
         """
 
         super().add_argument(parser)
-        default_config = basic_configure_with_prefix_build()
-        parser.add_argument("--build", type=str, help=f"The build platform of the toolchain.", default=default_config.build)
+        default_config = basic_build_configure()
         action = parser.add_argument(
             "--prefix",
+            "-p",
             dest="prefix_dir",
             type=str,
-            help="The dir to install the toolchain."
-            "If prefix is inputted as a relative path, it will be converted to an absolute path relative to the cwd."
-            "If prefix is imported as a relative path from configure file, it will be converted to an absolute path relative to the directory of the configure file",
+            help="The dir to install the toolchain. "
+            "If prefix is inputted as a relative path, it will be converted to an absolute path relative to the cwd. "
+            "If prefix is imported as a relative path from configure file, it will be converted to an absolute path relative to the directory of the configure file.",
             default=default_config.prefix_dir,
         )
         register_completer(action, dir_completer)
 
 
-class basic_build_configure(basic_configure_with_prefix_build):
-    """工具链构建配配置"""
+class basic_compress_configure(basic_prefix_configure):
+    """压缩环境配置"""
 
     jobs: int
-    _origin_prefix_dir: str
     compress_level: int
     long_distance_match: int
 
-    def __init__(
-        self,
-        jobs: int = (os.cpu_count() or 1) + 2,
-        compress_level: int = 17,
-        long_distance_match: int = 31,
-    ) -> None:
+    def __init__(self, jobs: int = (os.cpu_count() or 1) + 2, compress_level: int = 17, long_distance_match: int = 31, **kwargs) -> None:
         """初始化工具链构建配置
 
         Args:
             jobs (int, optional): 构建时的并发数. 默认为当前平台cpu核心数的1.5倍.
             compress_level (int, optional): zstd压缩等级(1~22). 默认为17级
-            long_distance_match (int): 长距离匹配窗口大小. 默认为31
+            long_distance_match (int): 长距离匹配窗口大小. 默认为3
         """
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.jobs = jobs
         self.compress_level = compress_level
         self.long_distance_match = long_distance_match
@@ -1648,6 +1623,7 @@ class basic_build_configure(basic_configure_with_prefix_build):
         )
         parser.add_argument(
             "--compress",
+            "-c",
             dest="compress_level",
             type=int,
             help="The compress level of zstd when packing. Support 1~22.",
@@ -1655,6 +1631,7 @@ class basic_build_configure(basic_configure_with_prefix_build):
         )
         parser.add_argument(
             "--long",
+            "-l",
             dest="long_distance_match",
             type=int,
             help="The long distance match windows of zstd when packing.",
@@ -1662,12 +1639,47 @@ class basic_build_configure(basic_configure_with_prefix_build):
         )
 
     def check(self) -> None:
-        """检查工具链构建配置是否合法"""
+        """检查压缩环境配置是否合法"""
 
         check_home(self.home)
-        assert self.build and triplet_field.check(self.build), toolchains_error(f"Invalid build platform: {self.build}.")
         assert self.jobs > 0, toolchains_error(f"Invalid jobs: {self.jobs}.")
         assert 1 <= self.compress_level <= 22, toolchains_error(f"Invalid compress level: {self.compress_level}")
+        assert 10 <= self.long_distance_match <= 31, toolchains_error(f"Invalid match distance: {self.long_distance_match}")
+
+
+class basic_prefix_build_configure(basic_prefix_configure):
+    """带有prefix和build选项的基本配置"""
+
+    build: str | None
+
+    def __init__(self, build: str | None = get_default_build_platform(), **kwargs) -> None:
+        """初始化工具链构建配置
+
+        Args:
+            build (str | None, optional): 构建平台. 默认为gcc -dumpmachine输出的结果，即当前平台.
+        """
+
+        super().__init__(**kwargs)
+        self.build = build
+
+    @classmethod
+    def add_argument(cls, parser: argparse.ArgumentParser) -> None:
+        """为argparse添加--prefix选项
+
+        Args:
+            parser (argparse.ArgumentParser): 命令行解析器
+        """
+
+        super().add_argument(parser)
+        default_config = basic_prefix_build_configure()
+        parser.add_argument("--build", type=str, help=f"The build platform of the toolchain.", default=default_config.build)
+
+
+class basic_build_configure(basic_compress_configure, basic_prefix_build_configure):
+    """工具链构建配配置"""
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
 
 
 @contextmanager

@@ -12,13 +12,13 @@ from toolchains.common import command_dry_run
 type Path = py.path.LocalPath
 
 
-class configure(common.basic_configure_with_prefix_build):
+class configure(common.basic_prefix_build_configure):
     libs: set[str]
     _origin_libs: set[str]
     _private: int  # 私有对象，在序列化/反序列化时不应该被访问
 
-    def __init__(self, libs: list[str] | None = None) -> None:
-        super().__init__()
+    def __init__(self, libs: list[str] | None = None, **kwargs) -> None:
+        super().__init__(**kwargs)
         self._origin_libs = {*(libs or [])}
         self.register_encode_name_map("libs", "_origin_libs")
         self.libs = {"basic", *self._origin_libs}
@@ -85,7 +85,7 @@ class test_basic_configure:
         """
 
         custom_build = "x86_64-w64-mingw32"
-        args = self.parser.parse_args(["build", f"--build={custom_build}"])
+        args = self.parser.parse_args(["build", "--build", custom_build])
         current_config = configure.parse_args(args)
         gt = configure()
         gt.build = custom_build
@@ -97,7 +97,7 @@ class test_basic_configure:
         """
 
         custom_prefix = str(tmpdir)
-        args = self.parser.parse_args(["prefix", f"--prefix={custom_prefix}"])
+        args = self.parser.parse_args(["prefix", "--prefix", custom_prefix])
         current_config = configure.parse_args(args)
         gt = configure()
         gt.prefix_dir = pathlib.Path(custom_prefix)
