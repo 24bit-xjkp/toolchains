@@ -847,14 +847,17 @@ class compress_environment:
         """
 
         with tempfile.TemporaryFile() as tmp:
+            toolchains_print(toolchains_info(f"Packing {path}"))
             with libarchive.fd_writer(tmp.fileno(), "pax") as tar, chdir_guard(self.prefix_dir):
                 tar.add_files(path)
             tmp.seek(0)
+            zst_file = f"{path}.tar.zst"
+            toolchains_print(toolchains_info(f"Compressing {zst_file}"))
             params = zstandard.ZstdCompressionParameters(
                 compression_level=self.compress_level, window_log=self.long_distance_match, enable_ldm=True, threads=self.jobs
             )
             compressor = zstandard.ZstdCompressor(compression_params=params)
-            with (self.prefix_dir / f"{path}.tar.zst").open("wb") as zst:
+            with (self.prefix_dir / zst_file).open("wb") as zst:
                 compressor.copy_stream(tmp, zst)
 
     def decompress_path(self, path: str) -> None:
@@ -865,10 +868,13 @@ class compress_environment:
         """
 
         with tempfile.TemporaryFile() as tmp:
+            zst_file = self.prefix_dir / path
+            toolchains_print(toolchains_info(f"Compressing {zst_file}"))
             decompressor = zstandard.ZstdDecompressor(max_window_size=1 << self.long_distance_match)
-            with (self.prefix_dir / path).open("rb") as zst:
+            with zst_file.open("rb") as zst:
                 decompressor.copy_stream(zst, tmp)
             tmp.seek(0)
+            toolchains_print(toolchains_info(f"Unpacking {path}"))
             with chdir_guard(self.prefix_dir):
                 libarchive.extract_fd(tmp.fileno())
 
@@ -1810,6 +1816,34 @@ def keyboard_interpret_received() -> typing.NoReturn:
         typing.NoReturn: 该函数永不返回
     """
     raise RuntimeError(toolchains_error("Keyboard interpret received."))
+
+
+def toolchains_package(file: Path) -> bool:
+    """判断给定文件是否是一个打包好的工具链
+
+    Args:
+        file (Path): 文件路径
+
+    Returns:
+        bool: 是否是工具链
+    """
+
+    file = file.resolve()
+    return file.is_file() and file.suffix == ".tar.zst" and any(name in file.name for name in ("gcc", "clang", "sysroot"))
+
+
+def toolchains_dir(dir: Path) -> bool:
+    """判断给定目录是否包含一个工具链
+
+    Args:
+        dir (Path): 目录路径
+
+    Returns:
+        bool: 是否是工具链
+    """
+
+    dir = dir.resolve()
+    return dir.is_dir() and any(name in dir.name for name in ("gcc", "clang", "sysroot"))
 
 
 assert __name__ != "__main__", "Import this file instead of running it directly."
