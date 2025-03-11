@@ -5,6 +5,7 @@
 import argparse
 import functools
 import multiprocessing
+from pathlib import Path
 
 from . import common
 from .utils_source import *
@@ -97,9 +98,9 @@ def main() -> int:
     common.register_completer(action, common.item_with_prefix_completer("prefix_dir", common.toolchains_package))
 
     common.support_argcomplete(parser)
-    errno = 0
     args = parser.parse_args()
-    try:
+
+    def do_main() -> None:
         match (args.command):
             case "compress":
                 compress(compress_configure.parse_args(args))
@@ -107,9 +108,5 @@ def main() -> int:
                 decompress(compress_configure.parse_args(args))
             case _:
                 pass
-    except Exception as e:
-        common.toolchains_print(e)
-        errno = 1
-    finally:
-        common.status_counter.show_status()
-        return errno
+
+    return common.toolchains_main(do_main)

@@ -352,13 +352,13 @@ def main() -> int:
     )
 
     common.support_argcomplete(parser)
-    errno = 0
     args = parser.parse_args()
-    try:
+
+    def do_main() -> None:
         if args.command == "system":
             print(common.toolchains_info(f"Please install following system libs: \n{' '.join(get_system_lib_list())}"))
             common.status_counter.set_quiet(True)
-            return 0
+            return
 
         # 检查输入是否合法
         _check_input(args)
@@ -378,9 +378,5 @@ def main() -> int:
                 remove(current_config, args.remove or all_lib_list.all_lib_list)
             case _:
                 pass
-    except Exception as e:
-        common.toolchains_print(e)
-        errno = 1
-    finally:
-        common.status_counter.show_status()
-        return errno
+
+    return common.toolchains_main(do_main)

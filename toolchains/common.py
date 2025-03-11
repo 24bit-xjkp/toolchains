@@ -831,7 +831,7 @@ def _compress_path_echo(path: str) -> str:
         str: 回显信息
     """
 
-    return f"Compressing {path}.tar.zst"
+    return toolchains_info(f"Compressing {path}.tar.zst")
 
 
 type optional_lock = multiprocessing.synchronize.Lock | threading.Lock | None
@@ -1938,6 +1938,21 @@ def toolchains_dir(dir: Path) -> bool:
 
     dir = dir.resolve()
     return dir.is_dir() and any(name in dir.name for name in ("gcc", "clang", "sysroot"))
+
+
+def toolchains_main(main: Callable[[], None]) -> int:
+    errno = 0
+    try:
+        main()
+    except Exception as e:
+        if not any(flag in (msg := str(e)) for flag in ("[toolchains]", "[toolchains internal]")):
+            toolchains_print(toolchains_error(msg))
+        else:
+            toolchains_print(e)
+        errno = 1
+    finally:
+        status_counter.show_status()
+        return errno
 
 
 assert __name__ != "__main__", "Import this file instead of running it directly."

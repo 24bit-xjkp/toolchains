@@ -56,9 +56,9 @@ def main() -> int:
     sysroot_config.add_argument(sysroot_parser)
 
     common.support_argcomplete(parser)
-    errno = 0
     args = parser.parse_args()
-    try:
+
+    def do_main() -> None:
         match (args.command):
             case "sysroot":
                 config: dict[str, typing.Any] = {}
@@ -71,9 +71,5 @@ def main() -> int:
                 sysroot(environment(**config))
             case _:
                 pass
-    except Exception as e:
-        common.toolchains_print(e)
-        errno = 1
-    finally:
-        common.status_counter.show_status()
-        return errno
+
+    return common.toolchains_main(do_main)

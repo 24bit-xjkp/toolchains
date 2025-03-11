@@ -119,9 +119,9 @@ def main() -> int:
     )
 
     common.support_argcomplete(parser)
-    errno = 0
     args = parser.parse_args()
-    try:
+
+    def do_main() -> None:
         match (args.command):
             case "build":
                 _check_input(args, args.command == "build")
@@ -135,9 +135,5 @@ def main() -> int:
                 dump_support_platform()
             case _:
                 pass
-    except Exception as e:
-        common.toolchains_print(e)
-        errno = 1
-    finally:
-        common.status_counter.show_status()
-        return errno
+
+    return common.toolchains_main(do_main)
