@@ -1,48 +1,48 @@
 import typing
 
 from . import common
-from .gcc_environment import build_environment as environment
+from .gcc_environment import build_gcc_environment
 
 
 class modifier_list:
     """针对特定平台修改gcc构建环境的回调函数"""
 
     @staticmethod
-    def arm_linux_gnueabi(env: environment) -> None:
+    def arm_linux_gnueabi(env: build_gcc_environment) -> None:
         """针对arm-linux-gnueabi平台使用arm-sf的链接器脚本
 
         Args:
-            env (environment): 当前gcc构建平台
+            env (build_gcc_environment): 当前gcc构建平台
         """
 
         env.adjust_glibc_arch = "arm-sf"
 
     @staticmethod
-    def arm_linux_gnueabihf(env: environment) -> None:
+    def arm_linux_gnueabihf(env: build_gcc_environment) -> None:
         """针对arm-linux-gnueabihf平台使用arm-hf的链接器脚本
 
         Args:
-            env (environment): 当前gcc构建平台
+            env (build_gcc_environment): 当前gcc构建平台
         """
 
         env.adjust_glibc_arch = "arm-hf"
 
     @staticmethod
-    def loongarch64_loongnix_linux_gnu(env: environment) -> None:
+    def loongarch64_loongnix_linux_gnu(env: build_gcc_environment) -> None:
         """针对loongarch64-loongnix-linux-gnu平台
         1. 使用loongarch64-loongnix的链接器脚本
         2. 使用预编译的glibc
         3. gcc添加--disable-libsanitizer选项
 
         Args:
-            env (environment): 当前gcc构建平台
+            env (build_gcc_environment): 当前gcc构建平台
         """
 
-        def build_gcc(build_env: environment) -> None:
+        def build_gcc(build_env: build_gcc_environment) -> None:
             """loongarch64-loongnix-linux-gnu专业编译流程，跳过glibc编译
 
             Args:
-                self (environment): gcc构建环境
+                self (build_gcc_environment): gcc构建环境
             """
 
             env = build_env.env
@@ -80,25 +80,25 @@ class modifier_list:
         env.gcc_option.append("--disable-libsanitizer")
 
     @staticmethod
-    def x86_64_w64_mingw32(env: environment) -> None:
+    def x86_64_w64_mingw32(env: build_gcc_environment) -> None:
         env.libc_option += ["--disable-lib32", "--enable-lib64"]
 
     @staticmethod
-    def i686_w64_mingw32(env: environment) -> None:
+    def i686_w64_mingw32(env: build_gcc_environment) -> None:
         env.libc_option += ["--disable-lib64", "--enable-lib32"]
 
     @staticmethod
-    def arm_none_eabi(env: environment) -> None:
+    def arm_none_eabi(env: build_gcc_environment) -> None:
         """arm嵌入式cpu大多使用armv7-m，只支持Thumb2
 
         Args:
-            env (environment): 当前gcc构建平台
+            env (build_gcc_environment): 当前gcc构建平台
         """
 
         env.gcc_option += ["--with-mode=thumb", "--with-arch=armv7-m"]
 
     @staticmethod
-    def modify(env: environment, target: str) -> None:
+    def modify(env: build_gcc_environment, target: str) -> None:
         target = target.replace("-", "_")
         if modifier := getattr(modifier_list, target, None):
             modifier(env)
@@ -183,4 +183,4 @@ def check_triplet(host: str, target: str) -> None:
             raise RuntimeError(common.toolchains_error(f'{name} "{input_triplet}" is not support.'))
 
 
-__all__ = ["modifier_list", "support_platform_list", "configure", "environment", "check_triplet"]
+__all__ = ["modifier_list", "support_platform_list", "configure", "build_gcc_environment", "check_triplet"]

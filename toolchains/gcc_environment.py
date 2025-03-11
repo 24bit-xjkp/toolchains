@@ -35,7 +35,7 @@ disable_hosted_option_pure = (
 arch_32_bit_list = ("arm", "armeb", "i486", "i686", "risc32", "risc32be")
 
 
-def get_specific_environment(self: common.basic_environment, host: str | None = None, target: str | None = None) -> "environment":
+def get_specific_environment(self: common.basic_environment, host: str | None = None, target: str | None = None) -> "gcc_environment":
     """在一个basic_environment的配置基础上获取指定配置的gcc环境
 
     Args:
@@ -44,13 +44,13 @@ def get_specific_environment(self: common.basic_environment, host: str | None = 
         target (str | None, optional): 指定的target平台. 默认使用self中的配置.
 
     Returns:
-        environment: 指定配置的gcc环境
+        gcc_environment: 指定配置的gcc环境
     """
 
-    return environment(self.build, host, target, self.home, self.jobs, self.prefix_dir, self.compress_level, True)
+    return gcc_environment(self.build, host, target, self.home, self.jobs, self.prefix_dir, self.compress_level, True)
 
 
-class environment(common.basic_environment):
+class gcc_environment(common.basic_environment):
     """gcc构建环境"""
 
     build: str  # build平台
@@ -336,11 +336,11 @@ class environment(common.basic_environment):
             return False
 
 
-def get_mingw_lib_prefix_list(env: environment) -> dict[str, Path]:
+def get_mingw_lib_prefix_list(env: gcc_environment) -> dict[str, Path]:
     """获取mingw平台下gdb所需包的安装路径
 
     Args:
-        env (environment): gcc环境
+        env (gcc_environment): gcc环境
 
     Returns:
         dict[str,Path]: {包名:安装路径}
@@ -349,7 +349,7 @@ def get_mingw_lib_prefix_list(env: environment) -> dict[str, Path]:
     return {lib: env.home / lib / "install" for lib in ("gmp", "expat", "mpfr")}
 
 
-def build_mingw_gdb_requirements(env: environment) -> None:
+def build_mingw_gdb_requirements(env: gcc_environment) -> None:
     """编译安装libgmp, libexpat, libmpfr"""
 
     lib_prefix_list = get_mingw_lib_prefix_list(env)
@@ -374,11 +374,11 @@ def build_mingw_gdb_requirements(env: environment) -> None:
         host_file.write_text(env.host)
 
 
-def get_mingw_gdb_lib_options(env: environment) -> list[str]:
+def get_mingw_gdb_lib_options(env: gcc_environment) -> list[str]:
     """获取mingw平台下gdb所需包配置选项
 
     Args:
-        env (environment): gcc环境
+        env (gcc_environment): gcc环境
     """
 
     lib_prefix_list = get_mingw_lib_prefix_list(env)
@@ -386,7 +386,7 @@ def get_mingw_gdb_lib_options(env: environment) -> list[str]:
     return [prefix_selector(lib) + f"{lib_prefix_list[lib]}" for lib in ("gmp", "mpfr", "expat")]
 
 
-def copy_pretty_printer(env: environment) -> None:
+def copy_pretty_printer(env: gcc_environment) -> None:
     """从x86_64-linux-gnu本地工具链中复制pretty-printer到不带newlib的独立工具链"""
 
     native_gcc = get_specific_environment(env)
@@ -396,10 +396,10 @@ def copy_pretty_printer(env: environment) -> None:
             return
 
 
-class build_environment:
+class build_gcc_environment:
     """gcc工具链构建环境"""
 
-    env: environment  # gcc构建环境
+    env: gcc_environment  # gcc构建环境
     host_os: str  # gcc环境的host操作系统
     target_os: str  # gcc环境的target操作系统
     target_arch: str  # gcc环境的target架构
@@ -449,7 +449,7 @@ class build_environment:
             long_distance_match (int): 长距离匹配窗口大小
         """
 
-        self.env = environment(build, host, target, home, jobs, prefix_dir, compress_level, long_distance_match)
+        self.env = gcc_environment(build, host, target, home, jobs, prefix_dir, compress_level, long_distance_match)
         self.host_os = self.env.host_field.os
         self.target_os = self.env.target_field.os
         self.target_arch = self.env.target_field.arch
@@ -578,7 +578,7 @@ class build_environment:
         self.env.package(self.need_gdb, self.need_gdb and self.host_os == "w64")
 
     @staticmethod
-    def native_build_linux(build_env: "build_environment") -> None:
+    def native_build_linux(build_env: "build_gcc_environment") -> None:
         """编译linux本地工具链
 
         Args:
@@ -612,7 +612,7 @@ class build_environment:
         build_env.after_build_gcc(True)
 
     @staticmethod
-    def full_build_linux(build_env: "build_environment") -> None:
+    def full_build_linux(build_env: "build_gcc_environment") -> None:
         """完整自举target为linux的gcc
 
         Args:
@@ -681,7 +681,7 @@ class build_environment:
             common.rename(self.env.bin_dir / pexports, self.env.bin_dir / f"{self.env.target}-{pexports}")
 
     @staticmethod
-    def full_build_mingw(build_env: "build_environment") -> None:
+    def full_build_mingw(build_env: "build_gcc_environment") -> None:
         """完整自举target为mingw的gcc
 
         Args:
@@ -724,7 +724,7 @@ class build_environment:
         build_env.after_build_gcc()
 
     @staticmethod
-    def full_build_freestanding(build_env: "build_environment") -> None:
+    def full_build_freestanding(build_env: "build_gcc_environment") -> None:
         """完整自举target为独立平台的gcc
 
         Args:
@@ -766,7 +766,7 @@ class build_environment:
         build_env.after_build_gcc()
 
     @staticmethod
-    def partial_build(build_env: "build_environment") -> None:
+    def partial_build(build_env: "build_gcc_environment") -> None:
         """编译gcc而无需自举
 
         Args:

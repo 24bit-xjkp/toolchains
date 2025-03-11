@@ -29,7 +29,7 @@ def build_specific_gcc(
     """
 
     config_list = config.get_public_fields()
-    env = environment(host=host, target=target, **config_list)
+    env = build_gcc_environment(host=host, target=target, **config_list)
     modifier_list.modify(env, target)
     env.build()
     common.toolchains_print(common.toolchains_success(f"Build {env.env.name} successfully."))
@@ -54,7 +54,7 @@ __all__ = [
     "modifier_list",
     "support_platform_list",
     "configure",
-    "environment",
+    "build_gcc_environment",
     "check_triplet",
     "build_specific_gcc",
     "dump_support_platform",

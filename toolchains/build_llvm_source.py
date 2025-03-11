@@ -2,14 +2,14 @@ import typing
 
 from . import common
 from .build_gcc_source import support_platform_list as gcc_support_platform_list
-from .llvm_environment import environment
+from .llvm_environment import llvm_environment
 
 
 class modifier_list:
     """针对特定平台修改llvm构建环境的回调函数"""
 
     @staticmethod
-    def modify(env: environment, target: str) -> None:
+    def modify(env: llvm_environment, target: str) -> None:
         target = target.replace("-", "_")
         if modifier := getattr(modifier_list, target, None):
             modifier(env)
@@ -77,4 +77,4 @@ class configure(common.basic_build_configure):
 sysroot_config = common.basic_prefix_build_configure
 
 
-__all__ = ["modifier_list", "support_platform_list", "configure", "environment", "sysroot_config"]
+__all__ = ["modifier_list", "support_platform_list", "configure", "llvm_environment", "sysroot_config"]

@@ -41,7 +41,7 @@ def gnu_to_llvm(target: str) -> str:
         return target
 
 
-class environment(common.basic_environment):
+class llvm_environment(common.basic_environment):
     host: str  # host平台
     build: str  # build平台
     bootstrap: bool = False  # 是否进行自举以便不依赖gnu相关库，需要多次编译

@@ -10,11 +10,11 @@ from .build_llvm_source import *
 from .gcc_environment import get_specific_environment
 
 
-def sysroot(env: environment) -> None:
+def sysroot(env: llvm_environment) -> None:
     """从已安装的gcc中复制库并创建sysroot
 
     Args:
-        env (environment): llvm构建环境
+        env (llvm_environment): llvm构建环境
     """
 
     common.mkdir(env.sysroot_dir, True)
@@ -43,7 +43,7 @@ def sysroot(env: environment) -> None:
     common.toolchains_print(common.toolchains_success("Build sysroot successfully."))
 
 
-__all__ = ["modifier_list", "support_platform_list", "configure", "environment", "sysroot_config", "sysroot"]
+__all__ = ["modifier_list", "support_platform_list", "configure", "llvm_environment", "sysroot_config", "sysroot"]
 
 
 def main() -> int:
@@ -71,7 +71,7 @@ def main() -> int:
                 config["jobs"] = 1
                 config["compress_level"] = 1
                 config["host"] = None
-                sysroot(environment(**config))
+                sysroot(llvm_environment(**config))
             case _:
                 pass
 

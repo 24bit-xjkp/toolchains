@@ -185,7 +185,7 @@ class extra_lib:
         """检查包是否存在
 
         Args:
-            config (environment): 源代码下载环境
+            config (configure): 源代码下载环境
         """
 
         for path in self.install_dir:
