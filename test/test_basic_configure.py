@@ -17,7 +17,7 @@ class configure(common.basic_prefix_build_configure):
     _origin_libs: set[str]
     _private: int  # 私有对象，在序列化/反序列化时不应该被访问
 
-    def __init__(self, libs: list[str] | None = None, **kwargs) -> None:
+    def __init__(self, libs: list[str] | None = None, **kwargs: typing.Any) -> None:
         super().__init__(**kwargs)
         self._origin_libs = {*(libs or [])}
         self.register_encode_name_map("libs", "_origin_libs")

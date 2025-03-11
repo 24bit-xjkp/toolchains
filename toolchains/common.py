@@ -1553,7 +1553,7 @@ class basic_prefix_configure(basic_configure):
     prefix_dir: Path
     _origin_prefix_dir: str
 
-    def __init__(self, prefix_dir: str = str(Path.home()), base_path: Path = Path.cwd(), **kwargs) -> None:
+    def __init__(self, prefix_dir: str = str(Path.home()), base_path: Path = Path.cwd(), **kwargs: typing.Any) -> None:
         """初始化工具链构建配置
 
         Args:
@@ -1596,7 +1596,9 @@ class basic_compress_configure(basic_prefix_configure):
     compress_level: int
     long_distance_match: int
 
-    def __init__(self, jobs: int = (os.cpu_count() or 1) + 2, compress_level: int = 17, long_distance_match: int = 31, **kwargs) -> None:
+    def __init__(
+        self, jobs: int = (os.cpu_count() or 1) + 2, compress_level: int = 17, long_distance_match: int = 31, **kwargs: typing.Any
+    ) -> None:
         """初始化工具链构建配置
 
         Args:
@@ -1658,7 +1660,7 @@ class basic_prefix_build_configure(basic_prefix_configure):
 
     build: str | None
 
-    def __init__(self, build: str | None = get_default_build_platform(), **kwargs) -> None:
+    def __init__(self, build: str | None = get_default_build_platform(), **kwargs: typing.Any) -> None:
         """初始化工具链构建配置
 
         Args:
@@ -1684,7 +1686,7 @@ class basic_prefix_build_configure(basic_prefix_configure):
 class basic_build_configure(basic_compress_configure, basic_prefix_build_configure):
     """工具链构建配配置"""
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(**kwargs)
 
 
