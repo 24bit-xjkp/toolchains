@@ -1496,7 +1496,7 @@ class basic_configure:
 
         param_list: dict[str, typing.Any] = {}
         for current_cls in cls.mro():
-            for key in itertools.islice(inspect.signature(current_cls.__init__).parameters.keys(), 1, None):
+            for key in itertools.islice(inspect.signature(current_cls.__init__).parameters.keys(), 1, None): # type: ignore
                 if key in input_list:
                     param_list[key] = input_list[key]
         return cls(**param_list)
@@ -1513,7 +1513,7 @@ class basic_configure:
         for current_cls in cls.mro():
             current_result: dict[str, typing.Any] = {
                 param.name: param.default
-                for param in itertools.islice(inspect.signature(current_cls.__init__).parameters.values(), 1, None)
+                for param in itertools.islice(inspect.signature(current_cls.__init__).parameters.values(), 1, None) # type: ignore
             }
             result.update(current_result)
 
@@ -1542,10 +1542,9 @@ class basic_configure:
         args_list = vars(args)
         input_list: dict[str, typing.Any] = {}
         for current_cls in cls.mro():
-            for param in filter(
-                lambda param: param in args_list, itertools.islice(inspect.signature(current_cls.__init__).parameters.keys(), 1, None)
-            ):
-                input_list[param] = args_list[param]
+            for param in itertools.islice(inspect.signature(current_cls.__init__).parameters.keys(), 1, None): # type: ignore
+                if param in args_list:
+                    input_list[param] = args_list[param]
         input_list["home"] = args.home
         input_list["base_path"] = Path.cwd()
 
@@ -1567,7 +1566,7 @@ class basic_configure:
 
         output_list: dict[str, typing.Any] = {}
         for current_cls in type(self).mro():
-            for key in itertools.islice(inspect.signature(current_cls.__init__).parameters.keys(), 1, None):
+            for key in itertools.islice(inspect.signature(current_cls.__init__).parameters.keys(), 1, None): # type: ignore
                 mapped_key = self.encode_name_map.get(key, key)  # 进行参数名->属性名映射，映射失败则直接使用参数名
                 value = getattr(self, mapped_key, None)
                 match (value):
