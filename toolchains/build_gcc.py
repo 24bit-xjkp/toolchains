@@ -4,7 +4,6 @@
 
 import argparse
 
-
 from . import common
 from .build_gcc_source import *
 

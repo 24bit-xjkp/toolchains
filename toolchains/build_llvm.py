@@ -5,7 +5,6 @@
 import argparse
 import typing
 
-
 from . import common
 from .build_llvm_source import *
 from .gcc_environment import get_specific_environment
