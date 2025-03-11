@@ -839,11 +839,12 @@ class compress_environment:
         self.compress_level = compress_level
         self.long_distance_match = long_distance_match
 
-    def compress_path(self, path: str) -> None:
+    def compress_path(self, path: str, output_dir: Path | None = None) -> None:
         """压缩指定目标
 
         Args:
             path (str): 要压缩的目标路径，是相对于self.prefix_dir的路径.
+            output_dir (Path | None, optional): 压缩后文件输出路径. 默认为self.prefix_dir
         """
 
         with tempfile.TemporaryFile() as tmp:
@@ -857,14 +858,16 @@ class compress_environment:
                 compression_level=self.compress_level, window_log=self.long_distance_match, enable_ldm=True, threads=self.jobs
             )
             compressor = zstandard.ZstdCompressor(compression_params=params)
-            with (self.prefix_dir / zst_file).open("wb") as zst:
+            output_dir = output_dir or self.prefix_dir
+            with (output_dir / zst_file).open("wb") as zst:
                 compressor.copy_stream(tmp, zst)
 
-    def decompress_path(self, path: str) -> None:
+    def decompress_path(self, path: str, output_dir: Path | None = None) -> None:
         """解压缩指定目标
 
         Args:
             path (str): 要解压缩的压缩包(.tar.zst)，是相对于self.prefix_dir的路径.
+            output_dir (Path | None, optional): 解压后工具链输出路径. 默认为self.prefix_dir
         """
 
         with tempfile.TemporaryFile() as tmp:
@@ -875,7 +878,7 @@ class compress_environment:
                 decompressor.copy_stream(zst, tmp)
             tmp.seek(0)
             toolchains_print(toolchains_info(f"Unpacking {path}"))
-            with chdir_guard(self.prefix_dir):
+            with chdir_guard(output_dir or self.prefix_dir):
                 libarchive.extract_fd(tmp.fileno())
 
 
