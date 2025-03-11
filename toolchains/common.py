@@ -7,11 +7,13 @@ import importlib.util
 import inspect
 import itertools
 import json
+import multiprocessing.synchronize
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import types
 import typing
 from collections.abc import Callable, Generator
@@ -819,6 +821,38 @@ def check_lib_dir(lib: str, lib_dir: Path, do_assert: bool = True, dry_run: bool
     return True
 
 
+def _compress_path_echo(path: str) -> str:
+    """在压缩工具链时回显信息
+
+    Args:
+        path (str): 工具链路径
+
+    Returns:
+        str: 回显信息
+    """
+
+    return f"Compressing {path}.tar.zst"
+
+
+type optional_lock = multiprocessing.synchronize.Lock | threading.Lock | None
+
+
+def _decompress_path_echo(path: str, mutex: optional_lock) -> None:
+    """在解压缩工具链时回显信息
+
+    Args:
+        path (str): 工具链路径
+        mutex (optional_lock, optional): 多进程下的互斥锁，用于保证并行解压缩时提示信息可以正常输出. 默认为单进程，无需使用锁.
+    """
+
+    msg = toolchains_info(f"Decompressing {path}")
+    if mutex is None:
+        toolchains_print(msg)
+    else:
+        with mutex:
+            toolchains_print(msg)
+
+
 class compress_environment:
     """打包压缩时使用的环境"""
 
@@ -839,17 +873,24 @@ class compress_environment:
         self.compress_level = compress_level
         self.long_distance_match = long_distance_match
 
-    def compress_path(self, path: str, output_dir: Path | None = None, chdir: bool = True) -> None:
+    @support_dry_run(_compress_path_echo)
+    def compress_path(
+        self,
+        path: str,
+        output_dir: Path | None = None,
+        chdir: bool = True,
+        dry_run: bool | None = None,
+    ) -> None:
         """压缩指定目标
 
         Args:
             path (str): 要压缩的目标路径，是相对于self.prefix_dir的路径.
             output_dir (Path | None, optional): 压缩后文件输出路径. 默认为self.prefix_dir.
             chdir (bool, optional): 是否切换工作目录. 默认为切换到self.prefix_dir下.
+            dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
         """
 
         with tempfile.TemporaryFile() as tmp:
-            toolchains_print(toolchains_info(f"Packing {path}"))
             with libarchive.fd_writer(tmp.fileno(), "pax") as tar:
                 if chdir:
                     with chdir_guard(self.prefix_dir):
@@ -858,7 +899,6 @@ class compress_environment:
                     tar.add_files(path)
             tmp.seek(0)
             zst_file = f"{path}.tar.zst"
-            toolchains_print(toolchains_info(f"Compressing {zst_file}"))
             params = zstandard.ZstdCompressionParameters(
                 compression_level=self.compress_level, window_log=self.long_distance_match, enable_ldm=True, threads=self.jobs
             )
@@ -867,23 +907,31 @@ class compress_environment:
             with (output_dir / zst_file).open("wb") as zst:
                 compressor.copy_stream(tmp, zst)
 
-    def decompress_path(self, path: str, output_dir: Path | None = None, chdir: bool = True) -> None:
+    @support_dry_run(_decompress_path_echo)
+    def decompress_path(
+        self,
+        path: str,
+        output_dir: Path | None = None,
+        chdir: bool = True,
+        mutex: optional_lock = None,
+        dry_run: bool | None = None,
+    ) -> None:
         """解压缩指定目标
 
         Args:
             path (str): 要解压缩的压缩包(.tar.zst)，是相对于self.prefix_dir的路径.
             output_dir (Path | None, optional): 解压后工具链输出路径. 默认为self.prefix_dir
             chdir (bool, optional): 是否切换工作目录. 默认为切换到output_dir下.
+            mutex (optional_lock, optional): 多进程下的互斥锁，用于保证并行解压缩时提示信息可以正常输出. 默认为单进程，无需使用锁.
+            dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
         """
 
         with tempfile.TemporaryFile() as tmp:
             zst_file = self.prefix_dir / path
-            toolchains_print(toolchains_info(f"Decompressing {zst_file}"))
             decompressor = zstandard.ZstdDecompressor(max_window_size=1 << self.long_distance_match)
             with zst_file.open("rb") as zst:
                 decompressor.copy_stream(zst, tmp)
             tmp.seek(0)
-            toolchains_print(toolchains_info(f"Unpacking {path}"))
             output_dir = output_dir or self.prefix_dir
             remove_if_exists(output_dir / zst_file.name.split(".")[0])
             if chdir:

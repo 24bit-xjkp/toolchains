@@ -3,6 +3,8 @@
 # PYTHON_ARGCOMPLETE_OK
 
 import argparse
+import functools
+import multiprocessing
 
 from . import common
 from .utils_source import *
@@ -24,6 +26,19 @@ def compress(config: compress_configure) -> None:
     common.toolchains_print(common.toolchains_success("Compress toolchains successfully."))
 
 
+def _decompress_worker(env: common.compress_environment, output_dir: Path, mutex: common.optional_lock, file: Path) -> None:
+    """执行解压缩操作
+
+    Args:
+        env (common.compress_environment): 工具链压缩环境
+        output_dir (Path): 输出目录
+        mutex (common.optional_lock): 并行环境下的互斥锁
+        file (Path): 要解压的文件
+    """
+
+    env.decompress_path(str(file.relative_to(env.prefix_dir)), output_dir, False, mutex)
+
+
 def decompress(config: compress_configure) -> None:
     """解压缩打包的工具链
 
@@ -34,8 +49,15 @@ def decompress(config: compress_configure) -> None:
     output_dir, file_list, env = config._output_dir, config._item_list, config.to_environment()
     common.mkdir(output_dir, False)
     with common.chdir_guard(output_dir):
-        for file in file_list or filter(lambda file: common.toolchains_package(file), env.prefix_dir.iterdir()):
-            env.decompress_path(str(file.relative_to(env.prefix_dir)), output_dir, False)
+        file_list = file_list or [*filter(lambda file: common.toolchains_package(file), env.prefix_dir.iterdir())]
+
+        if env.jobs > 1:
+            with multiprocessing.Manager() as manager, multiprocessing.Pool(config.jobs) as pool:
+                mutex = manager.Lock()
+                pool.map(functools.partial(_decompress_worker, env, output_dir, mutex), file_list)
+        else:
+            for file in file_list:
+                _decompress_worker(env, output_dir, None, file)
 
     common.toolchains_print(common.toolchains_success("Decompress toolchains successfully."))
 
