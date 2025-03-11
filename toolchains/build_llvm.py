@@ -43,6 +43,9 @@ def sysroot(env: environment) -> None:
     common.toolchains_print(common.toolchains_success("Build sysroot successfully."))
 
 
+__all__ = ["modifier_list", "support_platform_list", "configure", "environment", "sysroot_config", "sysroot"]
+
+
 def main() -> int:
     default_config = configure()
 

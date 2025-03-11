@@ -48,3 +48,6 @@ class compress_configure(common.basic_compress_configure):
         """
 
         return common.compress_environment(self.jobs, self.prefix_dir, self.compress_level, self.long_distance_match)
+
+
+__all__ = ["compress_configure"]

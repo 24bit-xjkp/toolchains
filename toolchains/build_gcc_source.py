@@ -162,4 +162,25 @@ class configure(common.basic_build_configure):
         self.nls = nls
 
 
-__all__ = ["modifier_list", "support_platform_list", "configure", "environment"]
+def check_triplet(host: str, target: str) -> None:
+    """检查输入triplet是否合法
+
+    Args:
+        host (str): 宿主平台
+        target (str): 目标平台
+    """
+
+    for input_triplet, triplet_list, name in (
+        (host, support_platform_list.host_list, "Host"),
+        (target, support_platform_list.target_list, "Target"),
+    ):
+        input_triplet_field = common.triplet_field(input_triplet)
+        for support_triplet in triplet_list:
+            support_triplet_field = common.triplet_field(support_triplet)
+            if input_triplet_field.weak_eq(support_triplet_field):
+                break
+        else:
+            raise RuntimeError(common.toolchains_error(f'{name} "{input_triplet}" is not support.'))
+
+
+__all__ = ["modifier_list", "support_platform_list", "configure", "environment", "check_triplet"]

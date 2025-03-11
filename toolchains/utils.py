@@ -63,6 +63,9 @@ def decompress(config: compress_configure) -> None:
     common.toolchains_print(common.toolchains_success("Decompress toolchains successfully."))
 
 
+__all__ = ["compress_configure", "compress", "decompress"]
+
+
 def main() -> int:
     default_config = compress_configure()
 
