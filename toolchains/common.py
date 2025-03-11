@@ -11,6 +11,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import types
 import typing
 from collections.abc import Callable, Generator
@@ -21,7 +22,6 @@ from typing import Self
 
 import colorama
 import libarchive  # type: ignore
-import tempfile
 import zstandard
 
 # 受支持的os列表
@@ -1238,6 +1238,36 @@ class triplet_completer:
                 result.append(option)
 
         return result
+
+
+# 用于过滤出需要的文件或目录的可调用对象
+type item_filter_t = Callable[[Path], bool]
+
+
+class item_with_prefix_completer:
+    """根据filter补全给定prefix下的文件或目录"""
+
+    prefix_arg_name: str
+    item_filter: item_filter_t
+
+    def __init__(self, prefix_arg_name: str, item_filter: item_filter_t) -> None:
+        """初始化补全器
+
+        Args:
+            prefix_arg_name (str): prefix对应的命令行选项的名称
+            item_filter (item_filter_t): 用于过滤出需要的文件或目录
+        """
+
+        self.prefix_arg_name = prefix_arg_name
+        self.item_filter = item_filter
+
+    def __call__(self, prefix: str, parsed_args: argparse.Namespace, **_: typing.Any) -> list[str]:
+        prefix_dir: str | None = getattr(parsed_args, self.prefix_arg_name, None)
+        if prefix_dir is None:
+            return []
+        prefix_path = Path(prefix_dir)
+        item_list = [Path(item) for item in _path_complete(str(prefix_path / prefix), True, [])]
+        return [str(item.relative_to(prefix_path)) for item in filter(self.item_filter, item_list)]
 
 
 def resolve_path(path: str | Path, base_path: Path) -> Path:
