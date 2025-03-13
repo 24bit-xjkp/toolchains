@@ -197,6 +197,7 @@ class llvm_environment(common.basic_environment):
         # 设置prefix
         self.prefix["llvm"] = self.prefix_dir / self.name
         self.compiler_rt_dir = self.prefix["llvm"] / "lib" / "clang" / self.major_version / "lib"
+        common.mkdir(self.build_tmp, False)
         # for i in sys.argv[1:]:
         #     if i == "--bootstrap":
         #         self.bootstrap = True

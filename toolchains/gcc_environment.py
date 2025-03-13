@@ -124,6 +124,7 @@ class gcc_environment(common.basic_environment):
         if simple:
             return
 
+        common.mkdir(self.build_tmp, False)
         self.lib_dir_list = {}
         for lib in lib_list:
             lib_dir = self.home / lib

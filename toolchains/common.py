@@ -979,7 +979,6 @@ class basic_environment(compress_environment):
         self.script_dir = self.root_dir.parent / "script"
         self.bin_dir = self.prefix_dir / self.name / "bin"
         self.build_tmp = build_tmp
-        mkdir(self.build_tmp, False)
 
     def compress(self, name: str | None = None) -> None:
         """压缩构建完成的工具链
