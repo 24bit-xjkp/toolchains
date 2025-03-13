@@ -275,19 +275,26 @@ class llvm_environment(common.basic_environment):
             list[str]: 编译选项
         """
 
-        assert target in self.runtime_build_options
+        assert target in [*self.runtime_build_options, self.host]
         command_list: list[str] = []
         compiler_path = {"C": "clang", "CXX": "clang++", "ASM": "clang"}
-        command_list.append(f'-DCMAKE_SYSROOT="{self.sysroot_dir}"')
         for compiler in self.compiler_list:
             command_list.append(f'-DCMAKE_{compiler}_COMPILER="{compiler_path[compiler]}"')
             command_list.append(f"-DCMAKE_{compiler}_COMPILER_TARGET={target}")
-            command_list.append(f'-DCMAKE_{compiler}_FLAGS="-Wno-unused-command-line-argument {" ".join(command_list_in)}"')
+            command_list.append(
+                f'-DCMAKE_{compiler}_FLAGS="-Wno-unused-command-line-argument --gcc-toolchain={self.sysroot_dir} {" ".join(command_list_in)}"'
+            )
             command_list.append(f"-DCMAKE_{compiler}_COMPILER_WORKS=ON")
         if target != self.build:
-            command_list.append(f"-DCMAKE_SYSTEM_NAME={self.runtime_build_options[target].system_name}")
+            system_name = (
+                self.runtime_build_options[target].system_name
+                if target in self.runtime_build_options
+                else self.llvm_build_options.system_name
+            )
+            command_list.append(f"-DCMAKE_SYSTEM_NAME={system_name}")
             command_list.append(f"-DCMAKE_SYSTEM_PROCESSOR={common.triplet_field(target).arch}")
             command_list.append("-DCMAKE_CROSSCOMPILING=TRUE")
+            command_list.append(f'-DCMAKE_SYSROOT="{self.sysroot_dir}"')
         command_list.append(f"-DLLVM_RUNTIMES_TARGET={target}")
         command_list.append(f"-DLLVM_DEFAULT_TARGET_TRIPLE={gnu_to_llvm(target)}")
         command_list.append(f"-DLLVM_HOST_TRIPLE={gnu_to_llvm(self.host)}")
