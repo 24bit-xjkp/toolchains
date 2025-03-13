@@ -104,7 +104,7 @@ class modifier_list:
             modifier(env)
 
 
-class support_platform_list:
+class gcc_support_platform_list:
     """受支持的平台列表，不包含vendor字段
 
     Attributes:
@@ -165,8 +165,8 @@ def check_triplet(host: str, target: str) -> None:
     """
 
     for input_triplet, triplet_list, name in (
-        (host, support_platform_list.host_list, "Host"),
-        (target, support_platform_list.target_list, "Target"),
+        (host, gcc_support_platform_list.host_list, "Host"),
+        (target, gcc_support_platform_list.target_list, "Target"),
     ):
         input_triplet_field = common.triplet_field(input_triplet)
         for support_triplet in triplet_list:
@@ -177,4 +177,4 @@ def check_triplet(host: str, target: str) -> None:
             raise RuntimeError(common.toolchains_error(f'{name} "{input_triplet}" is not support.'))
 
 
-__all__ = ["modifier_list", "support_platform_list", "configure", "build_gcc_environment", "check_triplet"]
+__all__ = ["modifier_list", "gcc_support_platform_list", "configure", "build_gcc_environment", "check_triplet"]
