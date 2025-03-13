@@ -526,23 +526,24 @@ def mkdir(path: Path, remove_if_exist: bool = True, dry_run: bool | None = None)
         dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
 
-    if remove_if_exist and path.exists():
+    if remove_if_exist and path.exists(follow_symlinks=False):
         shutil.rmtree(path)
     os.makedirs(path, exist_ok=True)
 
 
-def _copy_echo(src: Path, dst: Path) -> str:
+def _copy_echo(src: Path, dst: Path, overwrite: bool) -> str:
     """在复制文件或目录时回显信息
 
     Args:
         src (Path): 源路径
         dst (Path): 目标路径
+        overwrite (bool, optional): 是否覆盖已存在项.
 
     Returns:
         str: 回显信息
     """
 
-    return toolchains_info(f"Copy {src} -> {dst}.")
+    return toolchains_info(f"Copy {src} -> {dst}{'' if overwrite else ' if not exist.'}")
 
 
 @support_dry_run(_copy_echo)
@@ -558,16 +559,16 @@ def copy(src: Path, dst: Path, overwrite: bool = True, follow_symlinks: bool = F
     """
 
     # 创建目标目录
-    dir = dst.parent
-    mkdir(dir, False)
-    if not overwrite and dst.exists():
+    if not (dir := dst.parent).exists(follow_symlinks=False):
+        mkdir(dir)
+    if not overwrite and dst.exists(follow_symlinks=False):
         return
     if src.is_dir():
-        if dst.exists():
+        if dst.exists(follow_symlinks=False):
             shutil.rmtree(dst)
         shutil.copytree(src, dst, not follow_symlinks)
     else:
-        if dst.exists():
+        if dst.exists(follow_symlinks=False):
             os.remove(dst)
         shutil.copyfile(src, dst, follow_symlinks=follow_symlinks)
 
@@ -587,7 +588,7 @@ def copy_if_exist(src: Path, dst: Path, overwrite: bool = True, follow_symlinks:
         bool: 是否发生了复制
     """
 
-    if src.exists():
+    if src.exists(follow_symlinks=False):
         copy(src, dst, overwrite, follow_symlinks)
         return True
     else:
@@ -634,7 +635,7 @@ def remove_if_exists(path: Path, dry_run: bool | None = None) -> bool:
         bool: 是否发生了移动
     """
 
-    if path.exists():
+    if path.exists(follow_symlinks=False):
         remove(path)
         return True
     else:
@@ -723,7 +724,7 @@ def symlink(target: Path, symlink_path: Path, overwrite: bool = True, dry_run: b
         dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
 
-    if not overwrite and symlink_path.exists():
+    if not overwrite and symlink_path.exists(follow_symlinks=False):
         return
     remove_if_exists(symlink_path)
     symlink_path.symlink_to(target, target.is_dir())
@@ -739,7 +740,7 @@ def symlink_if_exist(target: Path, symlink_path: Path, overwrite: bool = True, d
         dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
 
-    if target.exists():
+    if target.exists(follow_symlinks=False):
         symlink(target, symlink_path, overwrite, dry_run)
 
 
