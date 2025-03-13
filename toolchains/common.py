@@ -1149,6 +1149,15 @@ class triplet_field:
 
         return f"{self.arch}-{self.os}-{self.abi}"
 
+    def __str__(self) -> str:
+        """将各个字段连接成字符串
+
+        Returns:
+            str: 由4个字段连接成的字符串
+        """
+
+        return f"{self.arch}-{self.vendor}-{self.os}-{self.abi}"
+
 
 def check_home(home: str | Path) -> None:
     assert Path(home).exists(), f'The home dir "{home}" does not exist.'
