@@ -47,7 +47,9 @@ def get_specific_environment(self: common.basic_environment, host: str | None = 
         gcc_environment: 指定配置的gcc环境
     """
 
-    return gcc_environment(self.build, host, target, self.home, self.jobs, self.prefix_dir, self.compress_level, True)
+    return gcc_environment(
+        self.build, host, target, self.home, self.jobs, self.prefix_dir, self.compress_level, self.long_distance_match, True
+    )
 
 
 class gcc_environment(common.basic_environment):
