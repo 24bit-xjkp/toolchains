@@ -66,31 +66,31 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(description="Build GCC toolchain to specific platform.")
     subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands.")
-    build_parse = subparsers.add_parser("build", help="Build the GCC toolchain.", formatter_class=common.arg_formatter)
+    build_parser = subparsers.add_parser("build", help="Build the GCC toolchain.", formatter_class=common.arg_formatter)
     subparsers.add_parser("dump", help="Print support platforms and exit.", formatter_class=common.arg_formatter)
 
     # 添加build相关选项
-    configure.add_argument(build_parse)
-    action = build_parse.add_argument("--host", type=str, help="The host platform of the GCC toolchain.", default=default_config.build)
+    configure.add_argument(build_parser)
+    action = build_parser.add_argument("--host", type=str, help="The host platform of the GCC toolchain.", default=default_config.build)
     common.register_completer(action, common.triplet_completer(support_platform_list.host_list))
-    action = build_parse.add_argument("--target", type=str, help="The target platform of the GCC toolchain.", default=default_config.build)
+    action = build_parser.add_argument("--target", type=str, help="The target platform of the GCC toolchain.", default=default_config.build)
     common.register_completer(action, common.triplet_completer(support_platform_list.target_list))
-    build_parse.add_argument(
+    build_parser.add_argument(
         "--gdb", action=argparse.BooleanOptionalAction, help="Whether to enable gdb support in GCC toolchain.", default=default_config.gdb
     )
-    build_parse.add_argument(
+    build_parser.add_argument(
         "--gdbserver",
         action=argparse.BooleanOptionalAction,
         help="Whether to enable gdbserver support in GCC toolchain.",
         default=default_config.gdbserver,
     )
-    build_parse.add_argument(
+    build_parser.add_argument(
         "--newlib",
         action=argparse.BooleanOptionalAction,
         help="Whether to enable newlib support in GCC freestanding toolchain.",
         default=default_config.newlib,
     )
-    build_parse.add_argument(
+    build_parser.add_argument(
         "--nls",
         action=argparse.BooleanOptionalAction,
         help="Whether to enable nls(nature language support) in GCC toolchain.",
