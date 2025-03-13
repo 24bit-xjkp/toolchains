@@ -139,13 +139,7 @@ class configure(common.basic_build_configure):
     nls: bool
     toolchain_type: str = "GCC"
 
-    def __init__(
-        self,
-        gdb: bool = True,
-        gdbserver: bool = True,
-        newlib: bool = True,
-        nls: bool = True,
-    ) -> None:
+    def __init__(self, gdb: bool = True, gdbserver: bool = True, newlib: bool = True, nls: bool = True, **kwargs: typing.Any) -> None:
         """设置gcc构建配置
 
         Args:
@@ -155,7 +149,7 @@ class configure(common.basic_build_configure):
             nls (bool, optional): 是否启用nls. 默认为启用.
         """
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.gdb = gdb
         self.gdbserver = gdbserver
         self.newlib = newlib

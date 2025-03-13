@@ -402,6 +402,7 @@ class configure(common.basic_configure):
         extra_libs: list[str] | None = None,
         retry: int = 5,
         remote: str = git_prefer_remote.github,
+        **kwargs: typing.Any,
     ) -> None:
         """设置源代码配置信息，可默认构造以提供默认配置
 
@@ -415,7 +416,7 @@ class configure(common.basic_configure):
             remote (str, optional): 倾向于使用的git源. 默认为GitHub源.
         """
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.glibc_version = glibc_version
         self.clone_type = git_clone_type[clone_type]
         self.shallow_clone_depth = depth

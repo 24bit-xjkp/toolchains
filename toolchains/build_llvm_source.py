@@ -62,16 +62,14 @@ class configure(common.basic_build_configure):
 
     toolchain_type: str = "LLVM"
 
-    def __init__(
-        self,
-    ) -> None:
+    def __init__(self, **kwargs: typing.Any) -> None:
         """设置llvm构建配置
 
         Args:
 
         """
 
-        super().__init__()
+        super().__init__(**kwargs)
 
 
 sysroot_config = common.basic_prefix_build_configure
