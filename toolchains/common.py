@@ -385,9 +385,9 @@ def need_dry_run(dry_run: bool | None) -> bool:
     return bool(dry_run is None and command_dry_run.get() or dry_run)
 
 
-def support_dry_run[**P, R](
-    echo_fn: Callable[..., str | None] | None = None, end: str | None = None
-) -> Callable[[Callable[P, R]], Callable[P, R | None]]:
+def support_dry_run[
+    **P, R
+](echo_fn: Callable[..., str | None] | None = None, end: str | None = None) -> Callable[[Callable[P, R]], Callable[P, R | None]]:
     """根据dry_run参数和command_dry_run中的全局状态确定是否只回显命令而不执行，若fn没有dry_run参数则只会使用全局状态
 
     Args:
@@ -954,6 +954,7 @@ class basic_environment(compress_environment):
     name_without_version: str  # 不带版本号的工具链名
     name: str  # 工具链名
     bin_dir: Path  # 安装后可执行文件所在目录
+    build_tmp: Path  # 构建过程中中间文件所在目录
 
     def __init__(
         self,
@@ -965,6 +966,7 @@ class basic_environment(compress_environment):
         prefix_dir: Path,
         compress_level: int,
         long_distance_match: int,
+        build_tmp: Path,
     ) -> None:
         super().__init__(jobs, prefix_dir, compress_level, long_distance_match)
         self.build = build
@@ -976,6 +978,8 @@ class basic_environment(compress_environment):
         self.root_dir = Path(__file__).parent.resolve()
         self.script_dir = self.root_dir.parent / "script"
         self.bin_dir = self.prefix_dir / self.name / "bin"
+        self.build_tmp = build_tmp
+        mkdir(self.build_tmp, False)
 
     def compress(self, name: str | None = None) -> None:
         """压缩构建完成的工具链
@@ -1777,8 +1781,27 @@ class basic_prefix_build_configure(basic_prefix_configure):
 class basic_build_configure(basic_compress_configure, basic_prefix_build_configure):
     """工具链构建配配置"""
 
-    def __init__(self, **kwargs: typing.Any) -> None:
-        super().__init__(**kwargs)
+    build_tmp: Path
+    _origin_build_tmp: str
+
+    def __init__(self, build_tmp: str = str(Path.home() / "build_tmp"), base_path: Path = Path.cwd(), **kwargs: typing.Any) -> None:
+        super().__init__(base_path=base_path, **kwargs)
+        self._origin_build_tmp = build_tmp
+        self.register_encode_name_map("build_tmp", "_origin_build_tmp")
+        self.build_tmp = resolve_path(build_tmp, base_path)
+
+    @classmethod
+    def add_argument(cls, parser: argparse.ArgumentParser) -> None:
+        super().add_argument(parser)
+        default_config = basic_build_configure()
+        action = parser.add_argument(
+            "--build-tmp",
+            "-t",
+            type=str,
+            help="The directory to store temporary files when build the toolchain.",
+            default=default_config.build_tmp,
+        )
+        register_completer(action, dir_completer)
 
 
 @contextmanager

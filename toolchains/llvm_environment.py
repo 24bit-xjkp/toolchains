@@ -173,6 +173,7 @@ class llvm_environment(common.basic_environment):
         prefix_dir: Path,
         compress_level: int,
         long_distance_match: int,
+        build_tmp: Path,
     ) -> None:
         """llvm构建环境
 
@@ -186,15 +187,15 @@ class llvm_environment(common.basic_environment):
             prefix_dir (str): 安装根目录
             compress_level (int): zstd压缩等级
             long_distance_match (int): 长距离匹配窗口大小
+            build_tmp (Path): 构建工具链时存放临时文件的路径
         """
         self.build = build
         self.host = host or self.build
         self.family = family
         name_without_version = f"{self.host}-clang"
-        super().__init__(build, "21.0.0", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match)
+        super().__init__(build, "21.0.0", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match, build_tmp)
         # 设置prefix
         self.prefix["llvm"] = self.prefix_dir / self.name
-        self.prefix["runtimes"] = self.prefix["llvm"] / "install"
         self.compiler_rt_dir = self.prefix["llvm"] / "lib" / "clang" / self.major_version / "lib"
         # for i in sys.argv[1:]:
         #     if i == "--bootstrap":
@@ -229,15 +230,18 @@ class llvm_environment(common.basic_environment):
                 self.runtime_build_options[target].system_name = "Windows"
                 self.runtime_build_options[target].cmake_option.update(self.win32_options)
         for lib in lib_list:
-            self.prefix[lib] = self.home / lib / "install"
+            self.prefix[lib] = self.build_tmp / f"{self.host}-{lib}-install"
         # 设置源目录和构建目录
         for project in subproject_list:
             self.source_dir[project] = self.home / "llvm" / project
-            self.build_dir[project] = self.home / "llvm" / f"build-{self.host}-{project}"
             common.check_lib_dir(project, self.source_dir[project])
+        self.build_dir["llvm"] = self.build_tmp / f"{self.host}-llvm"
+        for target in runtime_target_list:
+            self.build_dir[f"{target}-runtime"] = self.build_tmp / f"{target}-runtime"
+            self.prefix[f"{target}-runtime"] = self.build_tmp / f"{target}-runtime-install"
         for lib in lib_list:
             self.source_dir[lib] = self.home / lib
-            self.build_dir[lib] = self.source_dir[lib] / "build"
+            self.build_dir[lib] = self.build_tmp / f"{self.host}-{lib}"
             common.check_lib_dir(lib, self.source_dir[lib])
         # 设置sysroot目录
         self.sysroot_dir = self.prefix_dir / "sysroot"
@@ -300,9 +304,9 @@ class llvm_environment(common.basic_environment):
             cmake_option_list (dict[str, str]): 附加cmake配置选项
         """
 
-        common.remove_if_exists(self.build_dir[project])
         assert project in (*subproject_list, *lib_list)
-        command = f"cmake -G Ninja --install-prefix {self.prefix[project]} -B {self.build_dir[project]} -S {self.source_dir[project]} "
+        source_dir = self.source_dir[project] if "runtime" not in project else self.source_dir["runtime"]
+        command = f"cmake -G Ninja --install-prefix {self.prefix[project]} -B {self.build_dir[project]} -S {source_dir} "
         command += " ".join(self.get_compiler(target, command_list) + get_cmake_option(cmake_option_list))
         common.run_command(command)
 
@@ -325,20 +329,6 @@ class llvm_environment(common.basic_environment):
 
         assert project in (*subproject_list, *lib_list)
         common.run_command(f"ninja -C {self.build_dir[project]} install/strip -j{self.jobs}")
-
-    def remove_build_dir(self, project: str) -> None:
-        """移除构建目录
-
-        Args:
-            project (str): 目标项目
-        """
-
-        assert project in subproject_list
-        dir = self.build_dir[project]
-        common.remove_if_exists(dir)
-        if project == "runtimes":
-            dir = self.prefix[project]
-            common.remove_if_exists(dir)
 
     def build_sysroot(self, target: str) -> None:
         """构建sysroot
@@ -428,14 +418,12 @@ class build_llvm_environment:
         env.config("llvm", env.host, env.llvm_build_options.basic_option, env.llvm_build_options.cmake_option)
         env.make("llvm")
         env.install("llvm")
-        env.remove_build_dir("llvm")
         # 构建运行库
         for target, option in env.runtime_build_options.items():
             env.config("runtimes", target, option.basic_option, option.cmake_option)
             env.make("runtimes")
             env.install("runtimes")
             env.build_sysroot(target)
-            env.remove_build_dir("runtimes")
         # 打包
         env.package()
 
@@ -458,7 +446,6 @@ class build_llvm_environment:
         env.make("llvm")
         env.install("llvm")
         env.copy_llvm_libs()
-        env.remove_build_dir("llvm")
         env.package()
 
     @staticmethod
