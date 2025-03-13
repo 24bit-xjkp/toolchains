@@ -20,7 +20,7 @@ def sysroot(env: llvm_environment) -> None:
     common.mkdir(env.sysroot_dir, True)
     libgcc_prefix = env.sysroot_dir / "lib" / "gcc"
     common.mkdir(libgcc_prefix)
-    for target in support_platform_list.hosted_list:
+    for target in llvm_support_platform_list.hosted_list:
         gcc = get_specific_environment(env, env.build, target)
         target_dir = env.sysroot_dir / target
         common.mkdir(target_dir)
@@ -43,7 +43,17 @@ def sysroot(env: llvm_environment) -> None:
     common.toolchains_print(common.toolchains_success("Build sysroot successfully."))
 
 
-__all__ = ["modifier_list", "support_platform_list", "configure", "llvm_environment", "sysroot_config", "sysroot"]
+def build_specific_llvm(env: llvm_environment) -> None:
+    """构建指定llvm
+
+    Args:
+        env (llvm_environment): llvm构建环境
+    """
+
+    build_llvm_environment.build(env)
+
+
+__all__ = ["modifier_list", "llvm_support_platform_list", "configure", "llvm_environment", "sysroot_config", "sysroot"]
 
 
 def main() -> int:
@@ -52,11 +62,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Build LLVM toolchain to specific platform.")
     subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands.")
     sysroot_parser = subparsers.add_parser(
-        "sysroot",
-        help="Build sysroot for llvm toolchain using installed gcc toolchains.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        "sysroot", help="Build sysroot for llvm toolchain using installed gcc toolchains.", formatter_class=common.arg_formatter
     )
+    build_parser = subparsers.add_parser("build", help="Build the LLVM toolchain.", formatter_class=common.arg_formatter)
+
     sysroot_config.add_argument(sysroot_parser)
+    configure.add_argument(build_parser)
+    action = build_parser.add_argument("--host", type=str, help="The host platform of the LLVM toolchain.", default=default_config.build)
+    common.register_completer(action, common.triplet_completer(llvm_support_platform_list.host_list))
+    build_parser.add_argument(
+        "--family", "-f", type=str, help="The runtime family of the LLVM toolchain.", default=runtime_family.gnu, choices=runtime_family
+    )
 
     common.support_argcomplete(parser)
     args = parser.parse_args()
@@ -64,14 +80,24 @@ def main() -> int:
     def do_main() -> None:
         match (args.command):
             case "sysroot":
-                config: dict[str, typing.Any] = {}
+                sysroot_config_v: dict[str, typing.Any] = {}
                 for key, val in vars(sysroot_config.parse_args(args)).items():
                     if not key.startswith("_"):
-                        config[key] = val
-                config["jobs"] = 1
-                config["compress_level"] = 1
-                config["host"] = None
-                sysroot(llvm_environment(**config))
+                        sysroot_config_v[key] = val
+                sysroot_config_v["jobs"] = 1
+                sysroot_config_v["compress_level"] = 1
+                sysroot_config_v["host"] = None
+                sysroot(llvm_environment(**sysroot_config_v))
+            case "build":
+                build_config = configure.parse_args(args)
+                assert args.host in llvm_support_platform_list.host_list, common.toolchains_error(f"Host {args.host} is not supported.")
+                env = llvm_environment(
+                    host=args.host,
+                    family=args.family,
+                    runtime_target_list=llvm_support_platform_list.target_list,
+                    **build_config.get_public_fields(),
+                )
+                build_specific_llvm(env)
             case _:
                 pass
 
