@@ -617,7 +617,7 @@ def remove(path: Path, dry_run: bool | None = None) -> None:
         dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
 
-    if path.is_dir():
+    if path.is_dir(follow_symlinks=False):
         shutil.rmtree(path)
     else:
         os.remove(path)
@@ -724,9 +724,11 @@ def symlink(target: Path, symlink_path: Path, overwrite: bool = True, dry_run: b
         dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
 
-    if not overwrite and symlink_path.exists(follow_symlinks=False):
-        return
-    remove_if_exists(symlink_path)
+    if symlink_path.exists(follow_symlinks=False):
+        if overwrite:
+            remove(symlink_path)
+        else:
+            return
     symlink_path.symlink_to(target, target.is_dir())
 
 
@@ -740,7 +742,7 @@ def symlink_if_exist(target: Path, symlink_path: Path, overwrite: bool = True, d
         dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
 
-    if target.exists(follow_symlinks=False):
+    if (resolve_path(target, symlink_path.parent)).exists(follow_symlinks=False):
         symlink(target, symlink_path, overwrite, dry_run)
 
 
