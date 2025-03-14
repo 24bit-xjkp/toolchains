@@ -33,14 +33,12 @@ def gnu_to_llvm(target: str) -> str:
         str: llvm风格triplet
     """
 
-    if target.count("-") == 2:
-        index = target.find("-")
-        result = target[:index]
-        result += "-unknown"
-        result += target[index:]
-        return result
-    else:
-        return target
+    triplet_filed = common.triplet_field(target, False)
+    if triplet_filed.os == "w64":
+        triplet_filed.os = "windows"
+    if triplet_filed.abi == "mingw32":
+        triplet_filed.abi = "gnu"
+    return str(triplet_filed)
 
 
 class runtime_family(StrEnum):
@@ -53,6 +51,28 @@ class runtime_family(StrEnum):
 
     llvm = "llvm"
     gnu = "gnu"
+
+
+class cmake_generator(StrEnum):
+    """cmake生成工具
+
+    Attributes:
+        make: Linux默认的生成工具
+        ninja : ninja可以提供更快的生成速度
+    """
+
+    make = "make"
+    ninja = "ninja"
+
+    def get_cmake_option(self) -> str:
+        """获取cmake生成器选项中的名称
+
+        Returns:
+            str: 生成器名称
+        """
+
+        option_map = {"make": '"Unix Makefiles"', "ninja": "Ninja"}
+        return option_map[self]
 
 
 class build_options:
@@ -85,7 +105,8 @@ class llvm_environment(common.basic_environment):
     source_dir: dict[str, Path] = {}  # 源代码所在目录
     build_dir: dict[str, Path] = {}  # 构建时所在目录
     compiler_list = ("C", "CXX", "ASM")  # 编译器列表
-    sysroot_dir: Path  # sysroot所在路径
+    sysroot_dir: dict[str, Path]  # sysroot所在路径
+    generator_list: dict[str, cmake_generator]  # 构建指定目标平台的工具时使用的生成器
     llvm_build_options: build_options  # llvm构建选项
     runtime_build_options: dict[str, build_options]  # 运行库构建选项
     dylib_option_list: typing.Final[dict[str, str]] = {  # llvm动态链接选项
@@ -124,6 +145,7 @@ class llvm_environment(common.basic_environment):
         "LIBCXXABI_INCLUDE_TESTS": "OFF",  # 禁用libcxxabi测试
         "LLDB_INCLUDE_TESTS": "OFF",  # 禁用lldb测试
         "LLDB_ENABLE_PYTHON": "ON",  # 启用python支持
+        "LIBOMP_OMPD_GDB_SUPPORT": "OFF",  # 禁用openmpd的gdb支持，该支持需要python，而交叉编译时无法提供
     }
     lib_option: typing.Final[dict[str, str]] = {  # llvm依赖库编译选项
         "BUILD_SHARED_LIBS": "OFF",
@@ -144,6 +166,8 @@ class llvm_environment(common.basic_environment):
         "LIBCXX_ENABLE_STATIC_ABI_LIBRARY": "ON",
         "LIBCXX_ENABLE_THREADS": "ON",
         "LIBCXX_HAS_WIN32_THREAD_API": "ON",
+        "CMAKE_RC_COMPILER": "llvm-windres",
+        "LLVM_ENABLE_RUNTIMES": '"libcxx;libcxxabi;libunwind;compiler-rt"',  # 交叉编译下没有ml编译不了openmp
     }
     freestanding_option: typing.Final[dict[str, str]] = {
         "LIBUNWIND_IS_BAREMETAL": "ON",
@@ -154,10 +178,18 @@ class llvm_environment(common.basic_environment):
         "COMPILER_RT_BUILD_CTX_PROFILE": "OFF",
         "COMPILER_RT_BUILD_MEMPROF": "OFF",
         "COMPILER_RT_BUILD_GWP_ASAN": "OFF",
+        "COMPILER_RT_BAREMETAL_BUILD": "ON",
         "LIBCXX_ENABLE_THREADS": "OFF",
         "LIBCXXABI_ENABLE_THREADS": "OFF",
         "LIBCXXABI_ENABLE_SHARED": "OFF",
+        "LIBCXXABI_BAREMETAL": "ON",
         "LLVM_ENABLE_RUNTIMES": '"libcxx;libcxxabi;libunwind;compiler-rt"',
+        "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
+        "LIBCXX_ENABLE_SHARED": "OFF",
+        "BUILD_SHARED_LIBS": "OFF",
+        "LIBUNWIND_ENABLE_THREADS": "OFF",
+        "LIBCXX_ENABLE_MONOTONIC_CLOCK": "OFF",
+        "LIBCXX_ENABLE_FILESYSTEM": "OFF",
     }
 
     compiler_rt_dir: Path  # compiler-rt所在路径
@@ -174,6 +206,7 @@ class llvm_environment(common.basic_environment):
         compress_level: int,
         long_distance_match: int,
         build_tmp: Path,
+        default_generator: cmake_generator,
     ) -> None:
         """llvm构建环境
 
@@ -188,6 +221,7 @@ class llvm_environment(common.basic_environment):
             compress_level (int): zstd压缩等级
             long_distance_match (int): 长距离匹配窗口大小
             build_tmp (Path): 构建工具链时存放临时文件的路径
+            default_generator (cmake_generator): 默认的cmake生成工具
         """
         self.build = build
         self.host = host or self.build
@@ -198,13 +232,6 @@ class llvm_environment(common.basic_environment):
         self.prefix["llvm"] = self.prefix_dir / self.name
         self.compiler_rt_dir = self.prefix["llvm"] / "lib" / "clang" / self.major_version / "lib"
         common.mkdir(self.build_tmp, False)
-        # for i in sys.argv[1:]:
-        #     if i == "--bootstrap":
-        #         self.bootstrap = True
-        #     elif i.startswith("--stage="):
-        #         self.stage = int(i[8:])
-        #     else:
-        #         assert False, f'Unknown option: "{i}"'
 
         self.llvm_build_options = build_options(
             (
@@ -219,6 +246,8 @@ class llvm_environment(common.basic_environment):
             self.llvm_build_options.cmake_option["LIBUNWIND_USE_COMPILER_RT"] = "ON"
 
         self.runtime_build_options = {}
+        self.sysroot_dir = {}
+        self.generator_list = {}
         for target in runtime_target_list:
             self.runtime_build_options[target] = deepcopy(self.llvm_build_options)
             gcc = get_specific_environment(self, target=target)
@@ -230,6 +259,10 @@ class llvm_environment(common.basic_environment):
             else:
                 self.runtime_build_options[target].system_name = "Windows"
                 self.runtime_build_options[target].cmake_option.update(self.win32_options)
+            self.build_dir[f"{target}-runtimes"] = self.build_tmp / f"{target}-runtimes"
+            self.prefix[f"{target}-runtimes"] = self.build_tmp / f"{target}-runtimes-install"
+            self.sysroot_dir[target] = self.prefix_dir / "sysroot"
+            self.generator_list[target] = default_generator
         for lib in lib_list:
             self.prefix[lib] = self.build_tmp / f"{self.host}-{lib}-install"
         # 设置源目录和构建目录
@@ -237,15 +270,10 @@ class llvm_environment(common.basic_environment):
             self.source_dir[project] = self.home / "llvm" / project
             common.check_lib_dir(project, self.source_dir[project])
         self.build_dir["llvm"] = self.build_tmp / f"{self.host}-llvm"
-        for target in runtime_target_list:
-            self.build_dir[f"{target}-runtime"] = self.build_tmp / f"{target}-runtime"
-            self.prefix[f"{target}-runtime"] = self.build_tmp / f"{target}-runtime-install"
         for lib in lib_list:
             self.source_dir[lib] = self.home / lib
             self.build_dir[lib] = self.build_tmp / f"{self.host}-{lib}"
             common.check_lib_dir(lib, self.source_dir[lib])
-        # 设置sysroot目录
-        self.sysroot_dir = self.prefix_dir / "sysroot"
         if self.build != self.host:
             # 交叉编译时runtimes已经编译过了
             del self.llvm_build_options.cmake_option["LLVM_ENABLE_RUNTIMES"]
@@ -279,12 +307,12 @@ class llvm_environment(common.basic_environment):
         assert target in [*self.runtime_build_options, self.host]
         command_list: list[str] = []
         compiler_path = {"C": "clang", "CXX": "clang++", "ASM": "clang"}
+        sysroot_dir = self.sysroot_dir[target]
+        gcc_toolchain = f"--gcc-toolchain={sysroot_dir}" if target == self.build else ""
         for compiler in self.compiler_list:
             command_list.append(f'-DCMAKE_{compiler}_COMPILER="{compiler_path[compiler]}"')
             command_list.append(f"-DCMAKE_{compiler}_COMPILER_TARGET={target}")
-            command_list.append(
-                f'-DCMAKE_{compiler}_FLAGS="-Wno-unused-command-line-argument --gcc-toolchain={self.sysroot_dir} {" ".join(command_list_in)}"'
-            )
+            command_list.append(f'-DCMAKE_{compiler}_FLAGS="-Wno-unused-command-line-argument {gcc_toolchain} {" ".join(command_list_in)}"')
             command_list.append(f"-DCMAKE_{compiler}_COMPILER_WORKS=ON")
         if target != self.build:
             system_name = (
@@ -295,11 +323,10 @@ class llvm_environment(common.basic_environment):
             command_list.append(f"-DCMAKE_SYSTEM_NAME={system_name}")
             command_list.append(f"-DCMAKE_SYSTEM_PROCESSOR={common.triplet_field(target).arch}")
             command_list.append("-DCMAKE_CROSSCOMPILING=TRUE")
-            command_list.append(f'-DCMAKE_SYSROOT="{self.sysroot_dir}"')
+            command_list.append(f'-DCMAKE_SYSROOT="{sysroot_dir}"')
         command_list.append(f"-DLLVM_RUNTIMES_TARGET={target}")
         command_list.append(f"-DLLVM_DEFAULT_TARGET_TRIPLE={gnu_to_llvm(target)}")
         command_list.append(f"-DLLVM_HOST_TRIPLE={gnu_to_llvm(self.host)}")
-        command_list.append(f'-DCMAKE_LINK_FLAGS="{" ".join(command_list_in)}"')
         return command_list
 
     def config(self, project: str, target: str, command_list: list[str], cmake_option_list: dict[str, str]) -> None:
@@ -312,31 +339,33 @@ class llvm_environment(common.basic_environment):
             cmake_option_list (dict[str, str]): 附加cmake配置选项
         """
 
-        assert project in (*subproject_list, *lib_list)
-        source_dir = self.source_dir[project] if "runtime" not in project else self.source_dir["runtime"]
-        command = f"cmake -G Ninja --install-prefix {self.prefix[project]} -B {self.build_dir[project]} -S {source_dir} "
+        assert project in self.build_dir
+        source_dir = self.source_dir[project] if "runtimes" not in project else self.source_dir["runtimes"]
+        command = f"cmake -G {self.generator_list[target].get_cmake_option()} --install-prefix {self.prefix[project]} -B {self.build_dir[project]} -S {source_dir} "
         command += " ".join(self.get_compiler(target, command_list) + get_cmake_option(cmake_option_list))
         common.run_command(command)
 
-    def make(self, project: str) -> None:
+    def make(self, project: str, target: str) -> None:
         """构建项目
 
         Args:
             project (str): 目标项目
+            target (str): 目标平台
         """
 
-        assert project in (*subproject_list, *lib_list)
-        common.run_command(f"ninja -C {self.build_dir[project]} -j{self.jobs}")
+        assert project in self.build_dir
+        common.run_command(f"{self.generator_list[target]} -C {self.build_dir[project]} -j{self.jobs}")
 
-    def install(self, project: str) -> None:
+    def install(self, project: str, target: str) -> None:
         """安装项目
 
         Args:
             project (str): 目标项目
+            target (str): 目标平台
         """
 
-        assert project in (*subproject_list, *lib_list)
-        common.run_command(f"ninja -C {self.build_dir[project]} install/strip -j{self.jobs}")
+        assert project in self.build_dir
+        common.run_command(f"{self.generator_list[target]} -C {self.build_dir[project]} install/strip -j{self.jobs}")
 
     def build_sysroot(self, target: str) -> None:
         """构建sysroot
@@ -344,52 +373,75 @@ class llvm_environment(common.basic_environment):
         Args:
             target (str): 目标平台
         """
+        # TODO:armv7m-none-eabi的sysroot生成
 
-        prefix = self.prefix["runtimes"]
+        prefix = self.prefix[f"{target}-runtimes"]
+        arch = common.triplet_field(target).arch
+        sysroot_dir = self.sysroot_dir[target]
         for src_dir in prefix.iterdir():
             match src_dir.name:
                 case "bin":
                     # 复制dll
-                    dst_dir = self.sysroot_dir / target / "lib"
+                    dst_dir = sysroot_dir / target / "lib"
                     for file in src_dir.iterdir():
-                        if file.name.endswith("dll"):
+                        if file.suffix == ".dll":
                             common.copy(file, dst_dir / file.name)
                 case "lib":
-                    dst_dir = self.sysroot_dir / target / "lib"
-                    common.mkdir(self.compiler_rt_dir, False)
+                    dst_dir = sysroot_dir / target / "lib"
+                    common.mkdir(dst_dir, False)
                     for item in src_dir.iterdir():
                         # 复制compiler-rt
                         if item.name == self.runtime_build_options[target].system_name.lower():
-                            rt_dir = self.compiler_rt_dir / item
+                            if target == self.build:
+                                continue
+                            rt_dir = self.compiler_rt_dir / gnu_to_llvm(target)
                             common.mkdir(rt_dir, False)
                             for file in item.iterdir():
-                                common.copy(file, rt_dir / file.name)
-                            continue
-                        # 复制其他库
-                        common.copy(item, dst_dir / item.name)
+                                name = file.name
+                                pos = name.find(f"-{arch}")
+                                if pos != -1:
+                                    name = name[:pos] + name[pos + len(f"-{arch}") :]
+                                common.copy(file, rt_dir / name)
+                        else:
+                            # 复制其他库
+                            common.copy(item, dst_dir / item.name)
                 case "include":
                     # 复制__config_site
-                    dst_dir = self.sysroot_dir / target / "include"
+                    dst_dir = sysroot_dir / target / "include"
                     common.copy(src_dir / "c++" / "v1" / "__config_site", dst_dir / "__config_site")
                     # 对于Windows目标，需要在sysroot/include下准备一份头文件
-                    dst_dir = self.sysroot_dir / "include" / "c++"
+                    dst_dir = sysroot_dir / "include" / "c++"
                     common.copy(self.prefix["llvm"] / "include" / "c++", dst_dir, False)
+                case "share":
+                    dst_dir = sysroot_dir / target / "share"
+                    common.mkdir(dst_dir, False)
+                    for item in src_dir.iterdir():
+                        common.copy(item, dst_dir / item.name)
                 case _:
                     pass
+        # 为mingw目标建立软链接
+        match (target):
+            case "x86_64-w64-mingw32":
+                common.symlink(Path("x86_64-unknown-windows-gnu"), self.compiler_rt_dir / "x86_64-w64-windows-gnu")
+            case "i686-w64-mingw32":
+                common.symlink(Path("i686-unknown-windows-gnu"), self.compiler_rt_dir / "i686-w64-windows-gnu")
+            case _:
+                pass
 
     def copy_llvm_libs(self) -> None:
         """复制工具链所需库"""
 
-        src_prefix = self.sysroot_dir / self.host / "lib"
+        src_prefix = self.sysroot_dir[self.build] / self.host / "lib"
         dst_prefix = self.prefix["llvm"] / ("bin" if common.triplet_field(self.host).os == "w64" else "lib")
-        native_dir = self.home / f"{self.build}-clang{self.major_version}"
+        native_dir = self.prefix_dir / f"{self.build}-clang{self.major_version}"
         native_bin_dir = native_dir / "bin"
         native_compiler_rt_dir = native_dir / "lib" / "clang" / self.major_version / "lib"
         # 复制libc++和libunwind运行库
-        for file in filter(
-            lambda file: file.name.startswith(("libc++", "libunwind")) and not file.name.endswith((".a", ".json")), src_prefix.iterdir()
-        ):
-            common.copy(file, dst_prefix / file.name)
+        if self.family == runtime_family.llvm:
+            for file in filter(
+                lambda file: file.name.startswith(("libc++", "libunwind")) and not file.name.endswith((".a", ".json")), src_prefix.iterdir()
+            ):
+                common.copy(file, dst_prefix / file.name)
         # 复制公用libc++和libunwind头文件
         src_prefix = native_bin_dir.parent / "include"
         dst_prefix = self.prefix["llvm"] / "include"
@@ -424,13 +476,14 @@ class build_llvm_environment:
 
         # 构建llvm
         env.config("llvm", env.host, env.llvm_build_options.basic_option, env.llvm_build_options.cmake_option)
-        env.make("llvm")
-        env.install("llvm")
+        env.make("llvm", env.host)
+        env.install("llvm", env.host)
         # 构建运行库
         for target, option in env.runtime_build_options.items():
-            env.config("runtimes", target, option.basic_option, option.cmake_option)
-            env.make("runtimes")
-            env.install("runtimes")
+            runtimes_name = f"{target}-runtimes"
+            env.config(runtimes_name, target, option.basic_option, option.cmake_option)
+            env.make(runtimes_name, target)
+            env.install(runtimes_name, target)
             env.build_sysroot(target)
         # 打包
         env.package()
@@ -447,12 +500,12 @@ class build_llvm_environment:
         lib_basic_command = [*env.llvm_build_options.basic_option, "-lws2_32", "-lbcrypt"]
         for lib in lib_list:
             env.config(lib, env.host, lib_basic_command, env.lib_option)
-            env.make(lib)
-            env.install(lib)
+            env.make(lib, env.host)
+            env.install(lib, env.host)
         # 构建llvm
         env.config("llvm", env.host, env.llvm_build_options.basic_option, env.llvm_build_options.cmake_option)
-        env.make("llvm")
-        env.install("llvm")
+        env.make("llvm", env.host)
+        env.install("llvm", env.host)
         env.copy_llvm_libs()
         env.package()
 

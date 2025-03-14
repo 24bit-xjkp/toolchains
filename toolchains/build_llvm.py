@@ -17,12 +17,14 @@ def sysroot(env: llvm_environment) -> None:
         env (llvm_environment): llvm构建环境
     """
 
-    common.mkdir(env.sysroot_dir, True)
-    libgcc_prefix = env.sysroot_dir / "lib" / "gcc"
+    # TODO:armv7m-none-eabi的sysroot生成
+    sysroot_dir = env.sysroot_dir[env.build]
+    common.mkdir(sysroot_dir, True)
+    libgcc_prefix = sysroot_dir / "lib" / "gcc"
     common.mkdir(libgcc_prefix)
     for target in llvm_support_platform_list.hosted_list:
         gcc = get_specific_environment(env, env.build, target)
-        target_dir = env.sysroot_dir / target
+        target_dir = sysroot_dir / target
         common.mkdir(target_dir)
         if gcc.toolchain_type.contain(common.toolchain_type.native):
             # 复制include和lib64
@@ -50,6 +52,7 @@ def build_specific_llvm(env: llvm_environment) -> None:
         env (llvm_environment): llvm构建环境
     """
 
+    modifier_list.modify(env, [*env.runtime_build_options])
     build_llvm_environment.build(env)
 
 
