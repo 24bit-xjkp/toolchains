@@ -493,10 +493,10 @@ def run_command(
         )
     except subprocess.CalledProcessError as e:
         if not ignore_error:
-            raise RuntimeError(toolchains_error(f'Command "{command}" failed.', add_counter=False))
+            raise RuntimeError(toolchains_error(f'Command "{command}" failed.'))
         elif echo:
             toolchains_print(
-                toolchains_warning(f'Command "{command}" failed with errno={e.returncode}, but it is ignored.', add_counter=False)
+                toolchains_warning(f'Command "{command}" failed with errno={e.returncode}, but it is ignored.')
             )
         return None
     return result
