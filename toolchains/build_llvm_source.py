@@ -20,13 +20,24 @@ class modifier_list:
     @staticmethod
     def loongarch64_loongnix_linux_gnu(env: llvm_environment) -> None:
         env.runtime_build_options["loongarch64-loongnix-linux-gnu"].cmake_option.update(
-            {"COMPILER_RT_BUILD_SANITIZERS": "OFF", "COMPILER_RT_BUILD_GWP_ASAN": "OFF"}
+            {
+                "COMPILER_RT_BUILD_SANITIZERS": "OFF",
+                "COMPILER_RT_BUILD_GWP_ASAN": "OFF",
+                "COMPILER_RT_BUILD_XRAY": "OFF",
+                "COMPILER_RT_BUILD_MEMPROF": "OFF",
+                "COMPILER_RT_BUILD_CTX_PROFILE": "OFF",
+            }
         )
 
     @staticmethod
     def armv7m_none_eabi(env: llvm_environment) -> None:
         env.sysroot_dir["armv7m-none-eabi"] = env.prefix_dir / "sysroot" / "armv7m-none-eabi"
         env.generator_list["armv7m-none-eabi"] = cmake_generator.make
+
+        def after_build_sysroot(env: llvm_environment) -> None:
+            common.rename(env.compiler_rt_dir / "armv7m-unknown-none-eabi", env.compiler_rt_dir / "armv7-unknown-none-eabi")
+
+        env.after_build_sysroot["armv7m-none-eabi"] = after_build_sysroot
 
     @staticmethod
     def modify(env: llvm_environment, targets: list[str]) -> None:
@@ -63,16 +74,14 @@ class llvm_support_platform_list:
         arch_list: 支持的LLVM目标平台
         project_list: 支持的子项目
         runtime_list: 支持的运行时库
-        hosted_list: gcc支持的宿主平台
         target_list: 支持的runtimes的target列表
     """
 
     host_list: typing.Final[list[str]] = gcc_support_platform_list.host_list
     arch_list: typing.Final[list[str]] = ["X86", "AArch64", "RISCV", "ARM", "LoongArch", "Mips"]
-    project_list: typing.Final[list[str]] = ["clang", "clang-tools-extra", "lld", "lldb", "bolt"]
+    project_list: typing.Final[list[str]] = ["clang", "clang-tools-extra", "lld", "lldb", "bolt", "mlir"]
     runtime_list: typing.Final[list[str]] = ["libcxx", "libcxxabi", "libunwind", "compiler-rt", "openmp"]
-    hosted_list = generate_hosted_list_from_gcc()
-    target_list: typing.Final[list[str]] = [*hosted_list, "loongarch64-loongnix-linux-gnu", "armv7m-none-eabi"]
+    target_list: typing.Final[list[str]] = [*generate_hosted_list_from_gcc(), "loongarch64-loongnix-linux-gnu", "armv7m-none-eabi"]
 
 
 class configure(common.basic_build_configure):

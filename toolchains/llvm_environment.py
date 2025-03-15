@@ -5,6 +5,7 @@ from .gcc_environment import get_specific_environment
 from enum import StrEnum
 from copy import deepcopy
 import typing
+from collections.abc import Callable
 
 lib_list = ("zlib", "libxml2")
 subproject_list = ("llvm", "runtimes")
@@ -193,6 +194,7 @@ class llvm_environment(common.basic_environment):
     }
 
     compiler_rt_dir: Path  # compiler-rt所在路径
+    after_build_sysroot: dict[str, Callable[[typing.Self], None]]
 
     def __init__(
         self,
@@ -223,6 +225,7 @@ class llvm_environment(common.basic_environment):
             build_tmp (Path): 构建工具链时存放临时文件的路径
             default_generator (cmake_generator): 默认的cmake生成工具
         """
+
         self.build = build
         self.host = host or self.build
         self.family = family
@@ -292,6 +295,7 @@ class llvm_environment(common.basic_environment):
             )
         # 将自身注册到环境变量中
         self.register_in_env()
+        self.after_build_sysroot = {}
 
     def get_compiler(self, target: str, command_list_in: list[str]) -> list[str]:
         """获取编译器选项
@@ -373,7 +377,6 @@ class llvm_environment(common.basic_environment):
         Args:
             target (str): 目标平台
         """
-        # TODO:armv7m-none-eabi的sysroot生成
 
         prefix = self.prefix[f"{target}-runtimes"]
         arch = common.triplet_field(target).arch
@@ -427,6 +430,9 @@ class llvm_environment(common.basic_environment):
                 common.symlink(Path("i686-unknown-windows-gnu"), self.compiler_rt_dir / "i686-w64-windows-gnu")
             case _:
                 pass
+
+        if callback := self.after_build_sysroot.get(target, None):
+            callback(self)
 
     def copy_llvm_libs(self) -> None:
         """复制工具链所需库"""
