@@ -34,11 +34,6 @@ class modifier_list:
         env.sysroot_dir["armv7m-none-eabi"] = env.prefix_dir / "sysroot" / "armv7m-none-eabi"
         env.generator_list["armv7m-none-eabi"] = cmake_generator.make
 
-        def after_build_sysroot(env: llvm_environment) -> None:
-            common.rename(env.compiler_rt_dir / "armv7m-unknown-none-eabi", env.compiler_rt_dir / "armv7-unknown-none-eabi")
-
-        env.after_build_sysroot["armv7m-none-eabi"] = after_build_sysroot
-
     @staticmethod
     def modify(env: llvm_environment, targets: list[str]) -> None:
         for target in targets:

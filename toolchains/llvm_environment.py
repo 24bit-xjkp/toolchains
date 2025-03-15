@@ -390,16 +390,17 @@ class llvm_environment(common.basic_environment):
         if arch == "arm" and triplet_field.abi == "gnueabihf":
             arch = "armhf"
         sysroot_dir = self.sysroot_dir[target]
+        target_sysroot = sysroot_dir if sysroot_dir.name == target else sysroot_dir / target
         for src_dir in prefix.iterdir():
             match src_dir.name:
                 case "bin":
                     # 复制dll
-                    dst_dir = sysroot_dir / target / "lib"
+                    dst_dir = target_sysroot / "lib"
                     for file in src_dir.iterdir():
                         if file.suffix == ".dll":
                             common.copy(file, dst_dir / file.name)
                 case "lib":
-                    dst_dir = sysroot_dir / target / "lib"
+                    dst_dir = target_sysroot / "lib"
                     common.mkdir(dst_dir, False)
                     for item in src_dir.iterdir():
                         # 复制compiler-rt
@@ -419,13 +420,13 @@ class llvm_environment(common.basic_environment):
                             common.copy(item, dst_dir / item.name)
                 case "include":
                     # 复制__config_site
-                    dst_dir = sysroot_dir / target / "include"
+                    dst_dir = target_sysroot / "include"
                     common.copy(src_dir / "c++" / "v1" / "__config_site", dst_dir / "__config_site")
                     # 对于Windows目标，需要在sysroot/include下准备一份头文件
                     dst_dir = sysroot_dir / "include" / "c++"
                     common.copy(self.prefix["llvm"] / "include" / "c++", dst_dir, False)
                 case "share":
-                    dst_dir = sysroot_dir / target / "share"
+                    dst_dir = target_sysroot / "share"
                     common.mkdir(dst_dir, False)
                     for item in src_dir.iterdir():
                         common.copy(item, dst_dir / item.name)
