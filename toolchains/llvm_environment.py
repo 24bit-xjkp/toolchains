@@ -318,6 +318,8 @@ class llvm_environment(common.basic_environment):
             command_list.append(f"-DCMAKE_{compiler}_COMPILER_TARGET={target}")
             command_list.append(f'-DCMAKE_{compiler}_FLAGS="-Wno-unused-command-line-argument {gcc_toolchain} {" ".join(command_list_in)}"')
             command_list.append(f"-DCMAKE_{compiler}_COMPILER_WORKS=ON")
+        for linker in ("EXE", "MODULE", "SHARED"):
+            command_list.append(f'-DCMAKE_{linker}_LINKER_FLAGS="{gcc_toolchain} {" ".join(command_list_in)}"')
         if target != self.build:
             system_name = (
                 self.runtime_build_options[target].system_name
@@ -379,10 +381,14 @@ class llvm_environment(common.basic_environment):
         """
 
         prefix = self.prefix[f"{target}-runtimes"]
-        arch = common.triplet_field(target).arch
+        triplet_field = common.triplet_field(target)
+        arch = triplet_field.arch
         # 针对i686的修正
         if arch == "i686":
             arch = "i386"
+        # 针对arm-linux-gnueabihf的修正
+        if arch == "arm" and triplet_field.abi == "gnueabihf":
+            arch = "armhf"
         sysroot_dir = self.sysroot_dir[target]
         for src_dir in prefix.iterdir():
             match src_dir.name:
