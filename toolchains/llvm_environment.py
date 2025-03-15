@@ -380,6 +380,9 @@ class llvm_environment(common.basic_environment):
 
         prefix = self.prefix[f"{target}-runtimes"]
         arch = common.triplet_field(target).arch
+        # 针对i686的修正
+        if arch == "i686":
+            arch = "i386"
         sysroot_dir = self.sysroot_dir[target]
         for src_dir in prefix.iterdir():
             match src_dir.name:
