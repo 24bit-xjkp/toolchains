@@ -452,6 +452,7 @@ def run_command(
     ignore_error: bool = False,
     capture: bool | tuple[_FILE, _FILE] = False,
     echo: bool = True,
+    add_counter: bool = True,
     dry_run: bool | None = None,
 ) -> subprocess.CompletedProcess[str] | None:
     """运行指定命令, 若不忽略错误, 则在命令执行出错时抛出RuntimeError, 反之打印错误码
@@ -462,6 +463,7 @@ def run_command(
         capture (bool | tuple[_FILE, _FILE], optional): 是否捕获命令输出，默认为不捕获. 若为tuple则capture[0]和capture[1]分别为stdout和stderr.
                                                       tuple中字段为None表示不捕获相应管道的数据，则相应数据会回显
         echo (bool, optional): 是否回显信息，设置为False将不回显任何信息，包括错误提示，默认为回显.
+        add_counter (bool, optional): 是否增加状态计数. 默认为增加计数.
         dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
 
     Raises:
@@ -493,10 +495,10 @@ def run_command(
         )
     except subprocess.CalledProcessError as e:
         if not ignore_error:
-            raise RuntimeError(toolchains_error(f'Command "{command}" failed.'))
+            raise RuntimeError(toolchains_error(f'Command "{command}" failed.', add_counter=add_counter))
         elif echo:
             toolchains_print(
-                toolchains_warning(f'Command "{command}" failed with errno={e.returncode}, but it is ignored.')
+                toolchains_warning(f'Command "{command}" failed with errno={e.returncode}, but it is ignored.', add_counter=add_counter)
             )
         return None
     return result

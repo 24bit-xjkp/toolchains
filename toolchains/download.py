@@ -63,7 +63,6 @@ def download_specific_extra_lib(config: configure, lib: str) -> None:
     extra_lib_v = all_lib_list.extra_lib_list[lib]
     for file, url in extra_lib_v.url_list.items():
         common.run_command(f"wget {url} {common.command_quiet.get_option()} -c -t {config.network_try_times} -O {config.home / file}")
-    common.status_counter.add_success()
 
 
 def download(config: configure) -> None:
@@ -82,7 +81,9 @@ def download(config: configure) -> None:
             # 首先从源上克隆代码，但不进行签出
             for _ in range(config.network_try_times):
                 try:
-                    common.run_command(f"git clone {url} {common.command_quiet.get_option()} {extra_option} --no-checkout {lib_dir}")
+                    common.run_command(
+                        f"git clone {url} {common.command_quiet.get_option()} {extra_option} --no-checkout {lib_dir}", add_counter=False
+                    )
                     break
                 except KeyboardInterrupt:
                     common.remove_if_exists(lib_dir)
@@ -95,7 +96,7 @@ def download(config: configure) -> None:
             # 从git储存库中签出HEAD
             for _ in range(config.network_try_times):
                 try:
-                    common.run_command(f"git -C {lib_dir} checkout HEAD")
+                    common.run_command(f"git -C {lib_dir} checkout HEAD", add_counter=False)
                     break
                 except KeyboardInterrupt:
                     common.keyboard_interpret_received()
@@ -139,7 +140,7 @@ def update(config: configure) -> None:
         with tempfile.TemporaryFile("r+") as file:
             for _ in range(config.network_try_times):
                 try:
-                    common.run_command(f"git -C {lib_dir} fetch --dry-run", capture=(file, file))
+                    common.run_command(f"git -C {lib_dir} fetch --dry-run", capture=(file, file), add_counter=False)
                     break
                 except KeyboardInterrupt:
                     common.keyboard_interpret_received()
@@ -153,7 +154,7 @@ def update(config: configure) -> None:
             if file.tell():
                 for _ in range(config.network_try_times):
                     try:
-                        common.run_command(f"git -C {lib_dir} pull {common.command_quiet.get_option()}")
+                        common.run_command(f"git -C {lib_dir} pull {common.command_quiet.get_option()}", add_counter=False)
                         break
                     except KeyboardInterrupt:
                         common.keyboard_interpret_received()
