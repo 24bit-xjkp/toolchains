@@ -98,6 +98,16 @@ class modifier_list:
         env.gcc_option += ["--with-mode=thumb", "--with-arch=armv7-m"]
 
     @staticmethod
+    def arm_nonewlib_none_eabi(env: build_gcc_environment) -> None:
+        """arm嵌入式cpu大多使用armv7-m，只支持Thumb2
+
+        Args:
+            env (build_gcc_environment): 当前gcc构建平台
+        """
+
+        env.gcc_option += ["--with-mode=thumb", "--with-arch=armv7-m"]
+
+    @staticmethod
     def modify(env: build_gcc_environment, target: str) -> None:
         target = target.replace("-", "_")
         if modifier := getattr(modifier_list, target, None):
