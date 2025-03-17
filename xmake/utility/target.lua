@@ -23,17 +23,24 @@ function freestanding_modifier(toolchain, _)
     toolchain:add("ldflags", "-nodefaultlibs", "-lstdc++", "-lgcc")
 end
 
+local note_msg = "${color.warning}NOTE:${default} "
+
 ---根据target重设sysroot
 ---@param target string
 ---@param opt opt_t
 ---@return nil
 function _reset_sysroot(target, opt)
+    import("common")
+    local cache_info = common.get_cache()
+    if cache_info["sysroot_set_by_user"] then
+        return
+    end
     local sysroot_option = opt.sysroot
     local sysroot = sysroot_option.ldflags:sub(11)
     local libcxx_option = #sysroot_option.cxflags == 2 and sysroot_option.cxflags[2] or nil
     local target_sysroot = path.join(sysroot, target)
     if path.filename(sysroot) ~= target and os.isdir(target_sysroot) then
-        print([[Note: Reset "--sysroot" option to "%s".]], target_sysroot)
+        cprint(note_msg .. [[Reset "--sysroot" option to "%s".]], target_sysroot)
         sysroot = "--sysroot=" .. target_sysroot
         opt.sysroot.cxflags = { sysroot, libcxx_option }
         opt.sysroot.ldflags = sysroot
@@ -48,7 +55,7 @@ end
 function _reset_march(march, opt)
     local march_option = "-march=" .. march
     if opt.march ~= march_option then
-        print([[Note: Reset "-march" option to %s.]], march)
+        cprint(note_msg .. [[Reset "-march" option to %s.]], march)
         opt.march = march_option
     end
 end
@@ -82,6 +89,8 @@ clang_only_target_list = {
 ---@type modifier_table_t
 gcc_only_target_list = {
     ["arm-none-eabi"] = noop_modifier,
+    ---编译gcc时已经指定过默认选项，此处不再指定
+    ["arm-fpv4-none-eabi"] = noop_modifier,
     ["arm-nonewlib-none-eabi"] = freestanding_modifier,
     ["riscv-none-elf"] = noop_modifier,
 }
