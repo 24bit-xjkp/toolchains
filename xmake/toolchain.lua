@@ -114,6 +114,7 @@ function register_gcc_toolchain(target)
         end)
 
         on_load(function(toolchain)
+            target, modifier = import("utility.utility").get_target_modifier(target, "gcc")
             prefix = target == "native" and "" or target .. "-"
             toolchain:set("toolset", "cc", prefix .. "gcc")
             toolchain:set("toolset", "cxx", prefix .. "g++", prefix .. "gcc")
