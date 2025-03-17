@@ -385,9 +385,9 @@ def need_dry_run(dry_run: bool | None) -> bool:
     return bool(dry_run is None and command_dry_run.get() or dry_run)
 
 
-def support_dry_run[**P, R](
-    echo_fn: Callable[..., str | None] | None = None, end: str | None = None
-) -> Callable[[Callable[P, R]], Callable[P, R | None]]:
+def support_dry_run[
+    **P, R
+](echo_fn: Callable[..., str | None] | None = None, end: str | None = None) -> Callable[[Callable[P, R]], Callable[P, R | None]]:
     """根据dry_run参数和command_dry_run中的全局状态确定是否只回显命令而不执行，若fn没有dry_run参数则只会使用全局状态
 
     Args:
@@ -452,6 +452,7 @@ def run_command(
     ignore_error: bool = False,
     capture: bool | tuple[_FILE, _FILE] = False,
     echo: bool = True,
+    add_counter: bool = True,
     dry_run: bool | None = None,
 ) -> subprocess.CompletedProcess[str] | None:
     """运行指定命令, 若不忽略错误, 则在命令执行出错时抛出RuntimeError, 反之打印错误码
@@ -462,6 +463,7 @@ def run_command(
         capture (bool | tuple[_FILE, _FILE], optional): 是否捕获命令输出，默认为不捕获. 若为tuple则capture[0]和capture[1]分别为stdout和stderr.
                                                       tuple中字段为None表示不捕获相应管道的数据，则相应数据会回显
         echo (bool, optional): 是否回显信息，设置为False将不回显任何信息，包括错误提示，默认为回显.
+        add_counter (bool, optional): 是否增加状态计数. 默认为增加计数.
         dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
 
     Raises:
@@ -493,10 +495,10 @@ def run_command(
         )
     except subprocess.CalledProcessError as e:
         if not ignore_error:
-            raise RuntimeError(toolchains_error(f'Command "{command}" failed.', add_counter=False))
+            raise RuntimeError(toolchains_error(f'Command "{command}" failed.', add_counter=add_counter))
         elif echo:
             toolchains_print(
-                toolchains_warning(f'Command "{command}" failed with errno={e.returncode}, but it is ignored.', add_counter=False)
+                toolchains_warning(f'Command "{command}" failed with errno={e.returncode}, but it is ignored.', add_counter=add_counter)
             )
         return None
     return result
@@ -526,23 +528,24 @@ def mkdir(path: Path, remove_if_exist: bool = True, dry_run: bool | None = None)
         dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
 
-    if remove_if_exist and path.exists():
+    if remove_if_exist and path.exists(follow_symlinks=False):
         shutil.rmtree(path)
     os.makedirs(path, exist_ok=True)
 
 
-def _copy_echo(src: Path, dst: Path) -> str:
+def _copy_echo(src: Path, dst: Path, overwrite: bool) -> str:
     """在复制文件或目录时回显信息
 
     Args:
         src (Path): 源路径
         dst (Path): 目标路径
+        overwrite (bool, optional): 是否覆盖已存在项.
 
     Returns:
         str: 回显信息
     """
 
-    return toolchains_info(f"Copy {src} -> {dst}.")
+    return toolchains_info(f"Copy {src} -> {dst}{'' if overwrite else ' if not exist.'}")
 
 
 @support_dry_run(_copy_echo)
@@ -558,16 +561,16 @@ def copy(src: Path, dst: Path, overwrite: bool = True, follow_symlinks: bool = F
     """
 
     # 创建目标目录
-    dir = dst.parent
-    mkdir(dir, False)
-    if not overwrite and dst.exists():
+    if not (dir := dst.parent).exists(follow_symlinks=False):
+        mkdir(dir)
+    if not overwrite and dst.exists(follow_symlinks=False):
         return
     if src.is_dir():
-        if dst.exists():
+        if dst.exists(follow_symlinks=False):
             shutil.rmtree(dst)
         shutil.copytree(src, dst, not follow_symlinks)
     else:
-        if dst.exists():
+        if dst.exists(follow_symlinks=False):
             os.remove(dst)
         shutil.copyfile(src, dst, follow_symlinks=follow_symlinks)
 
@@ -587,7 +590,7 @@ def copy_if_exist(src: Path, dst: Path, overwrite: bool = True, follow_symlinks:
         bool: 是否发生了复制
     """
 
-    if src.exists():
+    if src.exists(follow_symlinks=False):
         copy(src, dst, overwrite, follow_symlinks)
         return True
     else:
@@ -616,7 +619,7 @@ def remove(path: Path, dry_run: bool | None = None) -> None:
         dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
 
-    if path.is_dir():
+    if path.is_dir(follow_symlinks=False):
         shutil.rmtree(path)
     else:
         os.remove(path)
@@ -634,7 +637,7 @@ def remove_if_exists(path: Path, dry_run: bool | None = None) -> bool:
         bool: 是否发生了移动
     """
 
-    if path.exists():
+    if path.exists(follow_symlinks=False):
         remove(path)
         return True
     else:
@@ -723,9 +726,11 @@ def symlink(target: Path, symlink_path: Path, overwrite: bool = True, dry_run: b
         dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
 
-    if not overwrite and symlink_path.exists():
-        return
-    remove_if_exists(symlink_path)
+    if symlink_path.exists(follow_symlinks=False):
+        if overwrite:
+            remove(symlink_path)
+        else:
+            return
     symlink_path.symlink_to(target, target.is_dir())
 
 
@@ -739,7 +744,7 @@ def symlink_if_exist(target: Path, symlink_path: Path, overwrite: bool = True, d
         dry_run (bool | None, optional): 是否只回显命令而不执行，默认为None.
     """
 
-    if target.exists():
+    if (resolve_path(target, symlink_path.parent)).exists(follow_symlinks=False):
         symlink(target, symlink_path, overwrite, dry_run)
 
 
@@ -954,6 +959,7 @@ class basic_environment(compress_environment):
     name_without_version: str  # 不带版本号的工具链名
     name: str  # 工具链名
     bin_dir: Path  # 安装后可执行文件所在目录
+    build_tmp: Path  # 构建过程中中间文件所在目录
 
     def __init__(
         self,
@@ -965,6 +971,7 @@ class basic_environment(compress_environment):
         prefix_dir: Path,
         compress_level: int,
         long_distance_match: int,
+        build_tmp: Path,
     ) -> None:
         super().__init__(jobs, prefix_dir, compress_level, long_distance_match)
         self.build = build
@@ -976,6 +983,7 @@ class basic_environment(compress_environment):
         self.root_dir = Path(__file__).parent.resolve()
         self.script_dir = self.root_dir.parent / "script"
         self.bin_dir = self.prefix_dir / self.name / "bin"
+        self.build_tmp = build_tmp
 
     def compress(self, name: str | None = None) -> None:
         """压缩构建完成的工具链
@@ -1144,6 +1152,15 @@ class triplet_field:
         """
 
         return f"{self.arch}-{self.os}-{self.abi}"
+
+    def __str__(self) -> str:
+        """将各个字段连接成字符串
+
+        Returns:
+            str: 由4个字段连接成的字符串
+        """
+
+        return f"{self.arch}-{self.vendor}-{self.os}-{self.abi}"
 
 
 def check_home(home: str | Path) -> None:
@@ -1777,8 +1794,27 @@ class basic_prefix_build_configure(basic_prefix_configure):
 class basic_build_configure(basic_compress_configure, basic_prefix_build_configure):
     """工具链构建配配置"""
 
-    def __init__(self, **kwargs: typing.Any) -> None:
-        super().__init__(**kwargs)
+    build_tmp: Path
+    _origin_build_tmp: str
+
+    def __init__(self, build_tmp: str = str(Path.home() / "build_tmp"), base_path: Path = Path.cwd(), **kwargs: typing.Any) -> None:
+        super().__init__(base_path=base_path, **kwargs)
+        self._origin_build_tmp = build_tmp
+        self.register_encode_name_map("build_tmp", "_origin_build_tmp")
+        self.build_tmp = resolve_path(build_tmp, base_path)
+
+    @classmethod
+    def add_argument(cls, parser: argparse.ArgumentParser) -> None:
+        super().add_argument(parser)
+        default_config = basic_build_configure()
+        action = parser.add_argument(
+            "--build-tmp",
+            "-t",
+            type=str,
+            help="The directory to store temporary files when build the toolchain.",
+            default=default_config.build_tmp,
+        )
+        register_completer(action, dir_completer)
 
 
 @contextmanager

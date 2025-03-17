@@ -239,6 +239,8 @@ class all_lib_list:
         "lld",
         "libxml2-dev",
         "wget",
+        "swig",
+        "libncurses5-dev",  # ncurses5-compat-libs for ArchLinux
     ]
     git_lib_list_github: typing.Final[dict[str, git_url]] = {
         "gcc": git_url("github.com", "gcc-mirror/gcc.git"),

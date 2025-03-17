@@ -39,10 +39,10 @@ def dump_support_platform() -> None:
     """打印所有受支持的平台"""
 
     print(common.color.note.wrapper("Host support:"))
-    for host in support_platform_list.host_list:
+    for host in gcc_support_platform_list.host_list:
         print(f"\t{host}")
     print(common.color.note.wrapper("Target support:"))
-    for target in support_platform_list.target_list:
+    for target in gcc_support_platform_list.target_list:
         print(f"\t{target}")
 
     print(common.color.note.wrapper("NOTE:"), "You can add a vendor field to triplets above.")
@@ -52,7 +52,7 @@ def dump_support_platform() -> None:
 
 __all__ = [
     "modifier_list",
-    "support_platform_list",
+    "gcc_support_platform_list",
     "configure",
     "build_gcc_environment",
     "check_triplet",
@@ -72,9 +72,9 @@ def main() -> int:
     # 添加build相关选项
     configure.add_argument(build_parser)
     action = build_parser.add_argument("--host", type=str, help="The host platform of the GCC toolchain.", default=default_config.build)
-    common.register_completer(action, common.triplet_completer(support_platform_list.host_list))
+    common.register_completer(action, common.triplet_completer(gcc_support_platform_list.host_list))
     action = build_parser.add_argument("--target", type=str, help="The target platform of the GCC toolchain.", default=default_config.build)
-    common.register_completer(action, common.triplet_completer(support_platform_list.target_list))
+    common.register_completer(action, common.triplet_completer(gcc_support_platform_list.target_list))
     build_parser.add_argument(
         "--gdb", action=argparse.BooleanOptionalAction, help="Whether to enable gdb support in GCC toolchain.", default=default_config.gdb
     )

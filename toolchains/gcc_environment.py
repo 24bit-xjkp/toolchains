@@ -48,7 +48,16 @@ def get_specific_environment(self: common.basic_environment, host: str | None = 
     """
 
     return gcc_environment(
-        self.build, host, target, self.home, self.jobs, self.prefix_dir, self.compress_level, self.long_distance_match, True
+        self.build,
+        host,
+        target,
+        self.home,
+        self.jobs,
+        self.prefix_dir,
+        self.compress_level,
+        self.long_distance_match,
+        self.build_tmp,
+        True,
     )
 
 
@@ -58,7 +67,7 @@ class gcc_environment(common.basic_environment):
     build: str  # build平台
     host: str  # host平台
     target: str  # target平台
-    toolchain_type: common.toolchain_type  # 工具链类别
+    toolchain_type: "common.toolchain_type"  # 工具链类别
     cross_compiler: bool  # 是否是交叉编译器
     prefix: Path  # 工具链安装位置
     lib_prefix: Path  # 安装后库目录的前缀]
@@ -85,6 +94,7 @@ class gcc_environment(common.basic_environment):
         prefix_dir: Path,
         compress_level: int,
         long_distance_match: int,
+        build_tmp: Path,
         simple: bool = False,
     ) -> None:
         self.build = build
@@ -96,7 +106,7 @@ class gcc_environment(common.basic_environment):
         self.cross_compiler = self.toolchain_type.contain(common.toolchain_type.cross | common.toolchain_type.canadian_cross)
 
         name_without_version = (f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native") + "-gcc"
-        super().__init__(build, "15.0.1", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match)
+        super().__init__(build, "15.0.1", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match, build_tmp)
 
         self.prefix = self.prefix_dir / self.name
         self.lib_prefix = self.prefix / self.target if not self.toolchain_type.contain(common.toolchain_type.canadian) else self.prefix
@@ -114,6 +124,7 @@ class gcc_environment(common.basic_environment):
         if simple:
             return
 
+        common.mkdir(self.build_tmp, False)
         self.lib_dir_list = {}
         for lib in lib_list:
             lib_dir = self.home / lib
@@ -132,6 +143,7 @@ class gcc_environment(common.basic_environment):
                 case _:
                     common.check_lib_dir(lib, lib_dir)
             self.lib_dir_list[lib] = lib_dir
+        self.lib_dir_list["gdbserver"] = self.lib_dir_list["binutils"]
         self.tool_prefix = f"{self.target}-" if self.cross_compiler else ""
 
         self.python_config_path = self.root_dir.parent / "script" / "python_config.sh"
@@ -145,7 +157,7 @@ class gcc_environment(common.basic_environment):
         # 将自身注册到环境变量中
         self.register_in_env()
 
-    def enter_build_dir(self, lib: str, remove_files: bool = True) -> None:
+    def enter_build_dir(self, lib: str) -> None:
         """进入构建目录
 
         Args:
@@ -153,18 +165,18 @@ class gcc_environment(common.basic_environment):
         """
 
         assert lib in lib_list
-        build_dir = self.lib_dir_list[lib]
         need_make_build_dir = True  # 是否需要建立build目录
         match lib:
             case "python-embed" | "linux":
                 need_make_build_dir = False  # 跳过python-embed和linux，python-embed仅需要生成静态库，linux有独立的编译方式
-            case "expat":
-                build_dir = build_dir / "expat" / "build"  # expat项目内嵌套了一层目录
+                build_dir = self.lib_dir_list[lib]
+            case "glibc" | "mingw" | "newlib":
+                build_dir = self.build_tmp / f"{self.host}-{lib}"
             case _:
-                build_dir = build_dir / "build"
+                build_dir = self.build_tmp / f"{self.host}-host-{self.target}-target-{lib}"
 
         if need_make_build_dir:
-            common.mkdir(build_dir, remove_files)
+            common.mkdir(build_dir, False)
 
         common.chdir(build_dir)
         # 添加构建gdb所需的环境变量
@@ -172,16 +184,18 @@ class gcc_environment(common.basic_environment):
             common.add_environ("ORIGIN", "$$ORIGIN")
             common.add_environ("PYTHON_EMBED_PACKAGE", self.lib_dir_list["python-embed"])  # mingw下编译带python支持的gdb需要
 
-    def configure(self, *option: str) -> None:
+    def configure(self, lib: str, *option: str) -> None:
         """自动对库进行配置
 
         Args:
+            lib (str): 要构建的库
             option (tuple[str, ...]): 配置选项
         """
 
         options = " ".join(("", *option))
+        configure_prefix = self.lib_dir_list[lib] if lib != "expat" else self.lib_dir_list[lib] / "expat"
         # 编译glibc时LD_LIBRARY_PATH中不能包含当前路径，此处直接清空LD_LIBRARY_PATH环境变量
-        common.run_command(f"../configure {common.command_quiet.get_option()} {options} LD_LIBRARY_PATH=")
+        common.run_command(f"{configure_prefix / 'configure'} {common.command_quiet.get_option()} {options} LD_LIBRARY_PATH=")
 
     def make(self, *target: str, ignore_error: bool = False) -> None:
         """自动对库进行编译
@@ -348,7 +362,7 @@ def get_mingw_lib_prefix_list(env: gcc_environment) -> dict[str, Path]:
         dict[str,Path]: {包名:安装路径}
     """
 
-    return {lib: env.home / lib / "install" for lib in ("gmp", "expat", "mpfr")}
+    return {lib: env.build_tmp / f"{env.host}-{lib}-install" for lib in ("gmp", "expat", "mpfr")}
 
 
 def build_mingw_gdb_requirements(env: gcc_environment) -> None:
@@ -365,6 +379,7 @@ def build_mingw_gdb_requirements(env: gcc_environment) -> None:
             continue  # 已经存在则跳过构建
         env.enter_build_dir(lib)
         env.configure(
+            lib,
             f"--host={env.host} --disable-shared --enable-static",
             f"--prefix={prefix}",
             f"--with-gmp={lib_prefix_list['gmp']}" if lib == "mpfr" else "",
@@ -433,6 +448,7 @@ class build_gcc_environment:
         nls: bool,
         compress_level: int,
         long_distance_match: int,
+        build_tmp: Path,
     ) -> None:
         """gcc交叉工具链对象
 
@@ -449,9 +465,10 @@ class build_gcc_environment:
             nls (bool): 是否启用nls
             compress_level (int): zstd压缩等级
             long_distance_match (int): 长距离匹配窗口大小
+            build_tmp (Path): 构建工具链时存放临时文件的路径
         """
 
-        self.env = gcc_environment(build, host, target, home, jobs, prefix_dir, compress_level, long_distance_match)
+        self.env = gcc_environment(build, host, target, home, jobs, prefix_dir, compress_level, long_distance_match, build_tmp)
         self.host_os = self.env.host_field.os
         self.target_os = self.env.target_field.os
         self.target_arch = self.env.target_field.arch
@@ -561,8 +578,8 @@ class build_gcc_environment:
         # 编译gdbserver
         if self.need_gdbserver:
             self.env.solve_libgcc_limits()
-            self.env.enter_build_dir("binutils")
-            self.env.configure(*self.basic_option, *self.gdbserver_option)
+            self.env.enter_build_dir("gdbserver")
+            self.env.configure("gdbserver", *self.basic_option, *self.gdbserver_option)
             self.env.make()
             self.env.install("install-strip-gdbserver")
 
@@ -590,7 +607,7 @@ class build_gcc_environment:
         env = build_env.env
         # 编译gcc
         env.enter_build_dir("gcc")
-        env.configure(*build_env.basic_option, *build_env.gcc_option)
+        env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
         env.make()
         env.install()
 
@@ -600,14 +617,14 @@ class build_gcc_environment:
 
         # 编译安装glibc
         env.enter_build_dir("glibc")
-        env.configure(*build_env.libc_option)
+        env.configure("glibc", *build_env.libc_option)
         env.make()
         env.install("install")
         env.adjust_glibc(build_env.adjust_glibc_arch)
 
         # 编译binutils，如果启用gdb和gdbserver则一并编译
         env.enter_build_dir("binutils")
-        env.configure(*build_env.basic_option, *build_env.gdb_option)
+        env.configure("binutils", *build_env.basic_option, *build_env.gdb_option)
         env.make()
         env.install()
         # 完成后续工作
@@ -623,14 +640,14 @@ class build_gcc_environment:
 
         env = build_env.env
         # 编译binutils，如果启用gdb则一并编译
-        env.enter_build_dir("binutils")
-        env.configure(*build_env.basic_option, *build_env.gdb_option)
+        env.enter_build_dir(lib="binutils")
+        env.configure(lib="binutils", *build_env.basic_option, *build_env.gdb_option)
         env.make()
         env.install()
 
         # 编译gcc
         env.enter_build_dir("gcc")
-        env.configure(*build_env.basic_option, *build_env.gcc_option, "--disable-shared")
+        env.configure("gcc", *build_env.basic_option, *build_env.gcc_option, "--disable-shared")
         env.make("all-gcc")
         env.install("install-strip-gcc")
 
@@ -640,27 +657,27 @@ class build_gcc_environment:
 
         # 安装glibc头文件
         env.enter_build_dir("glibc")
-        env.configure(*build_env.libc_option, "libc_cv_forced_unwind=yes")
+        env.configure("glibc", *build_env.libc_option, "libc_cv_forced_unwind=yes")
         env.make("install-headers")
         # 为了跨平台，不能使用mknod
         with build_env.glibc_phony_stubs_path.open("w"):
             pass
 
         # 编译安装libgcc
-        env.enter_build_dir("gcc", False)
+        env.enter_build_dir("gcc")
         env.make("all-target-libgcc")
         env.install("install-target-libgcc")
 
         # 编译安装glibc
         env.enter_build_dir("glibc")
-        env.configure(*build_env.libc_option)
+        env.configure("glibc", *build_env.libc_option)
         env.make()
         env.install("install")
         env.adjust_glibc(build_env.adjust_glibc_arch)
 
         # 编译完整gcc
         env.enter_build_dir("gcc")
-        env.configure(*build_env.basic_option, *build_env.gcc_option)
+        env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
         env.make()
         env.install()
 
@@ -671,6 +688,7 @@ class build_gcc_environment:
         # 编译pexports
         self.env.enter_build_dir("pexports")
         self.env.configure(
+            "pexports",
             f"--prefix={self.env.prefix} --host={self.env.host}",
             "CFLAGS=-O3",
             "CXXFLAGS=-O3",
@@ -693,31 +711,31 @@ class build_gcc_environment:
         env = build_env.env
         # 编译binutils，如果启用gdb则一并编译
         env.enter_build_dir("binutils")
-        env.configure(*build_env.basic_option, *build_env.gdb_option)
+        env.configure("binutils", *build_env.basic_option, *build_env.gdb_option)
         env.make()
         env.install()
 
         # 编译安装mingw-w64头文件
         env.enter_build_dir("mingw")
-        env.configure(*build_env.libc_option, "--without-crt")
+        env.configure("mingw", *build_env.libc_option, "--without-crt")
         env.make()
         env.install()
 
         # 编译gcc和libgcc
         env.enter_build_dir("gcc")
-        env.configure(*build_env.basic_option, *build_env.gcc_option, "--disable-shared")
+        env.configure("gcc", *build_env.basic_option, *build_env.gcc_option, "--disable-shared")
         env.make("all-gcc all-target-libgcc")
         env.install("install-strip-gcc install-target-libgcc")
 
         # 编译完整mingw-w64
         env.enter_build_dir("mingw")
-        env.configure(*build_env.libc_option)
+        env.configure("mingw", *build_env.libc_option)
         env.make()
         env.install()
 
         # 编译完整的gcc
         env.enter_build_dir("gcc")
-        env.configure(*build_env.basic_option, *build_env.gcc_option)
+        env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
         env.make()
         env.install()
 
@@ -736,31 +754,31 @@ class build_gcc_environment:
         env = build_env.env
         # 编译binutils，如果启用gdb则一并编译
         env.enter_build_dir("binutils")
-        env.configure(*build_env.basic_option, *build_env.gdb_option)
+        env.configure("binutils", *build_env.basic_option, *build_env.gdb_option)
         env.make()
         env.install()
 
         if build_env.need_newlib:
             # 编译安装gcc
             env.enter_build_dir("gcc")
-            env.configure(*build_env.basic_option, *build_env.gcc_option)
+            env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
             env.make("all-gcc")
             env.install("install-strip-gcc")
 
             # 编译安装newlib
             env.enter_build_dir("newlib")
-            env.configure(*build_env.libc_option)
+            env.configure("newlib", *build_env.libc_option)
             env.make()
             env.install()
 
             # 编译安装完整gcc
-            env.enter_build_dir("gcc", False)
+            env.enter_build_dir("gcc")
             env.make()
             env.install()
         else:
             # 编译安装完整gcc
             env.enter_build_dir("gcc")
-            env.configure(*build_env.basic_option, *build_env.gcc_option)
+            env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
             env.make()
             env.install("install-strip")
 
@@ -778,13 +796,13 @@ class build_gcc_environment:
         env = build_env.env
         # 编译binutils，如果启用gdb则一并编译
         env.enter_build_dir("binutils")
-        env.configure(*build_env.basic_option, *build_env.gdb_option)
+        env.configure("binutils", *build_env.basic_option, *build_env.gdb_option)
         env.make()
         env.install()
 
         # 编译安装gcc
         env.enter_build_dir("gcc")
-        env.configure(*build_env.basic_option, *build_env.gcc_option)
+        env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
         env.make("all-gcc")
         env.install("install-strip-gcc")
 

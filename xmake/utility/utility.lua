@@ -1,41 +1,19 @@
-import("core.cache.detectcache")
----@alias map_t table<string, string>
-
----判断工具链是否是clang
----@return boolean --是否是clang工具链
-function _is_clang()
-    return string.find(get_config("toolchain") or "", "clang", 1, true) ~= nil
-end
-
----本模块使用的缓存键
-local cache_key = "toolchain.utility"
-
----获取缓存信息
----@return table<string, any> --缓存信息表
-function _get_cache()
-    local cache_info = detectcache:get(cache_key)
-    if not cache_info then
-        cache_info = {}
-        detectcache:set(cache_key, cache_info)
-    end
-    return cache_info
-end
-
----更新缓存信息
----@param cache_info table --要保存的缓存信息
----@return nil
-function _update_cache(cache_info)
-    detectcache:set(cache_key, cache_info)
-    detectcache:save()
-end
+import("common")
 
 ---根据arch和plat推导target和modifier
+---@param target string --目标平台
 ---@param toolchain string --工具链名称
 ---@return string --目标平台
 ---@return modifier_t --调整函数
-function get_target_modifier(toolchain)
+function get_target_modifier(target, toolchain)
+    ---@type modifier_table_t
+    local target_list = import("target", { anonymous = true }).get_target_list()
+    if target ~= "target" then
+        return target, target_list[target]
+    end
+
     ---@type table<string, any>
-    local cache_info = _get_cache()
+    local cache_info = common.get_cache()
     ---@type string, modifier_t
     local target, modifier = table.unpack(cache_info["target"] or {})
     if target and modifier then -- 已经探测过，直接返回target和modifier
@@ -118,12 +96,12 @@ function get_target_modifier(toolchain)
     end
     target = table.concat(field, "-")
 
-    modifier = import("target", { anonymous = true }).get_target_list()[target]
+    modifier = target_list[target]
     cprint("detecting for target .. " .. (modifier and "${color.success}" or "${color.failure}") .. target)
     assert(modifier, format(message, "target", target))
 
     cache_info["target"] = { target, modifier }
-    _update_cache(cache_info)
+    common.update_cache(cache_info)
 
     return target, modifier
 end
@@ -131,7 +109,7 @@ end
 ---根据选项或探测结果获取sysroot选项列表
 ---@return table<string, string | string[]> | nil --选项列表
 function get_sysroot_option()
-    local cache_info = _get_cache()
+    local cache_info = common.get_cache()
     ---sysroot缓存
     ---@type string | nil
     local sysroot = cache_info["sysroot"]
@@ -156,7 +134,8 @@ function get_sysroot_option()
     -- sysroot不为"no"或"detect"则为指定的sysroot
     sysroot = (sysroot ~= "no" and not detect) and sysroot or nil
     -- 若使用clang工具链且未指定sysroot则尝试自动探测
-    detect = detect and _is_clang()
+    detect = detect and common.is_clang()
+    cache_info["sysroot_set_by_user"] = sysroot and true or false
     if sysroot then    -- 有指定sysroot则检查合法性
         assert(os.isdir(sysroot), string.format([[The sysroot "%s" is not a directory.]], sysroot))
     elseif detect then -- 尝试探测
@@ -183,7 +162,7 @@ function get_sysroot_option()
 
     -- 更新缓存
     cache_info["sysroot"] = sysroot or ""
-    _update_cache(cache_info)
+    common.update_cache(cache_info)
 
     if sysroot then
         return get_option_list()
@@ -201,7 +180,7 @@ end
 ---@note 在target和toolchain存在时才检查选项合法性
 ---@return string | nil --march选项
 function get_march_option(target, toolchain)
-    local cache_info = _get_cache()
+    local cache_info = common.get_cache()
     local option = cache_info["march"]
     if option == "" then
         return nil    -- 已经探测过，-march不受支持
@@ -242,7 +221,7 @@ function get_march_option(target, toolchain)
 
     -- 更新缓存
     cache_info["march"] = option
-    _update_cache(cache_info)
+    common.update_cache(cache_info)
     return option
 end
 
@@ -250,7 +229,7 @@ end
 ---@return string | nil --rtlib选项
 function get_rtlib_option()
     local config = get_config("rtlib")
-    return (_is_clang() and config ~= "default") and "-rtlib=" .. config or nil
+    return (common.is_clang() and config ~= "default") and "-rtlib=" .. config or nil
 end
 
 ---获取unwindlib选项
@@ -260,7 +239,7 @@ function get_unwindlib_option()
     local force = config:startswith("force")
     local lib = force and string.sub(config, 7, #config) or config
     local option = config ~= "default" and "-unwindlib=" .. lib or nil
-    return (_is_clang() and (force or get_config("rtlib") == "compiler-rt")) and option or nil
+    return (common.is_clang() and (force or get_config("rtlib") == "compiler-rt")) and option or nil
 end
 
 ---将mode映射为cmake风格

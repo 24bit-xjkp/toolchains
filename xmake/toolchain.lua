@@ -31,9 +31,8 @@ end
 
 ---注册clang工具链
 ---@param target string --clang工具链目标平台
----@param modifier modifier_t --回调函数，为target定制一些flag
 ---@return nil
-function register_clang_toolchain(target, modifier)
+function register_clang_toolchain(target)
     toolchain(target .. "-clang", function()
         set_kind("standalone")
         set_homepage("https://github.com/24bit-xjkp/toolchains/")
@@ -61,48 +60,55 @@ function register_clang_toolchain(target, modifier)
                 toolchain:add("runtimes", "MT", "MTd", "MD", "MDd")
             end
 
-            if target == "target" then
-                target, modifier = utility.get_target_modifier()
-            end
+            ---@type string, modifier_t
+            local target, modifier = utility.get_target_modifier(target, "clang")
 
-            toolchain:add("cxflags", utility.get_march_option(target, "clang"))
+            local march_option = utility.get_march_option(target, "clang")
             local sysroot_option = utility.get_sysroot_option()
+            local rtlib_option = utility.get_rtlib_option()
+            local unwind_option = utility.get_unwindlib_option()
+            local target_option = target ~= "native" and "--target=" .. target or nil
+
+            local opt = {
+                march = march_option,
+                sysroot = sysroot_option,
+                rtlib = rtlib_option,
+                unwind = unwind_option,
+                target = target_option
+            }
+            modifier(toolchain, opt)
+
+            toolchain:add("cxflags", march_option)
             for flag, option in pairs(sysroot_option) do
                 toolchain:add(flag, option)
             end
-
-            local rtlib_option = utility.get_rtlib_option()
-            local unwind_option = utility.get_unwindlib_option()
-            for _, flag in ipairs({ "cxflags", "ldflags", "shflags" }) do
-                toolchain:add(flag, target ~= "native" and "--target=" .. target or nil)
+            for _, flag in ipairs({ "cxflags", "ldflags", "shflags", "asflags" }) do
+                toolchain:add(flag, target_option)
                 toolchain:add(flag ~= "cxflags" and flag or nil, rtlib_option, unwind_option)
             end
-
-            modifier(toolchain)
         end)
     end)
 end
 
-for target, modifier in pairs(target_list) do
-    register_clang_toolchain(target, modifier)
+for target, _ in pairs(get_clang_target_list()) do
+    register_clang_toolchain(target)
 end
 
 ---注册gcc工具链
 ---@param target string --gcc工具链目标平台
----@param modifier modifier_t --回调函数，为target定制一些flag
 ---@return nil
-function register_gcc_toolchain(target, modifier)
+function register_gcc_toolchain(target)
     toolchain(target .. "-gcc", function()
         set_kind("standalone")
         set_homepage("https://github.com/24bit-xjkp/toolchains/")
         set_description(_get_toolchain_description("gcc", target))
         set_runtimes("stdc++_static", "stdc++_shared")
         local prefix
+        ---@type modifier_t
+        local modifier
 
         on_check(function(_)
-            if target == "target" then
-                target, modifier = import("utility.utility").get_target_modifier()
-            end
+            target, modifier = import("utility.utility").get_target_modifier(target, "gcc")
             prefix = target == "native" and "" or target .. "-"
             return import("lib.detect.find_program")(prefix .. "gcc")
         end)
@@ -120,17 +126,20 @@ function register_gcc_toolchain(target, modifier)
             toolchain:set("toolset", "as", prefix .. "gcc")
 
             import("utility.utility")
-            toolchain:add("cxflags", utility.get_march_option(target, "gcc"))
+            local march_option = utility.get_march_option(target, "gcc")
             local sysroot_option = utility.get_sysroot_option()
+
+            local opt = { march = march_option, sysroot = sysroot_option }
+            modifier(toolchain, opt)
+
+            toolchain:add("cxflags", march_option)
             for flag, option in pairs(sysroot_option) do
                 toolchain:add(flag, option)
             end
-
-            modifier(toolchain)
         end)
     end)
 end
 
-for target, modifier in pairs(general_target_list) do
-    register_gcc_toolchain(target, modifier)
+for target, _ in pairs(get_gcc_target_list()) do
+    register_gcc_toolchain(target)
 end
