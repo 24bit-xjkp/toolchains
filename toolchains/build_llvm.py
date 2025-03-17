@@ -26,21 +26,25 @@ def sysroot(env: llvm_environment) -> None:
         target_dir = sysroot_dir / target
         common.mkdir(target_dir)
         match (target):
-            case "armv7m-none-eabi":
-                gcc = get_specific_environment(env, env.build, "arm-none-eabi")
+            case "armv7m-none-eabi" | "armv7m-fpv4-none-eabi":
+                # 将armv7m转化为arm以便和gcc保持一致
+                triplet_filed = common.triplet_field(target)
+                triplet_filed.arch = "arm"
+                target = str(triplet_filed) if triplet_filed.vendor != "unknown" else triplet_filed.drop_vendor()
+                gcc = get_specific_environment(env, env.build, target)
                 # 复制include和lib
                 for dir in ("include", "lib"):
                     common.copy(gcc.lib_prefix / dir, target_dir / dir)
                 # 复制libgcc
                 for file in filter(
                     lambda file: file.suffix in (".a", ".o", ".specs"),
-                    (gcc.prefix / "lib" / "gcc" / "arm-none-eabi" / gcc.version).iterdir(),
+                    (gcc.prefix / "lib" / "gcc" / target / gcc.version).iterdir(),
                 ):
                     common.copy(file, target_dir / "lib" / file.name)
-                # 复制arm-none-eabi相关文件夹到c++ include根目录的文件夹下
+                # 复制target相关文件夹到c++ include根目录的文件夹下
                 cpp_dir = target_dir / "include" / "c++" / gcc.version
                 for dir in ("bits", "ext"):
-                    for file in (cpp_dir / "arm-none-eabi" / dir).iterdir():
+                    for file in (cpp_dir / target / dir).iterdir():
                         common.copy(file, cpp_dir / dir / file.name)
             case _:
                 gcc = get_specific_environment(env, env.build, target)

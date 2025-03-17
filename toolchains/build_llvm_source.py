@@ -31,8 +31,16 @@ class modifier_list:
 
     @staticmethod
     def armv7m_none_eabi(env: llvm_environment) -> None:
-        env.sysroot_dir["armv7m-none-eabi"] = env.prefix_dir / "sysroot" / "armv7m-none-eabi"
-        env.generator_list["armv7m-none-eabi"] = cmake_generator.make
+        target = "armv7m-none-eabi"
+        env.sysroot_dir[target] = env.prefix_dir / "sysroot" / target
+        env.generator_list[target] = cmake_generator.make
+
+    @staticmethod
+    def armv7m_fpv4_none_eabi(env: llvm_environment) -> None:
+        target = "armv7m-fpv4-none-eabi"
+        env.sysroot_dir[target] = env.prefix_dir / "sysroot" / target
+        env.generator_list[target] = cmake_generator.make
+        env.runtime_build_options[target].basic_option += ["-march=armv7-m", "-mfpu=fpv4-sp-d16", "-mfloat-abi=hard"]
 
     @staticmethod
     def modify(env: llvm_environment, targets: list[str]) -> None:
@@ -76,7 +84,12 @@ class llvm_support_platform_list:
     arch_list: typing.Final[list[str]] = ["X86", "AArch64", "RISCV", "ARM", "LoongArch", "Mips"]
     project_list: typing.Final[list[str]] = ["clang", "clang-tools-extra", "lld", "lldb", "bolt", "mlir"]
     runtime_list: typing.Final[list[str]] = ["libcxx", "libcxxabi", "libunwind", "compiler-rt", "openmp"]
-    target_list: typing.Final[list[str]] = [*generate_hosted_list_from_gcc(), "loongarch64-loongnix-linux-gnu", "armv7m-none-eabi"]
+    target_list: typing.Final[list[str]] = [
+        *generate_hosted_list_from_gcc(),
+        "loongarch64-loongnix-linux-gnu",
+        "armv7m-none-eabi",
+        "armv7m-fpv4-none-eabi",
+    ]
 
 
 class configure(common.basic_build_configure):
