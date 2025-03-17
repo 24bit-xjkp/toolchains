@@ -108,6 +108,17 @@ class modifier_list:
         env.gcc_option += ["--with-mode=thumb", "--with-arch=armv7-m"]
 
     @staticmethod
+    def arm_fpv4_none_eabi(env: build_gcc_environment) -> None:
+        """Thumb2+fpv4-sp-d16
+
+        Args:
+            env (build_gcc_environment): 当前gcc构建平台
+        """
+
+        env.gcc_option += ["--with-mode=thumb", "--with-arch=armv7-m", "--with-fpu=fpv4-sp-d16", "--with-float=hard"]
+        env.libc_option += ['CFLAGS_FOR_TARGET="-march=armv7-m -mfpu=fpv4-sp-d16 -mfloat-abi=hard -O3"']
+
+    @staticmethod
     def modify(env: build_gcc_environment, target: str) -> None:
         target = target.replace("-", "_")
         if modifier := getattr(modifier_list, target, None):
@@ -135,6 +146,7 @@ class support_platform_list:
         "x86_64-w64-mingw32",
         "i686-w64-mingw32",
         "arm-none-eabi",
+        "arm-none-eabihf",
         "x86_64-elf",
         "mips64el-linux-gnuabi64",
     ]
