@@ -1,5 +1,6 @@
 ---@alias modifier_t fun(toolchain:unknown, opt:table<string, unknown>):nil
 ---@alias modifier_table_t table<string, modifier_t>
+---@alias opt_t table<string, unknown>
 
 ---占位符，无效果
 ---@return nil
@@ -22,31 +23,61 @@ function freestanding_modifier(toolchain, _)
     toolchain:add("ldflags", "-nodefaultlibs", "-lstdc++", "-lgcc")
 end
 
----为armv7m定制部分flag
----@param opt table<string, unknown>
+---根据target重设sysroot
+---@param target string
+---@param opt opt_t
 ---@return nil
-function armv7m_modifier(_, opt)
-    if opt.march ~= "-march=armv7-m" then
-        print([[Note: Reset "-march" option to armv7-m.]])
-        opt.march = "-march=armv7-m"
-    end
+function _reset_sysroot(target, opt)
     local sysroot_option = opt.sysroot
     local sysroot = sysroot_option.ldflags:sub(11)
     local libcxx_option = #sysroot_option.cxflags == 2 and sysroot_option.cxflags[2] or nil
-    ---@type string
-    local armv7m_sysroot = path.join(sysroot, "armv7m-none-eabi")
-    if path.filename(sysroot) ~= "armv7m-none-eabi" and os.isdir(armv7m_sysroot) then
-        print([[Note: Reset "--sysroot" option to ]] .. armv7m_sysroot)
-        sysroot = "--sysroot=" .. armv7m_sysroot
+    local target_sysroot = path.join(sysroot, target)
+    if path.filename(sysroot) ~= target and os.isdir(target_sysroot) then
+        print([[Note: Reset "--sysroot" option to "%s".]], target_sysroot)
+        sysroot = "--sysroot=" .. target_sysroot
         opt.sysroot.cxflags = { sysroot, libcxx_option }
         opt.sysroot.ldflags = sysroot
         opt.sysroot.shflags = sysroot
     end
 end
 
+---重设march为指定值
+---@param march string
+---@param opt opt_t
+---@return nil
+function _reset_march(march, opt)
+    local march_option = "-march=" .. march
+    if opt.march ~= march_option then
+        print([[Note: Reset "-march" option to %s.]], march)
+        opt.march = march_option
+    end
+end
+
+---为armv7m定制部分flag
+---@param opt opt_t
+---@return nil
+function armv7m_modifier(_, opt)
+    _reset_march("armv7-m", opt)
+    _reset_sysroot("armv7m-none-eabi", opt)
+end
+
+---为armv7m-fpv4定制部分flag
+---@param opt opt_t
+---@return nil
+function armv7m_fpv4_modifier(toolchain, opt)
+    _reset_march("armv7-m", opt)
+    _reset_sysroot("armv7m-fpv4-none-eabi", opt)
+    toolchain:add("cxflags", "-mfpu=fpv4-sp-d16", "-mfloat-abi=hard")
+    toolchain:add("asflags", "-mfpu=fpv4-sp-d16")
+end
+
 ---只有clang支持的目标
 ---@type modifier_table_t
-clang_only_target_list = { ["x86_64-windows-msvc"] = noop_modifier, ["armv7m-none-eabi"] = armv7m_modifier }
+clang_only_target_list = {
+    ["x86_64-windows-msvc"] = noop_modifier,
+    ["armv7m-none-eabi"] = armv7m_modifier,
+    ["armv7m-fpv4-none-eabi"] = armv7m_fpv4_modifier,
+}
 ---只有gcc支持的目标
 ---@type modifier_table_t
 gcc_only_target_list = {
