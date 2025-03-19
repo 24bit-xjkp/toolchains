@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "toolchains"
-version = "0.2.0"
+version = "0.2.1"
 description = "Build GCC and LLVM toolchains automatically."
 authors = [
     { name = "24bit-xjkp", email = "2283572185@qq.com" },
