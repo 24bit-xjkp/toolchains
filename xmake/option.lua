@@ -1,9 +1,9 @@
 option("march", function()
     set_description([[Set the "-march" option for gcc and clang.]],
         "The option is automatically added if using our toolchain option.",
-        [[    no: Don't set the "-march" option, use the default march of the toolchain.]],
+        [[    none: Don't set the "-march" option, use the default march of the toolchain.]],
         [[    default: Set the "-march" option as "-march=native" if possible, otherwise don't set the "-march" option and use the default march of the toolchain.]],
-        [[    arch: Set the "-march" option as "-march=arch". Note that "arch" is any value other than "no" and "default".]])
+        [[    arch: Set the "-march" option as "-march=arch". Note that "arch" is any value other than "none" and "default".]])
     set_default("default")
     after_check(function(option)
         import("utility.utility")
@@ -14,9 +14,9 @@ end)
 option("sysroot", function()
     set_description("Set the `--sysroot` option for gcc and clang.",
         "The option is automatically added if using our toolchain option.",
-        [[    no: Don't set the "--sysroot" option, use the default sysroot of the toolchain.]],
+        [[    none: Don't set the "--sysroot" option, use the default sysroot of the toolchain.]],
         [[    detect: Detect and set the sysroot for clang, use the default sysroot for gcc.]],
-        [[    path: Set the "--sysroot" option as "--sysroot=path". Note that "path" is an absolute path or a relative path other than "no" and "detect".]])
+        [[    path: Set the "--sysroot" option as "--sysroot=path". Note that "path" is an absolute path or a relative path other than "none" and "detect".]])
     set_default("detect")
     after_check(function(option)
         import("utility.utility")
@@ -63,11 +63,11 @@ end)
 
 option("debug_strip", function()
     set_description("Whether to strip the symbols while building with debug information.",
-        [[    no: Don't strip the symbols if possible.]],
+        [[    none: Don't strip the symbols if possible.]],
         [[    debug: Strip the debug symbols to a independent symbol file while keeping other symbols in the target file.]],
         [[    all: Strip the debug symbols to a independent symbol file then strip all symbols from the target file.]])
-    set_default("no")
-    set_values("no", "debug", "all")
+    set_default("none")
+    set_values("none", "debug", "all")
 end)
 
 option("enable_lto", function()

@@ -1,7 +1,7 @@
 includes("option.lua")
 ---@type string | nil
 local debug_strip = get_config("debug_strip")
-if debug_strip == "no" then -- 不剥离符号
+if debug_strip == "none" then -- 不剥离符号
     debug_strip = nil
 end
 ---@type boolean

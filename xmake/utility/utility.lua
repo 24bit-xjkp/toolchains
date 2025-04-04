@@ -131,8 +131,8 @@ function get_sysroot_option()
     -- 检查给定sysroot或者自动探测sysroot
     sysroot = get_config("sysroot")
     local detect = sysroot == "detect"
-    -- sysroot不为"no"或"detect"则为指定的sysroot
-    sysroot = (sysroot ~= "no" and not detect) and sysroot or nil
+    -- sysroot不为"none"或"detect"则为指定的sysroot
+    sysroot = (sysroot ~= "none" and not detect) and sysroot or nil
     -- 若使用clang工具链且未指定sysroot则尝试自动探测
     detect = detect and common.is_clang()
     cache_info["sysroot_set_by_user"] = sysroot and true or false
@@ -191,7 +191,7 @@ function get_march_option(target, toolchain)
     ---探测march是否受支持
     ---@type string
     local arch = get_config("march")
-    if arch ~= "no" then
+    if arch ~= "none" then
         local march = (arch ~= "default" and arch or "native")
         option = { "-march=" .. march }
         -- 在target和toolchain存在时才检查选项合法性
