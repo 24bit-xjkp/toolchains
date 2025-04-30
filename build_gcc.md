@@ -5,7 +5,7 @@
 | 项目        | 版本         |
 | :---------- | :----------- |
 | OS          | Ubuntu 24.10 |
-| GCC         | 15.0.0       |
+| GCC         | 15.1.0       |
 | GDB         | 17.0.50      |
 | Binutils    | 2.44.50      |
 | Python $^*$ | 3.13.2       |
@@ -25,7 +25,7 @@
 ### 1.安装系统包
 
 ```shell
-sudo apt install bison flex texinfo make automake autoconf libtool git gcc g++ gcc-multilib g++-multilib python3 tar zstd unzip libgmp-dev libmpfr-dev zlib1g-dev libexpat1-dev gawk bzip2
+sudo apt install bison flex texinfo make automake autoconf libtool git gcc g++ gcc-multilib g++-multilib python3 tar zstd unzip libgmp-dev libmpfr-dev zlib1g-dev libexpat1-dev gawk bzip2 rsync
 ```
 
 ### 2.下载源代码
@@ -196,9 +196,9 @@ import gdb
 import os
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-# pretty-printer所需的python脚本位于share/gcc-15.0.0/python下
+# pretty-printer所需的python脚本位于share/gcc-15.1.0/python下
 # 故使用哪个libstdc++.so.6.0.33-gdb.py都不影响结果，此处选择lib64下的
-python_dir  = os.path.normpath(os.path.join(current_dir, "../share/gcc-15.0.0/python"))
+python_dir  = os.path.normpath(os.path.join(current_dir, "../share/gcc-15.1.0/python"))
 if not python_dir in sys.path:
     sys.path.insert(0, python_dir)
 # 注册pretty-printer
@@ -647,7 +647,7 @@ make install-target-libstdc++-v3 install-target-libgcc -j 20
 cd ~/$BUILD-native-gcc15
 cp lib64/libstdc++.so.6 $PREFIX/lib64
 cp lib64/libgcc_s.so.1 $PREFIX/lib64
-cp -r share/gcc-15.0.0 $PREFIX/share
+cp -r share/gcc-15.1.0 $PREFIX/share
 ```
 
 ### 36.打包工具链
@@ -718,7 +718,7 @@ cp lib/libgcc_s_seh-1.dll $PREFIX/bin
 
 ```shell
 cd ~/$BUILD-native-gcc15
-cp -r share/gcc-15.0.0 $PREFIX/share
+cp -r share/gcc-15.1.0 $PREFIX/share
 ```
 
 ### 42.打包工具链
@@ -779,7 +779,7 @@ make install-target-libstdc++-v3 install-target-libgcc -j 20
 cd ~/$BUILD-native-gcc15
 cp lib64/libstdc++.so.6 $PREFIX/lib64
 cp lib64/libgcc_s.so.1 $PREFIX/lib64
-cp -r share/gcc-15.0.0 $PREFIX/share
+cp -r share/gcc-15.1.0 $PREFIX/share
 ```
 
 ### 47.打包工具链
@@ -850,7 +850,7 @@ cp lib/libgcc_s_seh-1.dll $PREFIX/bin
 
 ```shell
 cd ~/$BUILD-native-gcc15
-cp -r share/gcc-15.0.0 $PREFIX/share
+cp -r share/gcc-15.1.0 $PREFIX/share
 ```
 
 ### 53.打包工具链
@@ -1278,7 +1278,7 @@ cp lib64/libgcc_s.so.1 $PREFIX/lib64
 对limits.h文件末尾的修改如下：
 
 ```c++
-// lib/gcc/loongarch64-linux-gnu/15.0.0/include/limits.h
+// lib/gcc/loongarch64-linux-gnu/15.1.0/include/limits.h
 #endif /* _LIMITS_H___ */
 #undef MB_LEN_MAX
 #define MB_LEN_MAX 16
