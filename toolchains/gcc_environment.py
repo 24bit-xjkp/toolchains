@@ -106,7 +106,7 @@ class gcc_environment(common.basic_environment):
         self.cross_compiler = self.toolchain_type.contain(common.toolchain_type.cross | common.toolchain_type.canadian_cross)
 
         name_without_version = (f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native") + "-gcc"
-        super().__init__(build, "15.0.1", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match, build_tmp)
+        super().__init__(build, "16.0.0", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match, build_tmp)
 
         self.prefix = self.prefix_dir / self.name
         self.lib_prefix = self.prefix / self.target if not self.toolchain_type.contain(common.toolchain_type.canadian) else self.prefix
@@ -161,11 +161,12 @@ class gcc_environment(common.basic_environment):
         ld_library_path = [*filter(lambda path: path != "", common.get_environ_list("LD_LIBRARY_PATH"))]
         common.set_environ_list("LD_LIBRARY_PATH", ld_library_path)
 
-    def enter_build_dir(self, lib: str) -> None:
+    def enter_build_dir(self, lib: str, remove_if_exist: bool = False) -> None:
         """进入构建目录
 
         Args:
             lib (str): 要构建的库
+            remove_if_exist(bool): 是否删除已经存在的目录
         """
 
         assert lib in lib_list
@@ -180,7 +181,7 @@ class gcc_environment(common.basic_environment):
                 build_dir = self.build_tmp / f"{self.host}-host-{self.target}-target-{lib}"
 
         if need_make_build_dir:
-            common.mkdir(build_dir, False)
+            common.mkdir(build_dir, remove_if_exist)
 
         common.chdir(build_dir)
         # 添加构建gdb所需的环境变量
@@ -581,8 +582,8 @@ class build_gcc_environment:
         # 编译gdbserver
         if self.need_gdbserver:
             self.env.solve_libgcc_limits()
-            self.env.enter_build_dir("gdbserver")
-            self.env.configure("gdbserver", *self.basic_option, *self.gdbserver_option)
+            self.env.enter_build_dir("binutils", True)
+            self.env.configure("binutils", *self.basic_option, *self.gdbserver_option)
             self.env.make()
             self.env.install("install-strip-gdbserver")
 
@@ -704,6 +705,32 @@ class build_gcc_environment:
             common.rename(self.env.bin_dir / pexports, self.env.bin_dir / f"{self.env.target}-{pexports}")
 
     @staticmethod
+    def make_with_mingw_libbacktrace_patch(env: gcc_environment, target: str | None = None) -> None:
+        """在构建时修正libbacktrace构建流程
+
+        gcc会删除构建完成的libbacktrace，然后只将stat.o打包为libbacktrace.a，进而导致链接错误
+        该函数首先尝试make，构建失败后重新编译libbacktrace，然后继续make流程
+
+        Args:
+            env (gcc_environment): gcc构建环境
+            target (str | None, optional): 传递给env.make函数的目标，为None表示调用env.make(). 默认为None.
+        """
+
+        try:
+            if target is None:
+                env.make()
+            else:
+                env.make(target)
+        except:
+            with common.chdir_guard(Path("libbacktrace")):
+                env.make("clean")
+                env.make()
+            if target is None:
+                env.make()
+            else:
+                env.make(target)
+
+    @staticmethod
     def full_build_mingw(build_env: "build_gcc_environment") -> None:
         """完整自举target为mingw的gcc
 
@@ -727,7 +754,7 @@ class build_gcc_environment:
         # 编译gcc和libgcc
         env.enter_build_dir("gcc")
         env.configure("gcc", *build_env.basic_option, *build_env.gcc_option, "--disable-shared")
-        env.make("all-gcc all-target-libgcc")
+        build_gcc_environment.make_with_mingw_libbacktrace_patch(env, "all-gcc all-target-libgcc")
         env.install("install-strip-gcc install-target-libgcc")
 
         # 编译完整mingw-w64
@@ -739,7 +766,7 @@ class build_gcc_environment:
         # 编译完整的gcc
         env.enter_build_dir("gcc")
         env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
-        env.make()
+        build_gcc_environment.make_with_mingw_libbacktrace_patch(env)
         env.install()
 
         build_env.build_pexports()
@@ -806,7 +833,10 @@ class build_gcc_environment:
         # 编译安装gcc
         env.enter_build_dir("gcc")
         env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
-        env.make("all-gcc")
+        if build_env.target_os == "w64":
+            build_gcc_environment.make_with_mingw_libbacktrace_patch(env, "all-gcc")
+        else:
+            env.make("all-gcc")
         env.install("install-strip-gcc")
 
         # 有需要则编译安装pexports
