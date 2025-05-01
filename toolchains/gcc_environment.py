@@ -833,10 +833,11 @@ class build_gcc_environment:
         # 编译安装gcc
         env.enter_build_dir("gcc")
         env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
-        if build_env.target_os == "w64":
+        if build_env.target_os == "w64" and build_env.host_os != "w64":
             build_gcc_environment.make_with_mingw_libbacktrace_patch(env, "all-gcc")
         else:
             env.make("all-gcc")
+        env.make("all-gcc")
         env.install("install-strip-gcc")
 
         # 有需要则编译安装pexports
