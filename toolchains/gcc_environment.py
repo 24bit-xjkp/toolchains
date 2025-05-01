@@ -635,6 +635,32 @@ class build_gcc_environment:
         build_env.after_build_gcc(True)
 
     @staticmethod
+    def make_with_libbacktrace_patch(env: gcc_environment, target: str | None = None) -> None:
+        """在构建时修正libbacktrace构建流程
+
+        gcc会删除构建完成的libbacktrace，然后只将stat.o打包为libbacktrace.a，进而导致链接错误
+        该函数首先尝试make，构建失败后重新编译libbacktrace，然后继续make流程
+
+        Args:
+            env (gcc_environment): gcc构建环境
+            target (str | None, optional): 传递给env.make函数的目标，为None表示调用env.make(). 默认为None.
+        """
+
+        try:
+            if target is None:
+                env.make()
+            else:
+                env.make(target)
+        except:
+            with common.chdir_guard(Path("libbacktrace")):
+                env.make("clean")
+                env.make()
+            if target is None:
+                env.make()
+            else:
+                env.make(target)
+
+    @staticmethod
     def full_build_linux(build_env: "build_gcc_environment") -> None:
         """完整自举target为linux的gcc
 
@@ -645,14 +671,17 @@ class build_gcc_environment:
         env = build_env.env
         # 编译binutils，如果启用gdb则一并编译
         env.enter_build_dir(lib="binutils")
-        env.configure(lib="binutils", *build_env.basic_option, *build_env.gdb_option)
+        env.configure("binutils", *build_env.basic_option, *build_env.gdb_option)
         env.make()
         env.install()
 
         # 编译gcc
         env.enter_build_dir("gcc")
         env.configure("gcc", *build_env.basic_option, *build_env.gcc_option, "--disable-shared")
-        env.make("all-gcc")
+        if build_env.target_arch == "i686":
+            build_gcc_environment.make_with_libbacktrace_patch(env, "all-gcc")
+        else:
+            env.make("all-gcc")
         env.install("install-strip-gcc")
 
         # 安装Linux头文件
@@ -682,7 +711,10 @@ class build_gcc_environment:
         # 编译完整gcc
         env.enter_build_dir("gcc")
         env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
-        env.make()
+        if build_env.target_arch == "i686":
+            build_gcc_environment.make_with_libbacktrace_patch(env)
+        else:
+            env.make()
         env.install()
 
         # 完成后续工作
@@ -703,32 +735,6 @@ class build_gcc_environment:
         if not self.env.toolchain_type.contain(self.native_or_canadian):
             pexports = "pexports.exe" if self.host_os == "w64" else "pexports"
             common.rename(self.env.bin_dir / pexports, self.env.bin_dir / f"{self.env.target}-{pexports}")
-
-    @staticmethod
-    def make_with_mingw_libbacktrace_patch(env: gcc_environment, target: str | None = None) -> None:
-        """在构建时修正libbacktrace构建流程
-
-        gcc会删除构建完成的libbacktrace，然后只将stat.o打包为libbacktrace.a，进而导致链接错误
-        该函数首先尝试make，构建失败后重新编译libbacktrace，然后继续make流程
-
-        Args:
-            env (gcc_environment): gcc构建环境
-            target (str | None, optional): 传递给env.make函数的目标，为None表示调用env.make(). 默认为None.
-        """
-
-        try:
-            if target is None:
-                env.make()
-            else:
-                env.make(target)
-        except:
-            with common.chdir_guard(Path("libbacktrace")):
-                env.make("clean")
-                env.make()
-            if target is None:
-                env.make()
-            else:
-                env.make(target)
 
     @staticmethod
     def full_build_mingw(build_env: "build_gcc_environment") -> None:
@@ -754,7 +760,7 @@ class build_gcc_environment:
         # 编译gcc和libgcc
         env.enter_build_dir("gcc")
         env.configure("gcc", *build_env.basic_option, *build_env.gcc_option, "--disable-shared")
-        build_gcc_environment.make_with_mingw_libbacktrace_patch(env, "all-gcc all-target-libgcc")
+        build_gcc_environment.make_with_libbacktrace_patch(env, "all-gcc all-target-libgcc")
         env.install("install-strip-gcc install-target-libgcc")
 
         # 编译完整mingw-w64
@@ -766,7 +772,7 @@ class build_gcc_environment:
         # 编译完整的gcc
         env.enter_build_dir("gcc")
         env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
-        build_gcc_environment.make_with_mingw_libbacktrace_patch(env)
+        build_gcc_environment.make_with_libbacktrace_patch(env)
         env.install()
 
         build_env.build_pexports()
@@ -833,8 +839,8 @@ class build_gcc_environment:
         # 编译安装gcc
         env.enter_build_dir("gcc")
         env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
-        if build_env.target_os == "w64" and build_env.host_os != "w64":
-            build_gcc_environment.make_with_mingw_libbacktrace_patch(env, "all-gcc")
+        if (build_env.target_os == "w64" and build_env.host_os != "w64") or build_env.target_arch == "i686":
+            build_gcc_environment.make_with_libbacktrace_patch(env, "all-gcc")
         else:
             env.make("all-gcc")
         env.make("all-gcc")
