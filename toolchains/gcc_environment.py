@@ -157,6 +157,10 @@ class gcc_environment(common.basic_environment):
         # 将自身注册到环境变量中
         self.register_in_env()
 
+        # 从LD_LIBRARY_PATH中过滤掉空路径
+        ld_library_path = [*filter(lambda path: path != "", common.get_environ_list("LD_LIBRARY_PATH"))]
+        common.set_environ_list("LD_LIBRARY_PATH", ld_library_path)
+
     def enter_build_dir(self, lib: str) -> None:
         """进入构建目录
 
@@ -194,8 +198,7 @@ class gcc_environment(common.basic_environment):
 
         options = " ".join(("", *option))
         configure_prefix = self.lib_dir_list[lib] if lib != "expat" else self.lib_dir_list[lib] / "expat"
-        # 编译glibc时LD_LIBRARY_PATH中不能包含当前路径，此处直接清空LD_LIBRARY_PATH环境变量
-        common.run_command(f"{configure_prefix / 'configure'} {common.command_quiet.get_option()} {options} LD_LIBRARY_PATH=")
+        common.run_command(f"{configure_prefix / 'configure'} {common.command_quiet.get_option()} {options}")
 
     def make(self, *target: str, ignore_error: bool = False) -> None:
         """自动对库进行编译

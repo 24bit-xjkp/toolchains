@@ -771,6 +771,28 @@ def insert_environ(key: str, value: str | Path) -> None:
     value = str(value)
     os.environ[key] = f"{value}{os.pathsep}{os.environ[key]}"
 
+def get_environ_list(key:str) -> list[str]:
+    """获取根据os.pathsep分割的环境变量值列表
+
+    Args:
+        key (str): 环境变量名称
+
+    Returns:
+        list[str]: 分割后的列表
+    """
+
+    return os.environ[key].split(os.pathsep)
+
+def set_environ_list(key:str, value:list[str])->None:
+    """将环境变量值列表设置到当前进程的环境变量中
+
+    Args:
+        key (str): 环境变量名称
+        value (list[str]): 值列表
+    """
+
+    os.environ[key] = os.pathsep.join(value)
+
 
 @contextmanager
 def chdir_guard(path: Path, dry_run: bool | None = None) -> Generator[None, None, None]:
