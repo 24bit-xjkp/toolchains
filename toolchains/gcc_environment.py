@@ -646,19 +646,14 @@ class build_gcc_environment:
             target (str | None, optional): 传递给env.make函数的目标，为None表示调用env.make(). 默认为None.
         """
 
+        make = lambda: env.make(*([target] if target is not None else []))
         try:
-            if target is None:
-                env.make()
-            else:
-                env.make(target)
+            make()
         except:
             with common.chdir_guard(Path("libbacktrace")):
                 env.make("clean")
                 env.make()
-            if target is None:
-                env.make()
-            else:
-                env.make(target)
+            make()
 
     @staticmethod
     def full_build_linux(build_env: "build_gcc_environment") -> None:
@@ -678,10 +673,7 @@ class build_gcc_environment:
         # 编译gcc
         env.enter_build_dir("gcc")
         env.configure("gcc", *build_env.basic_option, *build_env.gcc_option, "--disable-shared")
-        if build_env.target_arch == "i686":
-            build_gcc_environment.make_with_libbacktrace_patch(env, "all-gcc")
-        else:
-            env.make("all-gcc")
+        build_gcc_environment.make_with_libbacktrace_patch(env, "all-gcc")
         env.install("install-strip-gcc")
 
         # 安装Linux头文件
@@ -711,10 +703,7 @@ class build_gcc_environment:
         # 编译完整gcc
         env.enter_build_dir("gcc")
         env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
-        if build_env.target_arch == "i686":
-            build_gcc_environment.make_with_libbacktrace_patch(env)
-        else:
-            env.make()
+        build_gcc_environment.make_with_libbacktrace_patch(env)
         env.install()
 
         # 完成后续工作
@@ -839,11 +828,7 @@ class build_gcc_environment:
         # 编译安装gcc
         env.enter_build_dir("gcc")
         env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
-        if (build_env.target_os == "w64" and build_env.host_os != "w64") or build_env.target_arch == "i686":
-            build_gcc_environment.make_with_libbacktrace_patch(env, "all-gcc")
-        else:
-            env.make("all-gcc")
-        env.make("all-gcc")
+        build_gcc_environment.make_with_libbacktrace_patch(env, "all-gcc")
         env.install("install-strip-gcc")
 
         # 有需要则编译安装pexports
