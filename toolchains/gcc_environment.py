@@ -176,7 +176,7 @@ class gcc_environment(common.basic_environment):
                 need_make_build_dir = False  # 跳过python-embed和linux，python-embed仅需要生成静态库，linux有独立的编译方式
                 build_dir = self.lib_dir_list[lib]
             case "glibc" | "mingw" | "newlib":
-                build_dir = self.build_tmp / f"{self.host}-{lib}"
+                build_dir = self.build_tmp / f"{self.target}-{lib}"
             case _:
                 build_dir = self.build_tmp / f"{self.host}-host-{self.target}-target-{lib}"
 
