@@ -672,7 +672,7 @@ class build_gcc_environment:
 
         # 编译gcc
         env.enter_build_dir("gcc")
-        env.configure("gcc", *build_env.basic_option, *build_env.gcc_option, "--disable-shared")
+        env.configure("gcc", *build_env.basic_option, *build_env.gcc_option, "--disable-shared", "--disable-gcov")
         build_gcc_environment.make_with_libbacktrace_patch(env, "all-gcc")
         env.install("install-strip-gcc")
 
