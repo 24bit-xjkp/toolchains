@@ -169,7 +169,7 @@ class gcc_environment(common.basic_environment):
             remove_if_exist(bool): 是否删除已经存在的目录
         """
 
-        assert lib in lib_list
+        assert lib in self.lib_dir_list
         need_make_build_dir = True  # 是否需要建立build目录
         match lib:
             case "python-embed" | "linux":
@@ -582,8 +582,8 @@ class build_gcc_environment:
         # 编译gdbserver
         if self.need_gdbserver:
             self.env.solve_libgcc_limits()
-            self.env.enter_build_dir("binutils", True)
-            self.env.configure("binutils", *self.basic_option, *self.gdbserver_option)
+            self.env.enter_build_dir("gdbserver", True)
+            self.env.configure("gdbserver", *self.basic_option, *self.gdbserver_option)
             self.env.make()
             self.env.install("install-strip-gdbserver")
 
