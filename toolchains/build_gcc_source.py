@@ -48,7 +48,7 @@ class modifier_list:
             env = build_env.env
             # 编译binutils，如果启用gdb则一并编译
             env.enter_build_dir("binutils")
-            env.configure(*build_env.basic_option, *build_env.gdb_option)
+            env.configure("binutils", *build_env.basic_option, *build_env.gdb_option)
             env.make()
             env.install()
 
@@ -66,8 +66,8 @@ class modifier_list:
 
             # 编译完整gcc
             env.enter_build_dir("gcc")
-            env.configure(*build_env.basic_option, *build_env.gcc_option)
-            env.make()
+            env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
+            build_gcc_environment.make_with_libbacktrace_patch(env)
             env.install()
 
             # 完成后续工作
