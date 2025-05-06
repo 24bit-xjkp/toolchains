@@ -16,7 +16,7 @@ def _check_input(args: argparse.Namespace, need_check: bool) -> None:
 
 
 def build_specific_gcc(
-    config: configure,
+    config: gcc_configure,
     host: str,
     target: str,
 ) -> None:
@@ -53,7 +53,7 @@ def dump_support_platform() -> None:
 __all__ = [
     "modifier_list",
     "gcc_support_platform_list",
-    "configure",
+    "gcc_configure",
     "build_gcc_environment",
     "check_triplet",
     "build_specific_gcc",
@@ -62,7 +62,7 @@ __all__ = [
 
 
 def main() -> int:
-    default_config = configure()
+    default_config = gcc_configure()
 
     parser = argparse.ArgumentParser(description="Build GCC toolchain to specific platform.")
     subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands.")
@@ -70,7 +70,7 @@ def main() -> int:
     subparsers.add_parser("dump", help="Print support platforms and exit.", formatter_class=common.arg_formatter)
 
     # 添加build相关选项
-    configure.add_argument(build_parser)
+    gcc_configure.add_argument(build_parser)
     action = build_parser.add_argument("--host", type=str, help="The host platform of the GCC toolchain.", default=default_config.build)
     common.register_completer(action, common.triplet_completer(gcc_support_platform_list.host_list))
     action = build_parser.add_argument("--target", type=str, help="The target platform of the GCC toolchain.", default=default_config.build)
@@ -104,7 +104,7 @@ def main() -> int:
         match (args.command):
             case "build":
                 _check_input(args, args.command == "build")
-                current_config = configure.parse_args(args)
+                current_config = gcc_configure.parse_args(args)
 
                 # 检查合并配置后环境是否正确
                 current_config.check()
