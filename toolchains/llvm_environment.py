@@ -194,7 +194,7 @@ class llvm_environment(common.basic_environment):
     }
 
     compiler_rt_dir: Path  # compiler-rt所在路径
-    after_build_sysroot: dict[str, Callable[[typing.Self], None]]
+    after_build_sysroot: dict[str, Callable[["llvm_environment"], None]]
 
     def __init__(
         self,

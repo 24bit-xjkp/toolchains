@@ -646,7 +646,7 @@ class build_gcc_environment:
             target (str | None, optional): 传递给env.make函数的目标，为None表示调用env.make(). 默认为None.
         """
 
-        make = lambda: env.make(*([target] if target is not None else []))
+        make: Callable[[], None] = lambda: env.make(*([target] if target is not None else []))
         try:
             make()
         except:
