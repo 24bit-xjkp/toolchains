@@ -146,7 +146,6 @@ class gcc_support_platform_list:
         "x86_64-w64-mingw32",
         "i686-w64-mingw32",
         "arm-none-eabi",
-        "arm-none-eabihf",
         "x86_64-elf",
         "mips64el-linux-gnuabi64",
     ]
