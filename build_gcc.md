@@ -9,7 +9,7 @@
 | GDB         | 17.0.50      |
 | Binutils    | 2.44.50      |
 | Python $^*$ | 3.13.2       |
-| Linux       | 6.14-rc2     |
+| Linux       | 6.15-rc4     |
 | Glibc       | 2.40         |
 | Mingw-w64   | 12.0.0       |
 | PExports    | 0.47         |
