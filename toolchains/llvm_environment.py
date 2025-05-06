@@ -1,11 +1,11 @@
+import typing
+from collections.abc import Callable
+from copy import deepcopy
+from enum import StrEnum
 from pathlib import Path
 
 from . import common
 from .gcc_environment import get_specific_environment
-from enum import StrEnum
-from copy import deepcopy
-import typing
-from collections.abc import Callable
 
 lib_list = ("zlib", "libxml2")
 subproject_list = ("llvm", "runtimes")

@@ -771,7 +771,8 @@ def insert_environ(key: str, value: str | Path) -> None:
     value = str(value)
     os.environ[key] = f"{value}{os.pathsep}{os.environ[key]}"
 
-def get_environ_list(key:str) -> list[str]:
+
+def get_environ_list(key: str) -> list[str]:
     """获取根据os.pathsep分割的环境变量值列表
 
     Args:
@@ -783,7 +784,8 @@ def get_environ_list(key:str) -> list[str]:
 
     return os.environ[key].split(os.pathsep)
 
-def set_environ_list(key:str, value:list[str])->None:
+
+def set_environ_list(key: str, value: list[str]) -> None:
     """将环境变量值列表设置到当前进程的环境变量中
 
     Args:
