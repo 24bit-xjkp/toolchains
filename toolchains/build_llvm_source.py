@@ -92,7 +92,7 @@ class llvm_support_platform_list:
     ]
 
 
-class configure(common.basic_build_configure):
+class llvm_configure(common.basic_build_configure):
     """llvm构建配置"""
 
     toolchain_type: str = "LLVM"
@@ -112,7 +112,7 @@ class configure(common.basic_build_configure):
     def add_argument(cls, parser: ArgumentParser) -> None:
         super().add_argument(parser)
 
-        default_config = configure()
+        default_config = llvm_configure()
         parser.add_argument(
             "--generator",
             "-g",
@@ -130,7 +130,7 @@ sysroot_config = common.basic_prefix_build_configure
 __all__ = [
     "modifier_list",
     "llvm_support_platform_list",
-    "configure",
+    "llvm_configure",
     "llvm_environment",
     "build_llvm_environment",
     "runtime_family",

@@ -80,11 +80,11 @@ def build_specific_llvm(env: llvm_environment) -> None:
     common.toolchains_print(common.toolchains_success("Build LLVM successfully."))
 
 
-__all__ = ["modifier_list", "llvm_support_platform_list", "configure", "llvm_environment", "sysroot_config", "sysroot"]
+__all__ = ["modifier_list", "llvm_support_platform_list", "llvm_configure", "llvm_environment", "sysroot_config", "sysroot"]
 
 
 def main() -> int:
-    default_config = configure()
+    default_config = llvm_configure()
 
     parser = argparse.ArgumentParser(description="Build LLVM toolchain to specific platform.")
     subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands.")
@@ -96,7 +96,7 @@ def main() -> int:
     build_parser = subparsers.add_parser("build", help="Build the LLVM toolchain.", formatter_class=common.arg_formatter)
 
     sysroot_config.add_argument(sysroot_parser)
-    configure.add_argument(build_parser)
+    llvm_configure.add_argument(build_parser)
     action = build_parser.add_argument("--host", type=str, help="The host platform of the LLVM toolchain.", default=default_config.build)
     common.register_completer(action, common.triplet_completer(llvm_support_platform_list.host_list))
     build_parser.add_argument(
@@ -120,7 +120,7 @@ def main() -> int:
                 sysroot_config_v["build_tmp"] = Path.home() / "build_tmp"
                 sysroot(llvm_environment(**sysroot_config_v))
             case "build":
-                build_config = configure.parse_args(args)
+                build_config = llvm_configure.parse_args(args)
                 assert args.host in llvm_support_platform_list.host_list, common.toolchains_error(f"Host {args.host} is not supported.")
                 env = llvm_environment(
                     host=args.host,
@@ -133,3 +133,17 @@ def main() -> int:
                 pass
 
     return common.toolchains_main(do_main)
+
+
+__all__ = [
+    "modifier_list",
+    "llvm_support_platform_list",
+    "llvm_configure",
+    "llvm_environment",
+    "build_llvm_environment",
+    "runtime_family",
+    "cmake_generator",
+    "sysroot_config",
+    "sysroot",
+    "build_specific_llvm",
+]
