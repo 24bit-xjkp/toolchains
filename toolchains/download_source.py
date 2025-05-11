@@ -15,7 +15,7 @@ class extra_lib_version(enum.StrEnum):
     loongnix_glibc = "2.28"
     loongnix = loongnix_linux
     gmp = "6.3.0"
-    mpfr = "4.2.1"
+    mpfr = "4.2.2"
 
     def _save_version_echo(self, dir: Path) -> str:
         """在保存包信息时回显信息

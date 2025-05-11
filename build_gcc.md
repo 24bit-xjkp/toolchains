@@ -15,7 +15,7 @@
 | PExports    | 0.47         |
 | Iconv       | 1.18         |
 | Gmp         | 6.3.0        |
-| Mpfr        | 4.2.1        |
+| Mpfr        | 4.2.2        |
 | Expat       | 2.6.4        |
 
 *: 在为Windows平台编译带有Python支持的GDB时需要下载Python包，Linux平台可以使用系统自带包
