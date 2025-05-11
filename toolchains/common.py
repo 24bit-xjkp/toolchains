@@ -772,17 +772,19 @@ def insert_environ(key: str, value: str | Path) -> None:
     os.environ[key] = f"{value}{os.pathsep}{os.environ[key]}"
 
 
-def get_environ_list(key: str) -> list[str]:
+def get_environ_list(key: str, no_exist_ok: bool = False) -> list[str]:
     """获取根据os.pathsep分割的环境变量值列表
 
     Args:
         key (str): 环境变量名称
+        no_exist_ok(bool): 环境变量不存在时是否正常执行并返回空列表而不是抛出异常. 默认为否.
 
     Returns:
         list[str]: 分割后的列表
     """
 
-    return os.environ[key].split(os.pathsep)
+    env = os.environ.get(key, "") if no_exist_ok else os.environ[key]
+    return env.split(os.pathsep)
 
 
 def set_environ_list(key: str, value: list[str]) -> None:

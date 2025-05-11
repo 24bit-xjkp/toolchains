@@ -158,7 +158,7 @@ class gcc_environment(common.basic_environment):
         self.register_in_env()
 
         # 从LD_LIBRARY_PATH中过滤掉空路径
-        ld_library_path = [*filter(lambda path: path != "", common.get_environ_list("LD_LIBRARY_PATH"))]
+        ld_library_path = [*filter(lambda path: path != "", common.get_environ_list("LD_LIBRARY_PATH", True))]
         common.set_environ_list("LD_LIBRARY_PATH", ld_library_path)
 
     def enter_build_dir(self, lib: str, remove_if_exist: bool = False) -> None:
