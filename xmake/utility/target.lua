@@ -90,6 +90,13 @@ clang_only_target_list = {
     -- TODO: add another android target
     ["aarch64-linux-android30"] = noop_modifier,
     ["aarch64-apple-darwin24"] = noop_modifier,
+    -- wasm
+    ["wasm32-wasip1"] = noop_modifier,
+    ["wasm32-wasip1-threads"] = noop_modifier,
+    ["wasm32-wasip2"] = noop_modifier,
+    ["wasm32-wasip2-threads"] = noop_modifier,
+    ["wasm64-wasip1"] = noop_modifier,
+    ["wasm64-wasip1-threads"] = noop_modifier,
 }
 ---只有gcc支持的目标
 ---@type modifier_table_t
