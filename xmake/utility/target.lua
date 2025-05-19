@@ -82,6 +82,9 @@ end
 ---@type modifier_table_t
 clang_only_target_list = {
     ["x86_64-windows-msvc"] = noop_modifier,
+    ["aarch64-windows-msvc"] = noop_modifier,
+    ["i686-windows-msvc"] = noop_modifier,
+    ["x86_64-windows-gnu"] = noop_modifier,
     ["armv7m-none-eabi"] = armv7m_modifier,
     ["armv7m-fpv4-none-eabi"] = armv7m_fpv4_modifier,
 }
