@@ -87,6 +87,9 @@ clang_only_target_list = {
     ["x86_64-windows-gnu"] = noop_modifier,
     ["armv7m-none-eabi"] = armv7m_modifier,
     ["armv7m-fpv4-none-eabi"] = armv7m_fpv4_modifier,
+    -- TODO: add another android target
+    ["aarch64-linux-android30"] = noop_modifier,
+    ["aarch64-apple-darwin24"] = noop_modifier,
 }
 ---只有gcc支持的目标
 ---@type modifier_table_t
