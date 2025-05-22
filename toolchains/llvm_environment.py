@@ -173,6 +173,7 @@ class llvm_environment(common.basic_environment):
     freestanding_option: typing.Final[dict[str, str]] = {
         "LIBUNWIND_IS_BAREMETAL": "ON",
         "LIBUNWIND_ENABLE_SHARED": "OFF",
+        "LIBUNWIND_ENABLE_THREADS": "OFF",
         "COMPILER_RT_BUILD_SANITIZERS": "OFF",
         "COMPILER_RT_BUILD_XRAY": "OFF",
         "COMPILER_RT_BUILD_PROFILE": "OFF",
@@ -180,17 +181,21 @@ class llvm_environment(common.basic_environment):
         "COMPILER_RT_BUILD_MEMPROF": "OFF",
         "COMPILER_RT_BUILD_GWP_ASAN": "OFF",
         "COMPILER_RT_BAREMETAL_BUILD": "ON",
-        "LIBCXX_ENABLE_THREADS": "OFF",
         "LIBCXXABI_ENABLE_THREADS": "OFF",
         "LIBCXXABI_ENABLE_SHARED": "OFF",
+        "LIBCXXABI_ENABLE_EXCEPTIONS": "OFF",
         "LIBCXXABI_BAREMETAL": "ON",
         "LLVM_ENABLE_RUNTIMES": '"libcxx;libcxxabi;libunwind;compiler-rt"',
         "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
-        "LIBCXX_ENABLE_SHARED": "OFF",
         "BUILD_SHARED_LIBS": "OFF",
-        "LIBUNWIND_ENABLE_THREADS": "OFF",
+        "LIBCXX_ENABLE_SHARED": "OFF",
+        "LIBCXX_ENABLE_THREADS": "OFF",
         "LIBCXX_ENABLE_MONOTONIC_CLOCK": "OFF",
         "LIBCXX_ENABLE_FILESYSTEM": "OFF",
+        "LIBCXX_ENABLE_EXCEPTIONS": "OFF",
+        "LIBCXX_ENABLE_RTTI": "OFF",
+        "LIBCXX_ENABLE_LOCALIZATION": "OFF",
+        "LIBCXX_ENABLE_RANDOM_DEVICE": "OFF",
     }
 
     compiler_rt_dir: Path  # compiler-rt所在路径
