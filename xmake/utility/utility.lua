@@ -14,7 +14,7 @@ function get_target_modifier(target, toolchain)
 
     ---@type table<string, any>
     local cache_info = common.get_cache()
-    ---@type string, modifier_t
+    ---@type string, modifier_t | nil
     local target, modifier = table.unpack(cache_info["target"] or {})
     if target and modifier then -- 已经探测过，直接返回target和modifier
         return target, modifier
@@ -61,6 +61,7 @@ function get_target_modifier(target, toolchain)
         cross = target_os
     }
     local old_plat = plat
+    ---@type string | nil
     plat = plat_table[plat]
     assert(plat, format(message, "plat", old_plat))
 
@@ -96,6 +97,7 @@ function get_target_modifier(target, toolchain)
     end
     target = table.concat(field, "-")
 
+    ---@type modifier_t | nil
     modifier = target_list[target]
     cprint("detecting for target .. " .. (modifier and "${color.success}" or "${color.failure}") .. target)
     assert(modifier, format(message, "target", target))
@@ -134,6 +136,7 @@ function get_sysroot_option()
     -- sysroot不为"none"或"detect"则为指定的sysroot
     sysroot = (sysroot ~= "none" and not detect) and sysroot or nil
     -- 若使用clang工具链且未指定sysroot则尝试自动探测
+    ---@type boolean
     detect = detect and common.is_clang()
     cache_info["sysroot_set_by_user"] = sysroot and true or false
     if sysroot then    -- 有指定sysroot则检查合法性
@@ -175,12 +178,13 @@ function get_sysroot_option()
 end
 
 ---获取march选项
----@param target string --目标平台
----@param toolchain string --工具链类型
+---@param target string | nil --目标平台
+---@param toolchain string | nil --工具链类型
 ---@note 在target和toolchain存在时才检查选项合法性
 ---@return string | nil --march选项
 function get_march_option(target, toolchain)
     local cache_info = common.get_cache()
+    ---@type string | nil
     local option = cache_info["march"]
     if option == "" then
         return nil    -- 已经探测过，-march不受支持
@@ -193,15 +197,15 @@ function get_march_option(target, toolchain)
     local arch = get_config("march")
     if arch ~= "none" then
         local march = (arch ~= "default" and arch or "native")
-        option = { "-march=" .. march }
+        local options = { "-march=" .. march }
         -- 在target和toolchain存在时才检查选项合法性
         if target and toolchain then
             import("core.tool.compiler")
             if toolchain == "clang" and target ~= "native" then
-                table.insert(option, "--target=" .. target)
+                table.insert(options, "--target=" .. target)
             end
             ---@type boolean
-            local support = compiler.has_flags("cxx", table.concat(option, " "))
+            local support = compiler.has_flags("cxx", table.concat(options, " "))
             local message = "checking for march ... "
             cprint(message .. (support and "${color.success}" or "${color.failure}") .. march)
             if not support then
@@ -210,7 +214,7 @@ function get_march_option(target, toolchain)
                 end
                 option = ""
             else
-                option = option[1]
+                option = options[1]
             end
         else
             option = nil -- 未探测，设置为nil在下次进行探测

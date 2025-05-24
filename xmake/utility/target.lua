@@ -1,6 +1,12 @@
 ---@alias modifier_t fun(toolchain:unknown, opt:table<string, unknown>):nil
 ---@alias modifier_table_t table<string, modifier_t>
----@alias opt_t table<string, unknown>
+---@class sysroot_t
+---@field public ldflags string
+---@field public cxflags string | string[]
+---@field public shflags string
+---@class opt_t
+---@field public march string
+---@field public sysroot sysroot_t
 
 ---占位符，无效果
 ---@return nil
