@@ -70,6 +70,14 @@ option("debug_strip", function()
     set_values("none", "debug", "all")
 end)
 
+option("debug_info", function()
+    set_description("Whether to generate the debug information while building.",
+        [[    default: Generate the debug information in "debug" and "releasedbg" mode.]],
+        [[    all: Generate the debug information in every mode.]])
+    set_default("default")
+    set_values("default", "all")
+end)
+
 option("enable_lto", function()
     set_description("Whether to enable LTO while building in release/minsizerel/releasedbg mode.",
         "LTO is enabled by default, but when use different compiler and linker, " ..
