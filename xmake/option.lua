@@ -73,9 +73,9 @@ end)
 option("debug_info", function()
     set_description("Whether to generate the debug information while building.",
         [[    default: Generate the debug information in "debug" and "releasedbg" mode.]],
-        [[    all: Generate the debug information in every mode.]])
+        [[    minsizerel: Also generate the debug information in "minsizerel" mode.]])
     set_default("default")
-    set_values("default", "all")
+    set_values("default", "minsizerel")
 end)
 
 option("enable_lto", function()
