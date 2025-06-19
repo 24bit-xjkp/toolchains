@@ -88,8 +88,21 @@ end
 ---@type modifier_table_t
 clang_only_target_list = {
     ["x86_64-windows-msvc"] = noop_modifier,
+    ["aarch64-windows-msvc"] = noop_modifier,
+    ["i686-windows-msvc"] = noop_modifier,
+    ["x86_64-windows-gnu"] = noop_modifier,
     ["armv7m-none-eabi"] = armv7m_modifier,
     ["armv7m-fpv4-none-eabi"] = armv7m_fpv4_modifier,
+    -- TODO: add another android target
+    ["aarch64-linux-android30"] = noop_modifier,
+    ["aarch64-apple-darwin24"] = noop_modifier,
+    -- wasm
+    ["wasm32-wasip1"] = noop_modifier,
+    ["wasm32-wasip1-threads"] = noop_modifier,
+    ["wasm32-wasip2"] = noop_modifier,
+    ["wasm32-wasip2-threads"] = noop_modifier,
+    ["wasm64-wasip1"] = noop_modifier,
+    ["wasm64-wasip1-threads"] = noop_modifier,
 }
 ---只有gcc支持的目标
 ---@type modifier_table_t
