@@ -340,10 +340,21 @@ class gcc_environment(common.basic_environment):
             bool: gdbserver是否成功复制
         """
 
+        target_dir = self.lib_prefix
         # 复制libc、libstdc++、linux头文件等到本工具链中
         toolchain = get_specific_environment(self, target=self.target)
-        for dir in filter(lambda x: x.name != "bin", toolchain.lib_prefix.iterdir()):
-            common.copy(dir, self.lib_prefix / dir.name)
+        if toolchain.toolchain_type.contain(common.toolchain_type.native):
+            # 复制include和lib64
+            for dir in ("include", "lib64"):
+                common.copy(toolchain.prefix / dir, target_dir / dir)
+            # 复制glibc链接库
+            common.copy(toolchain.lib_prefix / "lib", target_dir / "lib")
+            # 复制glibc头和linux头
+            for item in (toolchain.lib_prefix / "include").iterdir():
+                common.copy(item, target_dir / "include" / item.name)
+        else:
+            for dir in filter(lambda x: x.name != "bin", toolchain.lib_prefix.iterdir()):
+                common.copy(dir, target_dir / dir.name)
 
         # 复制libgcc到本工具链中
         common.copy(toolchain.prefix / "lib" / "gcc", self.prefix / "lib" / "gcc")
