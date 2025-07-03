@@ -2016,4 +2016,46 @@ def toolchains_main(main: Callable[[], None]) -> int:
         return errno
 
 
+class binfmt:
+    """binfmt_misc格式管理类"""
+
+    bin_fmt_dir: Path = Path("/proc/sys/fs/binfmt_misc")
+
+    @classmethod
+    def is_enabled(cls, name: str) -> bool:
+        """检查binfmt_misc中是否启用指定的格式
+
+        Args:
+            name (str): 格式名称
+
+        Returns:
+            bool: 是否启用
+        """
+
+        path = cls.bin_fmt_dir / name
+        if not path.exists():
+            return False
+        lines = path.read_text().splitlines()
+        return lines[0] == "enabled"
+
+    @classmethod
+    def enable(cls, name: str) -> None:
+        """启用binfmt_misc中的格式
+
+        Args:
+            name (str): 格式名称
+        """
+
+        run_command(f"sudo sh -c 'echo 1 > {cls.bin_fmt_dir / name}'")
+
+    @classmethod
+    def disable(cls, name: str) -> None:
+        """禁用binfmt_misc中的格式
+
+        Args:
+            name (str): 格式名称
+        """
+        run_command(f"sudo sh -c 'echo 0 > {cls.bin_fmt_dir / name}'")
+
+
 assert __name__ != "__main__", "Import this file instead of running it directly."

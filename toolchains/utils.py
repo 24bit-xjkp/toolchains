@@ -63,7 +63,19 @@ def decompress(config: compress_configure) -> None:
     common.toolchains_print(common.toolchains_success("Decompress toolchains successfully."))
 
 
-__all__ = ["compress_configure", "compress", "decompress"]
+def disable_wine_binfmt() -> None:
+    """禁用Wine的binfmt_misc格式"""
+
+    common.binfmt.disable("DOSWin")
+
+
+def enable_wine_binfmt() -> None:
+    """启用Wine的binfmt_misc格式"""
+
+    common.binfmt.enable("DOSWin")
+
+
+__all__ = ["compress_configure", "compress", "decompress", "disable_wine_binfmt", "enable_wine_binfmt"]
 
 
 def main() -> int:
@@ -77,6 +89,11 @@ def main() -> int:
     )
     decompress_parser = subparsers.add_parser(
         "decompress", help="Decompress packed toolchains under the prefix directory.", formatter_class=common.arg_formatter
+    )
+    wine_binfmt_parser = subparsers.add_parser(
+        "wine-binfmt",
+        help="Set Wine's binfmt_misc support.",
+        formatter_class=common.arg_formatter,
     )
 
     compress_configure.add_argument(compress_parser)
@@ -99,6 +116,11 @@ def main() -> int:
         help="Files of packed toolchains to decompress. This is a path relative to the prefix directory.",
     )
     common.register_completer(action, common.item_with_prefix_completer("prefix_dir", common.toolchains_package))
+    wine_binfmt_parser.add_argument(
+        "action",
+        choices=["enable", "disable"],
+        help="Action to perform on Wine's binfmt_misc support.",
+    )
 
     common.support_argcomplete(parser)
     args = parser.parse_args()
@@ -109,6 +131,12 @@ def main() -> int:
                 compress(compress_configure.parse_args(args))
             case "decompress":
                 decompress(compress_configure.parse_args(args))
+            case "wine-binfmt":
+                common.status_counter.set_quiet(True)
+                if args.action == "enable":
+                    enable_wine_binfmt()
+                else:
+                    disable_wine_binfmt()
             case _:
                 pass
 
