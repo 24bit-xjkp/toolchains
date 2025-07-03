@@ -3,7 +3,7 @@ from pathlib import Path
 
 from . import common
 
-lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports", "python-embed", "glibc", "newlib")
+lib_list = ("expat", "gcc", "binutils", "gmp", "mpfr", "linux", "mingw", "pexports", "python-embed", "glibc", "newlib", "zstd")
 
 # 带newlib的独立环境需禁用的特性列表
 disable_hosted_option = (
@@ -177,6 +177,8 @@ class gcc_environment(common.basic_environment):
                 build_dir = self.lib_dir_list[lib]
             case "glibc" | "mingw" | "newlib":
                 build_dir = self.build_tmp / f"{self.target}-{lib}"
+            case "expat" | "gmp" | "mpfr" | "zstd":
+                build_dir = self.build_tmp / f"{self.host}-{lib}"
             case _:
                 build_dir = self.build_tmp / f"{self.host}-host-{self.target}-target-{lib}"
 
@@ -367,7 +369,7 @@ class gcc_environment(common.basic_environment):
             return False
 
 
-def get_mingw_lib_prefix_list(env: gcc_environment) -> dict[str, Path]:
+def get_mingw_gdb_lib_prefix_list(env: gcc_environment) -> dict[str, Path]:
     """获取mingw平台下gdb所需包的安装路径
 
     Args:
@@ -380,10 +382,27 @@ def get_mingw_lib_prefix_list(env: gcc_environment) -> dict[str, Path]:
     return {lib: env.build_tmp / f"{env.host}-{lib}-install" for lib in ("gmp", "expat", "mpfr")}
 
 
-def build_mingw_gdb_requirements(env: gcc_environment) -> None:
-    """编译安装libgmp, libexpat, libmpfr"""
+def get_mingw_gcc_lib_prefix_list(env: gcc_environment) -> dict[str, Path]:
+    """获取mingw平台下gcc所需包的安装路径
 
-    lib_prefix_list = get_mingw_lib_prefix_list(env)
+    Args:
+        env (gcc_environment): gcc环境
+
+    Returns:
+        dict[str,Path]: {包名:安装路径}
+    """
+
+    return {lib: env.build_tmp / f"{env.host}-{lib}-install" for lib in ("zstd",)}
+
+
+def build_mingw_gdb_requirements(env: gcc_environment) -> None:
+    """编译安装gdb依赖库
+
+    Args:
+        env (gcc_environment): gcc环境
+    """
+
+    lib_prefix_list = get_mingw_gdb_lib_prefix_list(env)
     for lib, prefix in lib_prefix_list.items():
         host_file = prefix / ".host"
         try:
@@ -392,6 +411,10 @@ def build_mingw_gdb_requirements(env: gcc_environment) -> None:
             host = ""
         if host == env.host:
             continue  # 已经存在则跳过构建
+
+        assert not common.binfmt.is_enabled("DOSWin"), common.toolchains_error(
+            f'Cannot build gdb dependencies because wine-binfmt is enabled.\nExecute "toolchains-util wine-binfmt disable" to disable wine-binfmt.'
+        )
         env.enter_build_dir(lib)
         env.configure(
             lib,
@@ -406,6 +429,43 @@ def build_mingw_gdb_requirements(env: gcc_environment) -> None:
         host_file.write_text(env.host)
 
 
+def build_mingw_gcc_requirements(env: gcc_environment) -> None:
+    """编译安装gcc依赖库
+
+    Args:
+        env (gcc_environment): gcc环境
+    """
+
+    lib_prefix_list = get_mingw_gcc_lib_prefix_list(env)
+    for lib, prefix in lib_prefix_list.items():
+        host_file = prefix / ".host"
+        try:
+            host = host_file.read_text()
+        except:
+            host = ""
+        if host == env.host:
+            continue  # 已经存在则跳过构建
+        env.enter_build_dir(lib)
+        if lib == "zstd":
+            cmake_option_list = [
+                f"-S {env.lib_dir_list['zstd'] / 'build' / 'cmake'}",
+                "-B .",
+                "-G Ninja",
+                "-DCMAKE_BUILD_TYPE=Release",
+                "-DCMAKE_SYSTEM_NAME=Windows",
+                "-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc",
+                "-DZSTD_BUILD_STATIC=ON",
+                "-DZSTD_BUILD_SHARED=OFF",
+                "-DZSTD_BUILD_PROGRAMS=OFF",
+                f"-DCMAKE_INSTALL_PREFIX={prefix}",
+            ]
+            common.run_command(f"cmake {' '.join(cmake_option_list)}")
+            common.run_command(f"ninja -j {env.jobs}")
+            common.run_command(f"ninja install/strip -j {env.jobs}")
+
+        host_file.write_text(env.host)
+
+
 def get_mingw_gdb_lib_options(env: gcc_environment) -> list[str]:
     """获取mingw平台下gdb所需包配置选项
 
@@ -413,9 +473,20 @@ def get_mingw_gdb_lib_options(env: gcc_environment) -> list[str]:
         env (gcc_environment): gcc环境
     """
 
-    lib_prefix_list = get_mingw_lib_prefix_list(env)
+    lib_prefix_list = get_mingw_gdb_lib_prefix_list(env)
     prefix_selector: Callable[[str], str] = lambda lib: f"--with-{lib}=" if lib in ("gmp", "mpfr") else f"--with-lib{lib}-prefix="
-    return [prefix_selector(lib) + f"{lib_prefix_list[lib]}" for lib in ("gmp", "mpfr", "expat")]
+    return [prefix_selector(lib) + f"{lib_prefix_list[lib]}" for lib in lib_prefix_list.keys()]
+
+
+def get_mingw_gcc_lib_options(env: gcc_environment) -> list[str]:
+    """获取mingw平台下gcc所需包配置选项
+
+    Args:
+        env (gcc_environment): gcc环境
+    """
+
+    lib_prefix_list = get_mingw_gcc_lib_prefix_list(env)
+    return [f"--with-{lib}={prefix}" for lib, prefix in lib_prefix_list.items()]
 
 
 def copy_pretty_printer(env: gcc_environment) -> None:
@@ -517,7 +588,7 @@ class build_gcc_environment:
 
         gcc_option_list = {
             "linux": ["--disable-bootstrap"],
-            "w64": ["--disable-sjlj-exceptions", "--enable-threads=win32"],
+            "w64": ["--disable-sjlj-exceptions", "--enable-threads=win32", *get_mingw_gcc_lib_options(self.env)],
             "unknown": [*disable_hosted_option] if self.need_newlib else [*disable_hosted_option_pure],
         }
         self.gcc_option = [
@@ -854,6 +925,9 @@ class build_gcc_environment:
     def build(self) -> None:
         """构建gcc工具链"""
 
+        # 编译gcc依赖库
+        if self.host_os == "w64":
+            build_mingw_gcc_requirements(self.env)
         # 编译gdb依赖库
         if self.need_gdb and self.host_os == "w64":
             build_mingw_gdb_requirements(self.env)
