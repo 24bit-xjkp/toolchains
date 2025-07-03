@@ -661,6 +661,8 @@ class build_gcc_environment:
         try:
             make()
         except:
+            # 由于实际上没有出错，因此将计数器减1
+            common.status_counter.sub_error()
             with common.chdir_guard(Path("libbacktrace")):
                 env.make("clean")
                 env.make()

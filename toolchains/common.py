@@ -161,16 +161,32 @@ class status_counter:
         cls.__counter.error += 1
 
     @classmethod
+    def sub_error(cls) -> None:
+        """减少错误计数"""
+        cls.__counter.error -= 1
+
+    @classmethod
     def add_warning(cls) -> None:
         """增加警告计数"""
 
         cls.__counter.warning += 1
 
     @classmethod
+    def sub_warning(cls) -> None:
+        """减少警告计数"""
+        cls.__counter.warning -= 1
+
+    @classmethod
     def add_note(cls) -> None:
         """增加注意计数"""
 
         cls.__counter.note += 1
+
+
+    @classmethod
+    def sub_note(cls) -> None:
+        """减少注意计数"""
+        cls.__counter.note -= 1
 
     @classmethod
     def add_info(cls) -> None:
@@ -179,10 +195,20 @@ class status_counter:
         cls.__counter.info += 1
 
     @classmethod
+    def sub_info(cls) -> None:
+        """减少信息计数"""
+        cls.__counter.info -= 1
+
+    @classmethod
     def add_success(cls) -> None:
         """增加成功计数"""
 
         cls.__counter.success += 1
+
+    @classmethod
+    def sub_success(cls) -> None:
+        """减少成功计数"""
+        cls.__counter.success -= 1
 
     @classmethod
     def get_counter(cls, name: str) -> int:
