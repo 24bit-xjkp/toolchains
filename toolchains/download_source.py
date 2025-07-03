@@ -9,7 +9,7 @@ from . import common
 
 
 class extra_lib_version(enum.StrEnum):
-    python = "3.13.2"
+    python = "3.13.5"
     iconv = "1.18"
     loongnix_linux = "4.19.190.8.22"
     loongnix_glibc = "2.28"
@@ -230,6 +230,7 @@ class all_lib_list:
         "libgmp-dev",
         "libmpfr-dev",
         "zlib1g-dev",
+        "libzstd-dev",
         "libexpat1-dev",
         "gawk",
         "bzip2",
@@ -255,6 +256,7 @@ class all_lib_list:
         "libxml2": git_url("github.com", "GNOME/libxml2.git"),
         "newlib": git_url("github.com", "bminor/newlib.git"),
         "llvm": git_url("github.com", "llvm/llvm-project.git"),
+        "zstd": git_url("github.com", "facebook/zstd.git"),
     }
     git_lib_list_native: typing.Final[dict[str, git_url]] = {
         **git_lib_list_github,

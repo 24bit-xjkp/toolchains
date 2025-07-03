@@ -4,19 +4,19 @@
 
 | 项目        | 版本         |
 | :---------- | :----------- |
-| OS          | Ubuntu 24.10 |
+| OS          | Ubuntu 25.04 |
 | GCC         | 16.0.0       |
 | GDB         | 17.0.50      |
 | Binutils    | 2.44.50      |
-| Python $^*$ | 3.13.2       |
+| Python $^*$ | 3.13.5       |
 | Linux       | 6.15-rc4     |
-| Glibc       | 2.40         |
+| Glibc       | 2.41         |
 | Mingw-w64   | 12.0.0       |
 | PExports    | 0.47         |
 | Iconv       | 1.18         |
 | Gmp         | 6.3.0        |
 | Mpfr        | 4.2.2        |
-| Expat       | 2.6.4        |
+| Expat       | 2.7.1        |
 
 *: 在为Windows平台编译带有Python支持的GDB时需要下载Python包，Linux平台可以使用系统自带包
 
