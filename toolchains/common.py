@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import types
 import typing
 from collections.abc import Callable, Generator
@@ -181,7 +182,6 @@ class status_counter:
         """增加注意计数"""
 
         cls.__counter.note += 1
-
 
     @classmethod
     def sub_note(cls) -> None:
@@ -2027,9 +2027,92 @@ def toolchains_dir(dir: Path) -> bool:
     return dir.is_dir() and any(name in dir.name for name in ("gcc", "clang", "sysroot"))
 
 
-def toolchains_main(main: Callable[[], None]) -> int:
+class build_timer:
+    """构建计时器"""
+
+    bias: float
+    _start_time: float
+
+    class build_time:
+        """构建用时"""
+
+        hour: int
+        minute: int
+        second: int
+
+        def __init__(self, time_stamp: float) -> None:
+            """初始化构建用时对象
+
+            Args:
+                time_stamp (float): 时间戳
+            """
+
+            rounded_time_stamp = round(time_stamp)
+            self.hour = int(rounded_time_stamp // 3600)
+            self.minute = int(rounded_time_stamp // 60 % 60)
+            self.second = int(rounded_time_stamp % 60)
+
+        def __repr__(self) -> str:
+            """将用时转化为字符串
+
+            Returns:
+                str: 字符串表示
+            """
+
+            hour_str: str = ""
+            minute_str: str = ""
+            second_str: str = ""
+            if self.hour:
+                hour_str = f"{self.hour} hour, " if self.hour == 1 else f"{self.hour} hours, "
+            if self.minute:
+                minute_str = f"{self.minute} min, " if self.minute == 1 else f"{self.minute} mins, "
+            if self.second:
+                second_str = f"{self.second} sec" if self.second == 1 else f"{self.second} secs"
+            return toolchains_info(f"Finished in {hour_str}{minute_str}{second_str}")
+
+    def __init__(self) -> None:
+        self.bias = 0
+
+    def start(self) -> None:
+        """开始计时"""
+
+        self._start_time = time.time()
+
+    def stop(self) -> "build_timer.build_time":
+        """停止计时，同时将用时加到偏移量上
+
+        Returns:
+            build_timer.build_time: 构建用时
+        """
+
+        time_used = time.time() - self._start_time
+        self.bias += time_used
+        return self.build_time(time_used)
+
+    def get_total_time(self) -> "build_timer.build_time":
+        """获取总用时
+
+        Returns:
+            build_timer.build_time: 总用时
+        """
+        return self.build_time(self.bias)
+
+
+def toolchains_main(main: Callable[[], None], need_timer: bool = False) -> int:
+    """执行主函数
+
+    Args:
+        main (Callable[[], None]): 主函数
+        need_timer (bool, optional): 是否需要进行计时. 默认不计时.
+
+    Returns:
+        int: 错误码
+    """
+
     errno = 0
+    timer = build_timer()
     try:
+        timer.start()
         main()
     except Exception as e:
         if not any(flag in (msg := str(e)) for flag in ("[toolchains]", "[toolchains internal]")):
@@ -2038,6 +2121,7 @@ def toolchains_main(main: Callable[[], None]) -> int:
             toolchains_print(e)
         errno = 1
     finally:
+        toolchains_print(timer.stop())
         status_counter.show_status()
         return errno
 

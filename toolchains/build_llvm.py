@@ -132,7 +132,7 @@ def main() -> int:
             case _:
                 pass
 
-    return common.toolchains_main(do_main)
+    return common.toolchains_main(do_main, args.command in ("sysroot", "build"))
 
 
 __all__ = [
