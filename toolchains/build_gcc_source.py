@@ -4,10 +4,19 @@ from . import common
 from .gcc_environment import build_gcc_environment
 
 
-# 独立环境下gcc编译选项
-freestanding_gcc_option_list: typing.Final[list[str]] = [
-    "--enable-cxx-flags='-fno-exceptions -ffunction-sections -fdata-sections -O2'",
-]
+def get_freestanding_libstdcxx_option(*args: str) -> str:
+    """获取独立环境下libstdcxx编译选项
+
+    Args:
+        *args (str): 额外选项
+
+    Returns:
+        str: 独立环境下libstdcxx编译选项
+    """
+
+    cxx_flags = ["-fno-exceptions", "-ffunction-sections", "-fdata-sections", "-O2", "-DNDEBUG", *args]
+
+    return f"--enable-cxx-flags='{' '.join(cxx_flags)}'"
 
 
 class modifier_list:
@@ -101,7 +110,7 @@ class modifier_list:
             env (build_gcc_environment): 当前gcc构建平台
         """
 
-        env.gcc_option += ["--with-mode=thumb", "--with-arch=armv7-m", *freestanding_gcc_option_list]
+        env.gcc_option += ["--with-mode=thumb", "--with-arch=armv7-m", get_freestanding_libstdcxx_option("-march=armv7-m")]
 
     @staticmethod
     def arm_nonewlib_none_eabi(env: build_gcc_environment) -> None:
@@ -111,7 +120,7 @@ class modifier_list:
             env (build_gcc_environment): 当前gcc构建平台
         """
 
-        env.gcc_option += ["--with-mode=thumb", "--with-arch=armv7-m", *freestanding_gcc_option_list]
+        env.gcc_option += ["--with-mode=thumb", "--with-arch=armv7-m", get_freestanding_libstdcxx_option("-march=armv7-m")]
 
     @staticmethod
     def arm_fpv4_none_eabi(env: build_gcc_environment) -> None:
@@ -126,7 +135,7 @@ class modifier_list:
             "--with-arch=armv7-m",
             "--with-fpu=fpv4-sp-d16",
             "--with-float=hard",
-            *freestanding_gcc_option_list,
+            get_freestanding_libstdcxx_option("-march=armv7-m", "-mfpu=fpv4-sp-d16", "-mfloat-abi=hard"),
         ]
         env.libc_option += ['CFLAGS_FOR_TARGET="-march=armv7-m -mfpu=fpv4-sp-d16 -mfloat-abi=hard -O2 -ffunction-sections"']
 
