@@ -51,3 +51,5 @@ def test_status_counter() -> None:
     for name in ("error", "warning", "note", "info", "success"):
         getattr(status_counter, f"add_{name}")()
         assert status_counter.get_counter(name) == 1
+        getattr(status_counter, f"sub_{name}")()
+        assert status_counter.get_counter(name) == 0
