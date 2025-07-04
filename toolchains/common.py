@@ -2168,4 +2168,35 @@ class binfmt:
         run_command(f"sudo sh -c 'echo 0 > {cls.bin_fmt_dir / name}'")
 
 
+@contextmanager
+def cached_lib_builder(prefix: Path, host: str) -> Generator[bool, None, None]:
+    """带缓存的依赖库构建器
+
+    Args:
+        prefix (Path): 库安装目录
+        host (str): 宿主名称
+
+    Yields:
+        Generator[bool, None, None]: 是否已经构建过
+    """
+
+    host_file = prefix / ".host"
+    try:
+        cached_host = host_file.read_text()
+    except:
+        cached_host = ""
+
+    is_built = cached_host == host
+    build_success = False
+    try:
+        yield is_built
+        build_success = True
+    except:
+        raise
+    finally:
+        if not is_built and build_success:
+            host_file.write_text(host)
+
+
+
 assert __name__ != "__main__", "Import this file instead of running it directly."

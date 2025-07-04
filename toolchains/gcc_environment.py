@@ -404,29 +404,25 @@ def build_mingw_gdb_requirements(env: gcc_environment) -> None:
 
     lib_prefix_list = get_mingw_gdb_lib_prefix_list(env)
     for lib, prefix in lib_prefix_list.items():
-        host_file = prefix / ".host"
-        try:
-            host = host_file.read_text()
-        except:
-            host = ""
-        if host == env.host:
-            continue  # 已经存在则跳过构建
+        with common.cached_lib_builder(prefix, env.host) as is_built:
+            if is_built:
+                continue
 
-        assert not common.binfmt.is_enabled("DOSWin"), common.toolchains_error(
-            f'Cannot build gdb dependencies because wine-binfmt is enabled.\nExecute "toolchains-util wine-binfmt disable" to disable wine-binfmt.'
-        )
-        env.enter_build_dir(lib)
-        env.configure(
-            lib,
-            f"--host={env.host} --disable-shared --enable-static",
-            f"--prefix={prefix}",
-            f"--with-gmp={lib_prefix_list['gmp']}" if lib == "mpfr" else "",
-            'CFLAGS="-O3 -std=c11"',
-            'CXXFLAGS="-O3"',
-        )
-        env.make()
-        env.install()
-        host_file.write_text(env.host)
+            assert not common.binfmt.is_enabled("DOSWin"), common.toolchains_error(
+                "Cannot build gdb dependencies because wine-binfmt is enabled.\n"
+                'Execute "toolchains-util wine-binfmt disable" to disable wine-binfmt.'
+            )
+            env.enter_build_dir(lib)
+            env.configure(
+                lib,
+                f"--host={env.host} --disable-shared --enable-static",
+                f"--prefix={prefix}",
+                f"--with-gmp={lib_prefix_list['gmp']}" if lib == "mpfr" else "",
+                'CFLAGS="-O3 -std=c11"',
+                'CXXFLAGS="-O3"',
+            )
+            env.make()
+            env.install()
 
 
 def build_mingw_gcc_requirements(env: gcc_environment) -> None:
@@ -438,32 +434,27 @@ def build_mingw_gcc_requirements(env: gcc_environment) -> None:
 
     lib_prefix_list = get_mingw_gcc_lib_prefix_list(env)
     for lib, prefix in lib_prefix_list.items():
-        host_file = prefix / ".host"
-        try:
-            host = host_file.read_text()
-        except:
-            host = ""
-        if host == env.host:
-            continue  # 已经存在则跳过构建
-        env.enter_build_dir(lib)
-        if lib == "zstd":
-            cmake_option_list = [
-                f"-S {env.lib_dir_list['zstd'] / 'build' / 'cmake'}",
-                "-B .",
-                "-G Ninja",
-                "-DCMAKE_BUILD_TYPE=Release",
-                "-DCMAKE_SYSTEM_NAME=Windows",
-                "-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc",
-                "-DZSTD_BUILD_STATIC=ON",
-                "-DZSTD_BUILD_SHARED=OFF",
-                "-DZSTD_BUILD_PROGRAMS=OFF",
-                f"-DCMAKE_INSTALL_PREFIX={prefix}",
-            ]
-            common.run_command(f"cmake {' '.join(cmake_option_list)}")
-            common.run_command(f"ninja -j {env.jobs}")
-            common.run_command(f"ninja install/strip -j {env.jobs}")
+        with common.cached_lib_builder(prefix, env.host) as is_built:
+            if is_built:
+                continue
 
-        host_file.write_text(env.host)
+            env.enter_build_dir(lib)
+            if lib == "zstd":
+                cmake_option_list = [
+                    f"-S {env.lib_dir_list['zstd'] / 'build' / 'cmake'}",
+                    "-B .",
+                    "-G Ninja",
+                    "-DCMAKE_BUILD_TYPE=Release",
+                    "-DCMAKE_SYSTEM_NAME=Windows",
+                    "-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc",
+                    "-DZSTD_BUILD_STATIC=ON",
+                    "-DZSTD_BUILD_SHARED=OFF",
+                    "-DZSTD_BUILD_PROGRAMS=OFF",
+                    f"-DCMAKE_INSTALL_PREFIX={prefix}",
+                ]
+                common.run_command(f"cmake {' '.join(cmake_option_list)}")
+                common.run_command(f"ninja -j {env.jobs}")
+                common.run_command(f"ninja install/strip -j {env.jobs}")
 
 
 def get_mingw_gdb_lib_options(env: gcc_environment) -> list[str]:
