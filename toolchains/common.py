@@ -2112,7 +2112,8 @@ def toolchains_main(main: Callable[[], None], need_timer: bool = False) -> int:
     errno = 0
     timer = build_timer()
     try:
-        timer.start()
+        if need_timer:
+            timer.start()
         main()
     except Exception as e:
         if not any(flag in (msg := str(e)) for flag in ("[toolchains]", "[toolchains internal]")):
@@ -2121,7 +2122,8 @@ def toolchains_main(main: Callable[[], None], need_timer: bool = False) -> int:
             toolchains_print(e)
         errno = 1
     finally:
-        toolchains_print(timer.stop())
+        if need_timer:
+            toolchains_print(timer.stop())
         status_counter.show_status()
         return errno
 
