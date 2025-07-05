@@ -4,12 +4,12 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "toolchains"
-version = "0.2.2"
+version = "0.3.0"
 description = "Build GCC and LLVM toolchains automatically."
 authors = [
-    { name = "24bit-xjkp", email = "2283572185@qq.com" },
-    { name = "Arendelle", email = "2381642961@qq.com" },
-    { name = "situNagisa", email = "1300296933@qq.com" },
+  { name = "24bit-xjkp", email = "2283572185@qq.com" },
+  { name = "Arendelle", email = "2381642961@qq.com" },
+  { name = "situNagisa", email = "1300296933@qq.com" },
 ]
 readme = "README.md"
 license = "MIT"
