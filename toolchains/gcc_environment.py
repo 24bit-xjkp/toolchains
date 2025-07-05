@@ -564,7 +564,7 @@ class build_gcc_environment:
             "Cannot build gdbserver for freestanding platform.\n" "You should use other server implementing the gdb protocol like OpenOCD."
         )
 
-        libc_option_list = {
+        libc_option_list: dict[str, list[str]] = {
             "linux": [f"--prefix={self.env.lib_prefix}", f"--host={self.env.target}", f"--build={self.env.build}", "--disable-werror"],
             "w64": [
                 f"--host={self.env.target}",
@@ -577,19 +577,21 @@ class build_gcc_environment:
         }
         self.libc_option = libc_option_list[self.target_os]
 
-        gcc_option_list = {
+        gcc_target_option_list: dict[str, list[str]] = {
             "linux": ["--disable-bootstrap"],
-            "w64": ["--disable-sjlj-exceptions", "--enable-threads=win32", *get_mingw_gcc_lib_options(self.env)],
+            "w64": ["--disable-sjlj-exceptions", "--enable-threads=win32"],
             "unknown": [*disable_hosted_option] if self.need_newlib else [*disable_hosted_option_pure],
         }
+        gcc_host_option_list: dict[str, list[str]] = {"linux": [], "w64": get_mingw_gcc_lib_options(self.env), "unknown": []}
         self.gcc_option = [
-            *gcc_option_list[self.target_os],
+            *gcc_target_option_list[self.target_os],
+            *gcc_host_option_list[self.host_os],
             "--enable-languages=c,c++",
             "--disable-multilib",
         ]
 
         w64_gdbsupport_option = 'CXXFLAGS="-O3 -D_WIN32_WINNT=0x0600"'
-        gdb_option_list = {
+        gdb_option_list: dict[str, list[str]] = {
             "linux": [f'LDFLAGS="{self.env.rpath_option}"', "--with-python=/usr/bin/python3"],
             "w64": [
                 f"--with-python={self.env.python_config_path}",
@@ -615,7 +617,7 @@ class build_gcc_environment:
         if gdb and self.host_os == "w64":
             self.env.build_libpython()
 
-        linux_arch_list = {
+        linux_arch_list: dict[str, str] = {
             "i686": "x86",
             "x86_64": "x86",
             "arm": "arm",
