@@ -105,7 +105,6 @@ class llvm_environment(common.basic_environment):
     lib_dir_list: dict[str, Path]  # 所有库所在目录
     source_dir: dict[str, Path] = {}  # 源代码所在目录
     build_dir: dict[str, Path] = {}  # 构建时所在目录
-    compiler_list = ("C", "CXX", "ASM")  # 编译器列表
     sysroot_dir: dict[str, Path]  # sysroot所在路径
     generator_list: dict[str, cmake_generator]  # 构建指定目标平台的工具时使用的生成器
     llvm_build_options: build_options  # llvm构建选项
@@ -168,7 +167,6 @@ class llvm_environment(common.basic_environment):
         "LIBCXX_ENABLE_THREADS": "ON",
         "LIBCXX_HAS_WIN32_THREAD_API": "ON",
         "CMAKE_RC_COMPILER": "llvm-windres",
-        "LLVM_ENABLE_RUNTIMES": '"libcxx;libcxxabi;libunwind;compiler-rt"',  # 交叉编译下没有ml编译不了openmp
     }
     freestanding_option: typing.Final[dict[str, str]] = {
         "LIBUNWIND_IS_BAREMETAL": "ON",
@@ -259,14 +257,17 @@ class llvm_environment(common.basic_environment):
         for target in runtime_target_list:
             self.runtime_build_options[target] = deepcopy(self.llvm_build_options)
             gcc = get_specific_environment(self, target=target)
+            options = self.runtime_build_options[target]
             if gcc.freestanding:
-                self.runtime_build_options[target].system_name = "Generic"
-                self.runtime_build_options[target].cmake_option.update(self.freestanding_option)
+                options.system_name = "Generic"
+                options.cmake_option.update(self.freestanding_option)
             elif gcc.target_field.os == "linux":
-                self.runtime_build_options[target].system_name = "Linux"
+                options.system_name = "Linux"
             else:
-                self.runtime_build_options[target].system_name = "Windows"
-                self.runtime_build_options[target].cmake_option.update(self.win32_options)
+                options.system_name = "Windows"
+                options.cmake_option.update(self.win32_options)
+                options.cmake_option["CMAKE_ASM_MASM_COMPILER"] = "llvm-ml64" if target.startswith("x86_64") else "llvm-ml"
+                options.cmake_option["CMAKE_RC_FLAGS"] = "--target=pe-x86-64" if target.startswith("x86_64") else "--target=pe-i386"
             self.build_dir[f"{target}-runtimes"] = self.build_tmp / f"{target}-runtimes"
             self.prefix[f"{target}-runtimes"] = self.build_tmp / f"{target}-runtimes-install"
             self.sysroot_dir[target] = self.prefix_dir / "sysroot"
@@ -318,7 +319,7 @@ class llvm_environment(common.basic_environment):
         compiler_path = {"C": "clang", "CXX": "clang++", "ASM": "clang"}
         sysroot_dir = self.sysroot_dir[target]
         gcc_toolchain = f"--gcc-toolchain={sysroot_dir}" if target == self.build else ""
-        for compiler in self.compiler_list:
+        for compiler in ("C", "CXX", "ASM"):
             command_list.append(f'-DCMAKE_{compiler}_COMPILER="{compiler_path[compiler]}"')
             command_list.append(f"-DCMAKE_{compiler}_COMPILER_TARGET={target}")
             command_list.append(f'-DCMAKE_{compiler}_FLAGS="-Wno-unused-command-line-argument {gcc_toolchain} {" ".join(command_list_in)}"')
@@ -502,10 +503,13 @@ class build_llvm_environment:
         # 构建运行库
         for target, option in env.runtime_build_options.items():
             runtimes_name = f"{target}-runtimes"
-            env.config(runtimes_name, target, option.basic_option, option.cmake_option)
-            env.make(runtimes_name, target)
-            env.install(runtimes_name, target)
-            env.build_sysroot(target)
+            with common.cached_lib_builder(env.prefix[runtimes_name], env.host) as is_built:
+                if is_built:
+                    continue
+                env.config(runtimes_name, target, option.basic_option, option.cmake_option)
+                env.make(runtimes_name, target)
+                env.install(runtimes_name, target)
+                env.build_sysroot(target)
         # 打包
         env.package()
 
