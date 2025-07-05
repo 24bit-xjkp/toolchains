@@ -7,7 +7,7 @@ from pathlib import Path
 from . import common
 from .gcc_environment import get_specific_environment
 
-lib_list = ("zlib", "libxml2")
+lib_list = ("zlib", "libxml2", "zstd")
 subproject_list = ("llvm", "runtimes")
 
 
@@ -144,20 +144,31 @@ class llvm_environment(common.basic_environment):
         "LIBCXXABI_ENABLE_ASSERTIONS": "OFF",  # 禁用断言
         "LIBCXXABI_INCLUDE_TESTS": "OFF",  # 禁用libcxxabi测试
         "LLDB_INCLUDE_TESTS": "OFF",  # 禁用lldb测试
-        "LLDB_ENABLE_PYTHON": "ON",  # 启用python支持
         "LIBOMP_OMPD_GDB_SUPPORT": "OFF",  # 禁用openmpd的gdb支持，该支持需要python，而交叉编译时无法提供
     }
-    lib_option: typing.Final[dict[str, str]] = {  # llvm依赖库编译选项
-        "BUILD_SHARED_LIBS": "OFF",
-        "LIBXML2_WITH_ICONV": "OFF",
-        "LIBXML2_WITH_LZMA": "OFF",
-        "LIBXML2_WITH_PYTHON": "OFF",
-        "LIBXML2_WITH_ZLIB": "OFF",
-        "LIBXML2_WITH_THREADS": "OFF",
-        "LIBXML2_WITH_CATALOG": "OFF",
-        "LIBXML2_WITH_TESTS": "OFF",
-        "CMAKE_RC_COMPILER": "llvm-windres",
-        "CMAKE_BUILD_WITH_INSTALL_RPATH": "ON",
+    lib_option: typing.Final[dict[str, dict[str, str]]] = {  # llvm依赖库编译选项
+        "libxml2": {
+            "BUILD_SHARED_LIBS": "ON",
+            "LIBXML2_WITH_ICONV": "OFF",
+            "LIBXML2_WITH_LZMA": "OFF",
+            "LIBXML2_WITH_PYTHON": "OFF",
+            "LIBXML2_WITH_ZLIB": "OFF",
+            "LIBXML2_WITH_THREADS": "OFF",
+            "LIBXML2_WITH_CATALOG": "OFF",
+            "LIBXML2_WITH_TESTS": "OFF",
+            "CMAKE_RC_COMPILER": "llvm-windres",
+            "CMAKE_BUILD_WITH_INSTALL_RPATH": "ON",
+        },
+        "zstd": {
+            "ZSTD_BUILD_STATIC": "ON",
+            "ZSTD_BUILD_SHARED": "ON",
+            "ZSTD_BUILD_PROGRAMS": "OFF",
+        },
+        "zlib": {
+            "ZLIB_BUILD_SHARED": "OFF",
+            "ZLIB_BUILD_STATIC": "ON",
+            "ZLIB_BUILD_TESTING": "OFF",
+        },
     }
     win32_options: typing.Final[dict[str, str]] = {
         "LIBCXXABI_ENABLE_THREADS": "ON",
@@ -248,6 +259,7 @@ class llvm_environment(common.basic_environment):
             {**self.llvm_option_list, **self.dylib_option_list, "LLVM_PARALLEL_LINK_JOBS": str(self.jobs // 6)},
             "Linux" if common.triplet_field(self.host).os == "linux" else "Windows",
         )
+        self.llvm_build_options.cmake_option["LLDB_ENABLE_PYTHON"] = "ON" if "linux" in self.host else "OFF"
         if self.family == runtime_family.llvm:
             self.llvm_build_options.cmake_option["LIBUNWIND_USE_COMPILER_RT"] = "ON"
 
@@ -273,16 +285,18 @@ class llvm_environment(common.basic_environment):
             self.sysroot_dir[target] = self.prefix_dir / "sysroot"
             self.generator_list[target] = default_generator
         for lib in lib_list:
-            self.prefix[lib] = self.build_tmp / f"{self.host}-{lib}-install"
+            self.prefix[lib] = (
+                self.build_tmp / f"{self.host}-{lib}-install" if lib != "zstd" else self.build_tmp / f"{self.host}-clang-{lib}-install"
+            )
         # 设置源目录和构建目录
         for project in subproject_list:
             self.source_dir[project] = self.home / "llvm" / project
             common.check_lib_dir(project, self.source_dir[project])
         self.build_dir["llvm"] = self.build_tmp / f"{self.host}-llvm"
         for lib in lib_list:
-            self.source_dir[lib] = self.home / lib
-            self.build_dir[lib] = self.build_tmp / f"{self.host}-{lib}"
-            common.check_lib_dir(lib, self.source_dir[lib])
+            self.source_dir[lib] = self.home / lib if lib != "zstd" else self.home / lib / "build" / "cmake"
+            self.build_dir[lib] = self.build_tmp / f"{self.host}-{lib}" if lib != "zstd" else self.build_tmp / f"{self.host}-clang-{lib}"
+            common.check_lib_dir(lib, self.home / lib)
         if self.build != self.host:
             # 交叉编译时runtimes已经编译过了
             del self.llvm_build_options.cmake_option["LLVM_ENABLE_RUNTIMES"]
@@ -291,11 +305,14 @@ class llvm_environment(common.basic_environment):
             self.llvm_build_options.cmake_option.update(
                 {
                     "LIBXML2_INCLUDE_DIR": f'"{self.prefix["libxml2"] / "include" / "libxml2"}"',
-                    "LIBXML2_LIBRARY": f'"{self.prefix["libxml2"] / "lib" / "libxml2.a"}"',
+                    "LIBXML2_LIBRARY": f'"{self.prefix["libxml2"] / "lib" / "libxml2.dll.a"}"',
                     "CLANG_ENABLE_LIBXML2": "ON",
                     "ZLIB_INCLUDE_DIR": f'"{self.prefix["zlib"] / "include"}"',
                     "ZLIB_LIBRARY": zlib,
                     "ZLIB_LIBRARY_RELEASE": zlib,
+                    "zstd_INCLUDE_DIR": f'"{self.prefix["zstd"] / "include"}"',
+                    "zstd_STATIC_LIBRARY": f'"{self.prefix["zstd"] / "lib" / "libzstd.a"}"',
+                    "zstd_LIBRARY": f'"{self.prefix["zstd"] / "lib" / "libzstd.dll.a"}"',
                     "LLVM_NATIVE_TOOL_DIR": f'"{self.prefix["llvm"] / f'{self.build}-clang{self.major_version}' / "bin"}"',
                 }
             )
@@ -303,12 +320,13 @@ class llvm_environment(common.basic_environment):
         self.register_in_env()
         self.after_build_sysroot = {}
 
-    def get_compiler(self, target: str, command_list_in: list[str]) -> list[str]:
+    def get_compiler(self, target: str, command_list_in: list[str], lang: list[str]) -> list[str]:
         """获取编译器选项
 
         Args:
             target (str): 目标平台
             command_list_in (list[str]): 编译器选项
+            lang (list[str]): 需要设置编译选项的语言列表
 
         Returns:
             list[str]: 编译选项
@@ -319,7 +337,7 @@ class llvm_environment(common.basic_environment):
         compiler_path = {"C": "clang", "CXX": "clang++", "ASM": "clang"}
         sysroot_dir = self.sysroot_dir[target]
         gcc_toolchain = f"--gcc-toolchain={sysroot_dir}" if target == self.build else ""
-        for compiler in ("C", "CXX", "ASM"):
+        for compiler in lang:
             command_list.append(f'-DCMAKE_{compiler}_COMPILER="{compiler_path[compiler]}"')
             command_list.append(f"-DCMAKE_{compiler}_COMPILER_TARGET={target}")
             command_list.append(f'-DCMAKE_{compiler}_FLAGS="-Wno-unused-command-line-argument {gcc_toolchain} {" ".join(command_list_in)}"')
@@ -354,7 +372,8 @@ class llvm_environment(common.basic_environment):
         assert project in self.build_dir
         source_dir = self.source_dir[project] if "runtimes" not in project else self.source_dir["runtimes"]
         command = f"cmake -G {self.generator_list[target].get_cmake_option()} --install-prefix {self.prefix[project]} -B {self.build_dir[project]} -S {source_dir} "
-        command += " ".join(self.get_compiler(target, command_list) + get_cmake_option(cmake_option_list))
+        lang = ["C", "CXX", "ASM"] if project != "zstd" else ["C"]
+        command += " ".join(self.get_compiler(target, command_list, lang) + get_cmake_option(cmake_option_list))
         common.run_command(command)
 
     def make(self, project: str, target: str) -> None:
@@ -477,6 +496,15 @@ class llvm_environment(common.basic_environment):
             dst_prefix = self.compiler_rt_dir
             common.copy(src_prefix, dst_prefix, True)
 
+            # 复制依赖库运行时
+            if common.triplet_field(self.host).os == "w64":
+                src_prefix = self.prefix["libxml2"] / "bin" / "libxml2.dll"
+                dst_prefix = self.prefix["llvm"] / "bin" / "libxml2.dll"
+                common.copy(src_prefix, dst_prefix)
+                src_prefix = self.prefix["zstd"] / "bin" / "libzstd.dll"
+                dst_prefix = self.prefix["llvm"] / "bin" / "libzstd.dll"
+                common.copy(src_prefix, dst_prefix)
+
     def package(self) -> None:
         """打包工具链"""
 
@@ -514,6 +542,19 @@ class build_llvm_environment:
         env.package()
 
     @staticmethod
+    def _build_mingw_llvm_requirements(env: llvm_environment) -> None:
+        lib_basic_command_list: dict[str, list[str]] = {"libxml2": ["-lws2_32", "-lbcrypt"]}
+        for lib in lib_list:
+            with common.cached_lib_builder(env.prefix[lib], env.host) as is_built:
+                if is_built:
+                    continue
+
+                command_list = [*env.llvm_build_options.basic_option, *lib_basic_command_list.get(lib, [])]
+                env.config(lib, env.host, command_list, env.lib_option[lib])
+                env.make(lib, env.host)
+                env.install(lib, env.host)
+
+    @staticmethod
     def _build_mingw(env: llvm_environment) -> None:
         """构建host为mingw的llvm
 
@@ -522,11 +563,7 @@ class build_llvm_environment:
         """
 
         # 构建依赖库
-        lib_basic_command = [*env.llvm_build_options.basic_option, "-lws2_32", "-lbcrypt"]
-        for lib in lib_list:
-            env.config(lib, env.host, lib_basic_command, env.lib_option)
-            env.make(lib, env.host)
-            env.install(lib, env.host)
+        build_llvm_environment._build_mingw_llvm_requirements(env)
         # 构建llvm
         env.config("llvm", env.host, env.llvm_build_options.basic_option, env.llvm_build_options.cmake_option)
         env.make("llvm", env.host)
