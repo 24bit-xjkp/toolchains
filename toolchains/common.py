@@ -2068,6 +2068,8 @@ class build_timer:
                 minute_str = f"{self.minute} min, " if self.minute == 1 else f"{self.minute} mins, "
             if self.second:
                 second_str = f"{self.second} sec" if self.second == 1 else f"{self.second} secs"
+            if not hour_str and not minute_str and not second_str:
+                second_str = "0 sec"
             return toolchains_info(f"Finished in {hour_str}{minute_str}{second_str}")
 
     def __init__(self) -> None:
