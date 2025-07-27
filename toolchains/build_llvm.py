@@ -22,7 +22,7 @@ def sysroot(env: llvm_environment) -> None:
     common.mkdir(sysroot_dir, True)
     libgcc_prefix = sysroot_dir / "lib" / "gcc"
     common.mkdir(libgcc_prefix)
-    for target in llvm_support_platform_list.target_list:
+    for target in [*llvm_support_platform_list.target_list, *llvm_support_platform_list.sysroot_only_list]:
         target_dir = sysroot_dir / target
         common.mkdir(target_dir)
         match (target):
