@@ -244,7 +244,7 @@ class llvm_environment(common.basic_environment):
         self.host = host or self.build
         self.family = family
         name_without_version = f"{self.host}-clang"
-        super().__init__(build, "21.0.0", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match, build_tmp)
+        super().__init__(build, "22.0.0", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match, build_tmp)
         # 设置prefix
         self.prefix["llvm"] = self.prefix_dir / self.name
         self.compiler_rt_dir = self.prefix["llvm"] / "lib" / "clang" / self.major_version / "lib"
@@ -262,6 +262,17 @@ class llvm_environment(common.basic_environment):
         self.llvm_build_options.cmake_option["LLDB_ENABLE_PYTHON"] = "ON" if "linux" in self.host else "OFF"
         if self.family == runtime_family.llvm:
             self.llvm_build_options.cmake_option["LIBUNWIND_USE_COMPILER_RT"] = "ON"
+            self.llvm_build_options.cmake_option["LLVM_ENABLE_LIBCXX"] = "ON"
+        elif common.triplet_field(self.host).os in ("windows", "w64"):
+            # Windows下使用libstdc++需要emulated-tls
+            self.llvm_build_options.basic_option.append("-femulated-tls")
+            # 需要禁用lto以正常链接
+            common.toolchains_print(
+                common.toolchains_warning(
+                    "Using libstdc++ on Windows needs to use emulated tls and disable LTO in order to link the executable."
+                )
+            )
+            self.llvm_build_options.cmake_option["LLVM_ENABLE_LTO"] = "NO"
 
         self.runtime_build_options = {}
         self.sysroot_dir = {}
