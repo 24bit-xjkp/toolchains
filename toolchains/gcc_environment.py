@@ -485,8 +485,8 @@ def copy_pretty_printer(env: gcc_environment) -> None:
 
     native_gcc = get_specific_environment(env)
     for src_dir in native_gcc.share_dir.iterdir():
-        if src_dir.name.startswith("gcc") and src_dir.is_dir():
-            common.copy(src_dir, env.share_dir / src_dir.name)
+        if src_dir.name.startswith("gcc") and src_dir.is_dir() and not (dst_dir := env.share_dir / src_dir.name).is_dir():
+            common.copy(src_dir, dst_dir)
             return
 
 
@@ -651,7 +651,7 @@ class build_gcc_environment:
         if not self.full_build:
             copy_success = self.env.copy_from_other_toolchain(self.need_gdbserver)
             self.need_gdbserver = self.need_gdbserver and not copy_success
-        if self.need_gdb and self.env.freestanding and not self.need_newlib:
+        if self.need_gdb:
             copy_pretty_printer(self.env)
 
         # 编译gdbserver
