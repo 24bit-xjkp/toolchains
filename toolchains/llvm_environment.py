@@ -1,3 +1,4 @@
+import json
 import typing
 from collections.abc import Callable
 from copy import deepcopy
@@ -480,6 +481,33 @@ class llvm_environment(common.basic_environment):
         if callback := self.after_build_sysroot.get(target, None):
             callback(self)
 
+    def copy_libstdcxx_models_json(self, dst_prefix: Path) -> None:
+        """复制libstdc++.modules.json和std模块文件
+           在clang目录下提供一份文件以便在未设置sysroot的情况下可以找到正确的libstdc++模块文件
+        Args:
+            dst_prefix (Path): 目标目录
+        """
+
+        src_prefix = self.sysroot_dir[self.build] / self.host
+        src_prefix = src_prefix / "lib64" if (src_prefix / "lib64").is_dir() else src_prefix / "lib"
+        dst_path = dst_prefix / "libstdc++.modules.json"
+        common.copy(src_prefix / "libstdc++.modules.json", dst_path)
+        models_json = json.loads(dst_path.read_text())
+        models: list = models_json["modules"]
+        source_prefix = "../../share/libstdc++"
+        source_name_list: list[str] = list()
+        for model in models:
+            source_name = Path(model["source-path"]).name
+            model["source-path"] = f"{source_prefix}/{source_name}"
+            source_name_list.append(source_name)
+        dst_path.write_text(json.dumps(models_json, indent=2))
+        dst_prefix = self.prefix["llvm"] / "share" / "libstdc++"
+        src_prefix = src_prefix = self.sysroot_dir[self.build] / self.host / "include" / "c++"
+        src_prefix = next(src_prefix.iterdir()) / "bits"
+        common.mkdir(dst_prefix)
+        for source_name in source_name_list:
+            common.copy(src_prefix / source_name, dst_prefix / source_name)
+
     def copy_llvm_libs(self) -> None:
         """复制工具链所需库"""
 
@@ -494,6 +522,10 @@ class llvm_environment(common.basic_environment):
                 lambda file: file.name.startswith(("libc++", "libunwind")) and not file.name.endswith((".a", ".json")), src_prefix.iterdir()
             ):
                 common.copy(file, dst_prefix / file.name)
+        dst_prefix = self.prefix["llvm"] / "lib"
+        # 复制libstdc++.modules.json
+        self.copy_libstdcxx_models_json(dst_prefix)
+
         # 复制公用libc++和libunwind头文件
         src_prefix = native_bin_dir.parent / "include"
         dst_prefix = self.prefix["llvm"] / "include"
@@ -549,6 +581,9 @@ class build_llvm_environment:
                 env.make(runtimes_name, target)
                 env.install(runtimes_name, target)
                 env.build_sysroot(target)
+
+        target = common.triplet_field(env.host)
+        env.copy_libstdcxx_models_json(env.prefix["llvm"] / "lib" / str(target))
         # 打包
         env.package()
 
