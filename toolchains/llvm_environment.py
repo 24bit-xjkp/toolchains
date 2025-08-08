@@ -525,6 +525,12 @@ class llvm_environment(common.basic_environment):
         dst_prefix = self.prefix["llvm"] / "lib"
         # 复制libstdc++.modules.json
         self.copy_libstdcxx_models_json(dst_prefix)
+        # 复制libc++.modules.json
+        common.copy(src_prefix / "libc++.modules.json", dst_prefix / "libc++.modules.json")
+        # 复制libc++模块文件
+        dst_prefix = self.prefix["llvm"] / "share" / "libc++"
+        src_prefix = self.sysroot_dir[self.build] / self.host / "share" / "libc++"
+        common.copy(src_prefix, dst_prefix)
 
         # 复制公用libc++和libunwind头文件
         src_prefix = native_bin_dir.parent / "include"
@@ -537,7 +543,7 @@ class llvm_environment(common.basic_environment):
             # 其他库在sysroot中，无需复制
             src_prefix = native_compiler_rt_dir
             dst_prefix = self.compiler_rt_dir
-            common.copy(src_prefix, dst_prefix, True)
+            common.copy(src_prefix, dst_prefix)
 
             # 复制依赖库运行时
             if common.triplet_field(self.host).os == "w64":
