@@ -1,19 +1,19 @@
----@alias modifier_t fun(toolchain:unknown, opt:table<string, unknown>):nil
+---@alias modifier_t fun(toolchain: unknown, opt: table<string, unknown>): void
 ---@alias modifier_table_t table<string, modifier_t>
 ---@class sysroot_t
 ---@field public ldflags string
----@field public cxflags string | string[]
+---@field public cxflags string
 ---@field public shflags string
 ---@class opt_t
 ---@field public march string
 ---@field public sysroot sysroot_t
 
 ---占位符，无效果
----@return nil
+---@return void
 function noop_modifier(_, _) return end
 
 ---为loongnix定制部分flag
----@return nil
+---@return void
 function loongnix_modifier(toolchain, _)
     -- loongnix的glibc版本较老，使用的ld路径与新编译器默认路径不同
     toolchain:add("ldflags", "-Wl,-dynamic-linker=/lib64/ld.so.1")
@@ -22,7 +22,7 @@ function loongnix_modifier(toolchain, _)
 end
 
 ---为独立工具链定制部分flag
----@return nil
+---@return void
 function freestanding_modifier(toolchain, _)
     -- freestanding需要禁用标准库
     toolchain:add("cxflags", "-ffreestanding")
@@ -34,7 +34,7 @@ local note_msg = "${color.warning}NOTE:${default} "
 ---根据target重设sysroot
 ---@param target string
 ---@param opt opt_t
----@return nil
+---@return void
 function _reset_sysroot(target, opt)
     import("common")
     local cache_info = common.get_cache()
@@ -43,12 +43,11 @@ function _reset_sysroot(target, opt)
     end
     local sysroot_option = opt.sysroot
     local sysroot = sysroot_option.ldflags:sub(11)
-    local libcxx_option = #sysroot_option.cxflags == 2 and sysroot_option.cxflags[2] or nil
     local target_sysroot = path.join(sysroot, target)
     if path.filename(sysroot) ~= target and os.isdir(target_sysroot) then
         cprint(note_msg .. [[Reset "--sysroot" option to "%s".]], target_sysroot)
         sysroot = "--sysroot=" .. target_sysroot
-        opt.sysroot.cxflags = { sysroot, libcxx_option }
+        opt.sysroot.cxflags = sysroot
         opt.sysroot.ldflags = sysroot
         opt.sysroot.shflags = sysroot
     end
@@ -57,7 +56,7 @@ end
 ---重设march为指定值
 ---@param march string
 ---@param opt opt_t
----@return nil
+---@return void
 function _reset_march(march, opt)
     local march_option = "-march=" .. march
     if opt.march ~= march_option then
@@ -68,7 +67,7 @@ end
 
 ---为armv7m定制部分flag
 ---@param opt opt_t
----@return nil
+---@return void
 function armv7m_modifier(_, opt)
     _reset_march("armv7-m", opt)
     _reset_sysroot("armv7m-none-eabi", opt)
@@ -76,7 +75,7 @@ end
 
 ---为armv7m-fpv4定制部分flag
 ---@param opt opt_t
----@return nil
+---@return void
 function armv7m_fpv4_modifier(toolchain, opt)
     _reset_march("armv7-m", opt)
     _reset_sysroot("armv7m-fpv4-none-eabi", opt)

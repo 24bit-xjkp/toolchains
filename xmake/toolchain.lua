@@ -1,9 +1,9 @@
----@type string | nil
+---@type string?
 local rcfiles = os.getenv("XMAKE_RCFILES")
----@type string | nil
+---@type string?
 local script_dir = nil
 ---探测toolchain.lua并根据该文件的绝对路径提取脚本目录
----@see https://github.com/xmake-io/xmake/issues/6048
+---see https://github.com/xmake-io/xmake/issues/6048
 if rcfiles then
     for _, rcfile in ipairs(path.splitenv(rcfiles)) do
         if rcfile:endswith("toolchain.lua") then
@@ -21,17 +21,17 @@ else
 end
 
 ---获取工具链描述文本
----@param toolchain string --工具链名称
----@param target string --工具链目标
----@return string --描述文本
+---@param toolchain string @工具链名称
+---@param target string @工具链目标
+---@return string @描述文本
 function _get_toolchain_description(toolchain, target)
     return format("A %s toolchain for ", toolchain) ..
         (target ~= "target" and target or "target detected by arch and plat")
 end
 
 ---注册clang工具链
----@param target string --clang工具链目标平台
----@return nil
+---@param target string @clang工具链目标平台
+---@return void
 function register_clang_toolchain(target)
     toolchain(target .. "-clang", function()
         set_kind("standalone")
@@ -49,6 +49,7 @@ function register_clang_toolchain(target)
         set_toolset("ranlib", "llvm-ranlib")
         set_toolset("objcopy", "llvm-objcopy")
         set_toolset("mrc", "llvm-rc")
+        set_toolset("dlltool", "llvm-dlltool")
 
         on_check(function(_)
             return import("lib.detect.find_program")("clang")
@@ -60,8 +61,9 @@ function register_clang_toolchain(target)
                 toolchain:add("runtimes", "MT", "MTd", "MD", "MDd")
             end
 
+            local modifier
             ---@type string, modifier_t
-            local target, modifier = utility.get_target_modifier(target, "clang")
+            target, modifier = utility.get_target_modifier(target, "clang")
 
             local march_option = utility.get_march_option(target, "clang")
             local sysroot_option = utility.get_sysroot_option()
@@ -95,8 +97,8 @@ for target, _ in pairs(get_clang_target_list()) do
 end
 
 ---注册gcc工具链
----@param target string --gcc工具链目标平台
----@return nil
+---@param target string @gcc工具链目标平台
+---@return void
 function register_gcc_toolchain(target)
     toolchain(target .. "-gcc", function()
         set_kind("standalone")
@@ -104,16 +106,17 @@ function register_gcc_toolchain(target)
         set_description(_get_toolchain_description("gcc", target))
         set_runtimes("stdc++_static", "stdc++_shared")
         local prefix
-        ---@type modifier_t
         local modifier
 
         on_check(function(_)
+            ---@type string, modifier_t
             target, modifier = import("utility.utility").get_target_modifier(target, "gcc")
             prefix = target == "native" and "" or target .. "-"
             return import("lib.detect.find_program")(prefix .. "gcc")
         end)
 
         on_load(function(toolchain)
+            ---@type string, modifier_t
             target, modifier = import("utility.utility").get_target_modifier(target, "gcc")
             prefix = target == "native" and "" or target .. "-"
             toolchain:set("toolset", "cc", prefix .. "gcc")
@@ -125,6 +128,10 @@ function register_gcc_toolchain(target)
             toolchain:set("toolset", "objcopy", prefix .. "objcopy")
             toolchain:set("toolset", "ranlib", prefix .. "ranlib")
             toolchain:set("toolset", "as", prefix .. "gcc")
+            if string.find(prefix, "w64") then
+                toolchain:set("toolset", "mrc", prefix .. "windres")
+                toolchain:set("toolset", "dlltool", prefix .. "dlltool")
+            end
 
             import("utility.utility")
             local march_option = utility.get_march_option(target, "gcc")
