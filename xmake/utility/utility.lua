@@ -119,10 +119,7 @@ function get_sysroot_option()
     ---@return table<string, string | string[]> --选项列表
     local function get_option_list()
         local sysroot_option = "--sysroot=" .. sysroot
-        -- 判断是不是libc++
-        local is_libcxx = (get_config("runtimes") or ""):startswith("c++")
-        local libcxx_option = is_libcxx and "-isystem" .. path.join(sysroot, "include", "c++", "v1") or nil
-        return { cxflags = { sysroot_option, libcxx_option }, ldflags = sysroot_option, shflags = sysroot_option }
+        return { cxflags = sysroot_option, ldflags = sysroot_option, shflags = sysroot_option }
     end
     if sysroot == "" then
         return nil               -- 已经探测过，无sysroot可用
