@@ -7,6 +7,12 @@ function is_clang()
     return string.find(get_config("toolchain") or "", "clang", 1, true) ~= nil
 end
 
+---判断工具链是否是gcc
+---@return boolean @是否是gcc工具链
+function is_gcc()
+    return string.find(get_config("toolchain") or "", "gcc", 1, true) ~= nil
+end
+
 ---本模块使用的缓存键
 local cache_key = "toolchain.utility"
 
