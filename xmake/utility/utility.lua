@@ -109,14 +109,15 @@ function get_target_modifier(target, toolchain)
 end
 
 ---根据选项或探测结果获取sysroot选项列表
----@return table<string, string | string[]>? @选项列表
+---@return table<string, string>? @选项列表
 function get_sysroot_option()
+    ---@type table<string, any>
     local cache_info = common.get_cache()
     ---sysroot缓存
     ---@type string?
     local sysroot = cache_info["sysroot"]
     ---根据sysroot获取选项列表
-    ---@return table<string, string | string[]> --选项列表
+    ---@return table<string, string> --选项列表
     local function get_option_list()
         local sysroot_option = "--sysroot=" .. sysroot
         return { cxflags = sysroot_option, ldflags = sysroot_option, shflags = sysroot_option }
