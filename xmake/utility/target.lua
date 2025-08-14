@@ -54,22 +54,28 @@ function _reset_sysroot(target, opt)
 end
 
 ---重设march为指定值
----@param march string
+---@param default_march string
+---@param support_arch_list string[]
 ---@param opt opt_t
 ---@return void
-function _reset_march(march, opt)
-    local march_option = "-march=" .. march
-    if opt.march ~= march_option then
-        cprint(note_msg .. [[Reset "-march" option to %s.]], march)
+function _reset_march(default_march, support_arch_list, opt)
+    local march_option = "-march=" .. default_march
+    local _, arch = opt.march:match("([^=]+)=([^=]+)")
+    if not table.contains(support_arch_list, arch) then
+        cprint(note_msg .. [[Reset "-march" option to %s.]], default_march)
         opt.march = march_option
     end
 end
+
+local arm32_arch_list = { "armv4", "armv4t", "armv5t", "armv5te", "armv5tej", "armv6", "armv6j", "armv6k", "armv6z",
+    "armv6kz", "armv6zk", "armv6t2", "armv6-m", "armv6s-m", "armv7", "armv7-a", "armv7ve", "armv7-r", "armv7-m",
+    "armv7e-m" }
 
 ---为armv7m定制部分flag
 ---@param opt opt_t
 ---@return void
 function armv7m_modifier(_, opt)
-    _reset_march("armv7-m", opt)
+    _reset_march("armv7-m", arm32_arch_list, opt)
     _reset_sysroot("armv7m-none-eabi", opt)
 end
 
@@ -77,7 +83,7 @@ end
 ---@param opt opt_t
 ---@return void
 function armv7m_fpv4_modifier(toolchain, opt)
-    _reset_march("armv7-m", opt)
+    _reset_march("armv7-m", arm32_arch_list, opt)
     _reset_sysroot("armv7m-fpv4-none-eabi", opt)
     toolchain:add("cxflags", "-mfpu=fpv4-sp-d16", "-mfloat-abi=hard")
     toolchain:add("asflags", "-mfpu=fpv4-sp-d16")
