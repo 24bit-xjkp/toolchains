@@ -59,6 +59,7 @@ function get_target_modifier(target, toolchain)
         msys = "w64",
         linux = "linux",
         windows = "windows",
+        macosx = "apple",
         cross = target_os
     }
     ---@type string?
@@ -82,7 +83,10 @@ function get_target_modifier(target, toolchain)
             linux = "gnueabihf",
             none = "eabi"
         },
-        aarch64 = linux_abi_table,
+        aarch64 = {
+            linux = "gnu",
+            apple = "darwin24"
+        },
         riscv64 = linux_abi_table,
         loongarch64 = linux_abi_table
     }
