@@ -186,9 +186,13 @@ end
 ---@note 在target和toolchain存在时才检查选项合法性
 ---@return string? @march选项
 function get_march_option(target, toolchain)
+    ---@type table<string, any>
     local cache_info = common.get_cache()
+    -- 支持一个工程同时使用目标平台和本地两套工具链
+    -- 目标平台为native时，march选项为march_host；其他平台时，march选项为march
+    local march_key = target == "native" and "march_host" or "march"
     ---@type string?
-    local option = cache_info["march"]
+    local option = cache_info[march_key]
     if option == "" then
         return nil    -- 已经探测过，-march不受支持
     elseif option then
@@ -197,7 +201,7 @@ function get_march_option(target, toolchain)
 
     ---探测march是否受支持
     ---@type string
-    local arch = get_config("march")
+    local arch = get_config(march_key)
     if arch ~= "none" then
         local march = (arch ~= "default" and arch or "native")
         local options = { "-march=" .. march }
@@ -227,7 +231,7 @@ function get_march_option(target, toolchain)
     end
 
     -- 更新缓存
-    cache_info["march"] = option
+    cache_info[march_key] = option
     common.update_cache(cache_info)
     return option
 end

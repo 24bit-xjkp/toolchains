@@ -3,11 +3,26 @@ option("march", function()
         "The option is automatically added if using our toolchain option.",
         [[    none: Don't set the "-march" option, use the default march of the toolchain.]],
         [[    default: Set the "-march" option as "-march=native" if possible, otherwise don't set the "-march" option and use the default march of the toolchain.]],
-        [[    arch: Set the "-march" option as "-march=arch". Note that "arch" is any value other than "none" and "default".]])
+        [[    arch: Set the "-march" option as "-march=arch". Note that "arch" is any value other than "none" and "default".]],
+        [[NOTE: If you are using "native-gcc" or "native-clang" as the toolchain, set the "march_host" option instead.]])
     set_default("default")
     after_check(function(option)
         import("utility.utility")
         option:add("cxflags", utility.get_march_option())
+    end)
+end)
+
+option("march_host", function()
+    set_description([[Set the "-march" option for native gcc and clang.]],
+        "The option is automatically added if using our toolchain option.",
+        [[    none: Don't set the "-march" option, use the default march of the toolchain.]],
+        [[    default: Set the "-march" option as "-march=native" if possible, otherwise don't set the "-march" option and use the default march of the toolchain.]],
+        [[    arch: Set the "-march" option as "-march=arch". Note that "arch" is any value other than "none" and "default".]],
+        [[    NOTE: This option only works for "native-gcc" and "native-clang" toolchain.]])
+    set_default("default")
+    after_check(function(option)
+        import("utility.utility")
+        option:add("cxflags", utility.get_march_option("native"))
     end)
 end)
 
