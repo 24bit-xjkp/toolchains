@@ -9,3 +9,4 @@ dist
 .mypy_cache
 .coverage
 .pytest_cache
+.marscode
