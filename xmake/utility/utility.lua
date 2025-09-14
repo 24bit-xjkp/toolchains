@@ -189,8 +189,9 @@ function get_march_option(target, toolchain)
     ---@type table<string, any>
     local cache_info = common.get_cache()
     -- 支持一个工程同时使用目标平台和本地两套工具链
-    -- 目标平台为native时，march选项为march_host；其他平台时，march选项为march
-    local march_key = target == "native" and "march_host" or "march"
+    -- 目标平台为native或该工具链为host工具链时，march选项为march_host；其他平台时，march选项为march
+    local is_host = target == "native" or get_config("toolchain_host") == format("%s-%s", target, toolchain)
+    local march_key = is_host and "march_host" or "march"
     ---@type string?
     local option = cache_info[march_key]
     if option == "" then
@@ -213,11 +214,10 @@ function get_march_option(target, toolchain)
             end
             ---@type boolean
             local support = compiler.has_flags("cxx", table.concat(options, " "))
-            local message = "checking for march ... "
-            cprint(message .. (support and "${color.success}" or "${color.failure}") .. march)
+            cprint("checking for %s ... %s%s", march_key, support and "${color.success}" or "${color.failure}", march)
             if not support then
                 if arch ~= "default" then
-                    raise(string.format([[The toolchain doesn't support the arch "%s"]], march))
+                    raise(format([[The toolchain doesn't support the arch "%s"]], march))
                 end
                 option = ""
             else
