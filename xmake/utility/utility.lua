@@ -261,3 +261,44 @@ function get_cmake_mode(mode)
     local table = { debug = "Debug", release = "Release", minsizerel = "MinSizeRel", releasedbg = "RelWithDebInfo" }
     return table[mode]
 end
+
+---检查目标是否支持覆盖率分析
+---@param option_name string @选项名称，默认为target
+---@param do_assert boolean? @不支持时是否报错，默认为true
+---@return table? @目标实例
+function check_target_for_coverage(option_name, do_assert)
+    import("core.base.option")
+    import("core.project.project")
+
+
+    option_name = option_name or "target"
+    do_assert = do_assert == nil and true or do_assert
+    local target_name = option.get(option_name)
+    if do_assert then
+        assert(target_name, "Target not set!")
+    else
+        if target_name == nil then
+            return
+        end
+    end
+    local target = project.target(target_name)
+    -- 从工程中查找指定目标
+    if do_assert then
+        assert(target, [[Target "%s" not found!]], target_name)
+    else
+        if target == nil then
+            return
+        end
+    end
+    local target_kind = target:targetkind()
+    -- 目标应当是可执行文件或动态库
+    local is_executable = target_kind == "binary" or target_kind == "shared"
+    if do_assert then
+        assert(is_executable, [[Target "%s" is not a executable target!]], target_name)
+    else
+        if not is_executable then
+            return
+        end
+    end
+    return target
+end
