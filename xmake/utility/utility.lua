@@ -262,43 +262,62 @@ function get_cmake_mode(mode)
     return table[mode]
 end
 
+---@class check_target_for_coverage_opt_t
+---@field option_name string? @选项名称，默认为target
+---@field allow_kinds string[] @允许的目标类型，默认为{"binary", "shared"}
+---@field is_array boolean? @是否为数组，默认为false
+
 ---检查目标是否支持覆盖率分析
----@param option_name string @选项名称，默认为target
----@param do_assert boolean? @不支持时是否报错，默认为true
----@return table? @目标实例
-function check_target_for_coverage(option_name, do_assert)
+---@param opt check_target_for_coverage_opt_t? @选项名称，默认为target
+---@return table | table[] @目标实例
+function check_target_for_coverage(opt)
     import("core.base.option")
     import("core.project.project")
 
+    ---@type check_target_for_coverage_opt_t
+    opt = opt or {}
+    local option_name = opt.option_name or "target"
+    local allow_kinds = opt.allow_kinds or { "binary", "shared" }
+    local is_array = opt.is_array == nil and false or opt.is_array
+    local len = #allow_kinds
+    local message = table.concat(allow_kinds, ", ", 1, len - 1) .. ", or " .. allow_kinds[len]
 
-    option_name = option_name or "target"
-    do_assert = do_assert == nil and true or do_assert
-    local target_name = option.get(option_name)
-    if do_assert then
-        assert(target_name, "Target not set!")
-    else
-        if target_name == nil then
-            return
-        end
-    end
-    local target = project.target(target_name)
-    -- 从工程中查找指定目标
-    if do_assert then
+    ---检查目标是否支持覆盖率分析
+    ---@param target_name string? @目标名称
+    ---@return table | table[] @目标实例
+    local function do_check(target_name)
+        local target = project.target(target_name)
+        -- 从工程中查找指定目标
         assert(target, [[Target "%s" not found!]], target_name)
-    else
-        if target == nil then
-            return
-        end
+        local target_kind = target:targetkind()
+        -- 目标应当是可执行文件或动态库
+        local is_allowed = table.contains(allow_kinds, target_kind)
+        assert(is_allowed, [[Target "%s" should be a %s target!]], target_name, message)
+        return target
     end
-    local target_kind = target:targetkind()
-    -- 目标应当是可执行文件或动态库
-    local is_executable = target_kind == "binary" or target_kind == "shared"
-    if do_assert then
-        assert(is_executable, [[Target "%s" is not a executable target!]], target_name)
-    else
-        if not is_executable then
-            return
+
+    if is_array then
+        ---@type string[]?
+        local target_names = option.get(option_name)
+        assert(target_names, "Targets not set!")
+        target_names = table.unique(target_names)
+        ---@type table[]
+        local targets = {}
+        for _, target_name in ipairs(target_names) do
+            table.insert(targets, do_check(target_name))
         end
+        return targets
+    else
+        local target_name = option.get(option_name)
+        assert(target_name, "Target not set!")
+        return do_check(target_name)
     end
-    return target
+end
+
+---覆盖率分析任务执行成功后的回显函数
+---@param output_path string @输出目录
+---@param start_time number @任务开始时间
+function coverage_task_echo_on_success(output_path, start_time)
+    local seconds = (os.mclock() - start_time) / 1000
+    cprint("${color.success}[100%%]: Output has been written to %s, spent %.3f s", output_path, seconds)
 end
