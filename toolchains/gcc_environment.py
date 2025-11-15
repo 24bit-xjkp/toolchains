@@ -787,7 +787,7 @@ class build_gcc_environment:
         build_env.after_build_gcc()
 
     def build_pexports(self) -> None:
-        # 编译pexports
+        """ # 编译pexports
         self.env.enter_build_dir("pexports")
         self.env.configure(
             "pexports",
@@ -800,7 +800,10 @@ class build_gcc_environment:
         # 为交叉工具链添加target前缀
         if not self.env.toolchain_type.contain(self.native_or_canadian):
             pexports = "pexports.exe" if self.host_os == "w64" else "pexports"
-            common.rename(self.env.bin_dir / pexports, self.env.bin_dir / f"{self.env.target}-{pexports}")
+            common.rename(self.env.bin_dir / pexports, self.env.bin_dir / f"{self.env.target}-{pexports}") """
+
+        # TODO: 添加meson支持
+        common.toolchains_warning("Pexports is now using meson build system. It's not supported yet.")
 
     @staticmethod
     def full_build_mingw(build_env: "build_gcc_environment") -> None:

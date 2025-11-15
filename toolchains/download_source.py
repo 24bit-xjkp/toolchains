@@ -462,17 +462,6 @@ class after_download_list:
             common.run_command("./buildconf.sh")
 
     @staticmethod
-    def pexports(config: configure) -> None:
-        """通过autoconf生成pexports的configure文件
-
-        Args:
-            config (configure): 当前源代码下载配置
-        """
-
-        with common.chdir_guard(config.home / "pexports"):
-            common.run_command("autoreconf -if")
-
-    @staticmethod
     def python_embed(config: configure) -> None:
         """解压python embed package和python源代码，提取出dll和include文件，并合并到python-embed文件夹中
 
