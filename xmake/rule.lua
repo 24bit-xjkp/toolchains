@@ -109,7 +109,7 @@ local function register_fuzzer_rule_on_load(target)
     target:add("ldflags", "-fsanitize=fuzzer")
     target:add("shflags", "-fsanitize=fuzzer")
     target:set("symbols", "debug")
-    target:set("optimize", "fast")
+    target:set("optimize", get_config("fuzzer_optimize_level"))
     target:set("strip", debug_strip)
 end
 
