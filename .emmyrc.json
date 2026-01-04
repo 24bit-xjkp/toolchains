@@ -1,7 +1,77 @@
 {
-    "diagnostics": {
-        "disable": [
-            "undefined-global"
-        ]
-    }
+  "completion": {
+    "enable": true,
+    "autoRequire": true,
+    "autoRequireFunction": "require",
+    "autoRequireNamingConvention": "keep",
+    "autoRequireSeparator": ".",
+    "callSnippet": false,
+    "postfix": "@"
+  },
+  "diagnostics": {
+    "disable": [
+      "undefined-global",
+      "undefined-field"
+    ],
+    "enable": true,
+    "globals": [],
+    "globalsRegex": [],
+    "severity": {},
+    "enables": [],
+    "diagnosticInterval": null
+  },
+  "signature": {
+    "detailSignatureHelper": true
+  },
+  "hint": {
+    "enable": true,
+    "paramHint": true,
+    "indexHint": true,
+    "localHint": true,
+    "overrideHint": true
+  },
+  "runtime": {
+    "version": "LuaLatest",
+    "requireLikeFunction": [],
+    "frameworkVersions": [],
+    "extensions": [],
+    "requirePattern": []
+  },
+  "workspace": {
+    "ignoreDir": [],
+    "ignoreGlobs": [],
+    "library": [],
+    "workspaceRoots": [],
+    "preloadFileSize": 0,
+    "encoding": "utf-8",
+    "moduleMap": [],
+    "reindexDuration": 5000,
+    "enableReindex": false
+  },
+  "resource": {
+    "paths": []
+  },
+  "codeLens": {
+    "enable": true
+  },
+  "strict": {
+    "requirePath": false,
+    "typeCall": false,
+    "arrayIndex": true,
+    "metaOverrideFileDefine": true
+  },
+  "semanticTokens": {
+    "enable": true
+  },
+  "references": {
+    "enable": true,
+    "fuzzySearch": true,
+    "shortStringSearch": false
+  },
+  "hover": {
+    "enable": true
+  },
+  "documentColor": {
+    "enable": true
+  }
 }

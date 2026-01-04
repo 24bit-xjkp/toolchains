@@ -12,34 +12,43 @@
 - 支持调试符号
 
 支持如下工具链：
-| 工具链 | Host               | Target                              |
-| :----- | :----------------- | :---------------------------------- |
-| gcc    | x86_64-linux-gnu   | x86_64-linux-gnu                    |
-| gcc    | x86_64-linux-gnu   | i686-linux-gnu                      |
-| gcc    | x86_64-linux-gnu   | x86_64-w64-mingw32                  |
-| gcc    | x86_64-linux-gnu   | i686-w64-mingw32                    |
-| gcc    | x86_64-linux-gnu   | arm-none-eabi                       |
-| gcc    | x86_64-linux-gnu   | x86_64-elf                          |
-| gcc    | x86_64-linux-gnu   | loongarch64-linux-gnu               |
-| gcc    | x86_64-linux-gnu   | loongarch64-loongnix-linux-gnu      |
-| gcc    | x86_64-linux-gnu   | riscv64-linux-gnu                   |
-| gcc    | x86_64-linux-gnu   | aarch64-linux-gnu                   |
-| gcc    | x86_64-linux-gnu   | arm-linux-gnueabi                   |
-| gcc    | x86_64-linux-gnu   | arm-linux-gnueabihf                 |
-| gcc    | x86_64-w64-mingw32 | x86_64-w64-mingw32                  |
-| gcc    | x86_64-w64-mingw32 | i686-w64-mingw32                    |
-| gcc    | x86_64-w64-mingw32 | x86_64-linux-gnu                    |
-| gcc    | x86_64-w64-mingw32 | i686-linux-gnu                      |
-| gcc    | x86_64-w64-mingw32 | arm-none-eabi                       |
-| gcc    | x86_64-w64-mingw32 | x86_64-elf                          |
-| gcc    | x86_64-w64-mingw32 | loongarch64-linux-gnu               |
-| gcc    | x86_64-w64-mingw32 | loongarch64-loongnix-linux-gnu      |
-| gcc    | x86_64-w64-mingw32 | riscv64-linux-gnu                   |
-| gcc    | x86_64-w64-mingw32 | aarch64-linux-gnu                   |
-| gcc    | x86_64-w64-mingw32 | arm-linux-gnueabi                   |
-| gcc    | x86_64-w64-mingw32 | arm-linux-gnueabihf                 |
-| llvm   | x86_64-linux-gnu   | X86, ARM, AArch64, LoongArch, RISCV |
-| llvm   | x86_64-w64-mingw32 | X86, ARM, AArch64, LoongArch, RISCV |
+
+| 工具链 | Host               | Target                                    |
+| :----- | :----------------- | :---------------------------------------- |
+| gcc    | x86_64-linux-gnu   | x86_64-linux-gnu                          |
+| gcc    | x86_64-linux-gnu   | i686-linux-gnu                            |
+| gcc    | x86_64-linux-gnu   | x86_64-w64-mingw32                        |
+| gcc    | x86_64-linux-gnu   | i686-w64-mingw32                          |
+| gcc    | x86_64-linux-gnu   | arm-none-eabi                             |
+| gcc    | x86_64-linux-gnu   | arm-fpv4-none-eabi                        |
+| gcc    | x86_64-linux-gnu   | arm-nonewlib-none-eabi                    |
+| gcc    | x86_64-linux-gnu   | x86_64-elf                                |
+| gcc    | x86_64-linux-gnu   | loongarch64-linux-gnu                     |
+| gcc    | x86_64-linux-gnu   | loongarch64-loongnix-linux-gnu            |
+| gcc    | x86_64-linux-gnu   | riscv64-linux-gnu                         |
+| gcc    | x86_64-linux-gnu   | riscv64-none-elf                          |
+| gcc    | x86_64-linux-gnu   | aarch64-linux-gnu                         |
+| gcc    | x86_64-linux-gnu   | arm-linux-gnueabi                         |
+| gcc    | x86_64-linux-gnu   | arm-linux-gnueabihf                       |
+| gcc    | x86_64-linux-gnu   | mips64el-linux-gnuabi64                   |
+| gcc    | x86_64-w64-mingw32 | x86_64-w64-mingw32                        |
+| gcc    | x86_64-w64-mingw32 | i686-w64-mingw32                          |
+| gcc    | x86_64-w64-mingw32 | x86_64-linux-gnu                          |
+| gcc    | x86_64-w64-mingw32 | i686-linux-gnu                            |
+| gcc    | x86_64-w64-mingw32 | arm-none-eabi                             |
+| gcc    | x86_64-w64-mingw32 | arm-fpv4-none-eabi                        |
+| gcc    | x86_64-w64-mingw32 | arm-nonewlib-none-eabi                    |
+| gcc    | x86_64-w64-mingw32 | x86_64-elf                                |
+| gcc    | x86_64-w64-mingw32 | loongarch64-linux-gnu                     |
+| gcc    | x86_64-w64-mingw32 | loongarch64-loongnix-linux-gnu            |
+| gcc    | x86_64-w64-mingw32 | riscv64-linux-gnu                         |
+| gcc    | x86_64-w64-mingw32 | riscv64-none-elf                          |
+| gcc    | x86_64-w64-mingw32 | aarch64-linux-gnu                         |
+| gcc    | x86_64-w64-mingw32 | arm-linux-gnueabi                         |
+| gcc    | x86_64-w64-mingw32 | arm-linux-gnueabihf                       |
+| gcc    | x86_64-w64-mingw32 | mips64el-linux-gnuabi64                   |
+| llvm   | x86_64-linux-gnu   | X86, ARM, AArch64, LoongArch, RISCV, Mips |
+| llvm   | x86_64-w64-mingw32 | X86, ARM, AArch64, LoongArch, RISCV, Mips |
 
 ## 构建流程说明与构建脚本
 
@@ -70,10 +79,12 @@
 | plat_clang.py $^{[3]}$                | LLVM工具链构建脚本 $^{[4]}$                                                     |
 | plat_native_gcc.py $^{[3]}$           | GCC本地工具链/加拿大工具链构建脚本 $^{[4]}$                                     |
 | plat_host_plat_target_gcc.py $^{[3]}$ | GCC交叉工具链/加拿大交叉工具链构建脚本 $^{[4]}$                                 |
+| download.py $^{[5]}$                  | 自动从github和其他源下载构建GCC和LLVM所需的包                                   |
 
 注释：
 
 [1] 字段说明如下表所示：
+
 | 字段   | 说明                                                                                                  |
 | :----- | :---------------------------------------------------------------------------------------------------- |
 | prefix | 一般为arch，若存在多个target则会增加vendor字段（如`loongnix`）或abi字段（如`hf`），取决于target间差异 |
@@ -81,6 +92,7 @@
 | suffix | glibc中库文件名后缀，如`.so`和`.a`，取决于哪些类型的库使用了链接器脚本而非软链接                      |
 
 [2] 该脚本支持如下选项：
+
 | 选项        | 说明                                                                     |
 | :---------- | :----------------------------------------------------------------------- |
 | --build     | 全自动构建所有GCC工具链                                                  |
@@ -92,6 +104,39 @@
 [3] plat字段表示一个triplet，用于描述一个目标平台，如`x86_6-linux-gnu`
 
 [4] 构建脚本可作为库使用，也可直接执行。引用这些脚本可以获取工具链的构建环境和一些实用函数，直接执行可以完成自动化构建
+
+[5] 该脚本支持如下选项：
+
+| 选项            | 说明                                                                   |
+| :-------------- | :--------------------------------------------------------------------- |
+| --glibc_version | 设置目标平台的Glibc版本，默认为系统Glibc版本                           |
+| --home          | 设置源码树的根目录，默认为`$HOME`                                      |
+| --clone_type    | Git克隆类型，默认为部分克隆                                            |
+| --depth         | 使用Git进行浅克隆时的克隆深度，默认为1                                 |
+| --ssh           | 是否在从github克隆时使用SSH，默认为否                                  |
+| --extra_libs    | 要下载或更新的额外包                                                   |
+| --retry         | 网络操作失败时最大重试次数，默认为5次                                  |
+| --remote        | 设置首选git源，在源可用时使用源以加速克隆，默认为github                |
+| --update        | 更新已安装的包，要求所有包均已安装                                     |
+| --download      | 下载缺失的包，不会更新已安装的包                                       |
+| --auto          | 先下载缺失的包，然后更新已安装的包。由于二次检查，可能会需要更多时间。 |
+| --system        | 打印需要的系统包                                                       |
+| --remove        | 删除已经安装的包，不指定包名则删除所有安装的包                         |
+| --import        | 从文件中导入配置                                                       |
+| --export        | 将配置导出到文件                                                       |
+| --help          | 打印帮助信息                                                           |
+
+remote选项支持的git源如下：
+
+| 源     | 说明                                                                           |
+| :----- | :----------------------------------------------------------------------------- |
+| github | 默认远程源，部分为仓库镜像，支持ssh克隆                                        |
+| native | 各个git库的原生远程源，可以克隆最新的提交，但可能访问较慢，部分仓库使用git协议 |
+| nju    | 南京大学开源镜像站，包含gcc、binutils、linux、glibc、llvm仓库镜像              |
+| tuna   | 清华大学开源软件镜像站，镜像同上                                               |
+| bfsu   | 北京外国语大学开源软件镜像站，镜像同上                                         |
+| nyist  | 南阳理工学院开源软件镜像站，镜像同上                                           |
+| cernet | 校园网联合镜像站，mirrorz-302 智能选择，镜像同上                               |
 
 ### 工具链说明
 
@@ -173,6 +218,7 @@ xmake支持文件位于`xmake`文件夹下，下面是各个文件的说明：
    | arch   | 添加`-march=arch`选项，`arch`不能为`no`和`detect`         |
 
 - sysroot 设置工具链的`--sysroot`选项，默认为`detect`
+
     | 选项   | 说明                                                                         |
     | :----- | :--------------------------------------------------------------------------- |
     | no     | 不添加`--sysroot`选项                                                        |
@@ -182,6 +228,7 @@ xmake支持文件位于`xmake`文件夹下，下面是各个文件的说明：
     *：关于自动探测支持请参阅[sysroot说明](readme/sysroot.md#说明)。
 
 - rtlib 设置clang的`-rtlib`选项，默认为`default`
+
     | 选项        | 说明                                                |
     | :---------- | :-------------------------------------------------- |
     | default     | 不添加`-rtlib`选项，即使用构建clang时指定的默认选项 |
@@ -190,6 +237,7 @@ xmake支持文件位于`xmake`文件夹下，下面是各个文件的说明：
     | platform    | 添加`-rtlib=platform`，即使用目标平台的默认选项     |
 
 - unwindlib 设置clang的`-unwindlib`选项，默认为`default`
+
     | 选项            | 说明                                                      |
     | :-------------- | :-------------------------------------------------------- |
     | default         | 不添加`-unwind`选项，即使用构建clang时指定的默认选项      |
@@ -203,6 +251,7 @@ xmake支持文件位于`xmake`文件夹下，下面是各个文件的说明：
     *：为避免`argument unused`警告，默认情况下仅在`rtlib`选项为`compiler-rt`时添加该选项，可以使用force版本强制添加
 
 - debug_strip 设置在启用调试符号的规则中是否要剥离符号表，默认为`no`
+
     | 选项  | 说明                                                   |
     | :---- | :----------------------------------------------------- |
     | no    | 如果可能，不剥离任何符号                               |
@@ -210,6 +259,7 @@ xmake支持文件位于`xmake`文件夹下，下面是各个文件的说明：
     | all   | 剥离调试符号到独立符号文件，然后去除目标文件中所有符号 |
 
 - enable_lto 设置在具有发布属性的规则（如`release`，`minsizerel`和`releasedbg`）中是否启用链接时优化（LTO），默认为`true`
+
     | 选项  | 说明    |
     | :---- | :------ |
     | true  | 启用LTO |

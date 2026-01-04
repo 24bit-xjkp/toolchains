@@ -1,0 +1,104 @@
+[build-system]
+requires = ["poetry-core>=1.9.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project]
+name = "toolchains"
+version = "0.3.0"
+description = "Build GCC and LLVM toolchains automatically."
+authors = [
+  { name = "24bit-xjkp", email = "2283572185@qq.com" },
+  { name = "Arendelle", email = "2381642961@qq.com" },
+  { name = "situNagisa", email = "1300296933@qq.com" },
+]
+readme = "README.md"
+license = "MIT"
+requires-python = "^3.12.0"
+dependencies = ["packaging>=21.0", "colorama>=0.4.6", "libarchive-c (>=5.1,<6.0)", "zstandard (>=0.23.0,<0.24.0)"]
+optional-dependencies = { complete = ["argcomplete (>=3.5.3,<4.0.0)"] }
+
+[project.urls]
+repository = "https://github.com/24bit-xjkp/toolchains"
+
+[project.scripts]
+toolchains-download = "toolchains.download:main"
+toolchains-gcc = "toolchains.build_gcc:main"
+toolchains-llvm = "toolchains.build_llvm:main"
+toolchains-util = "toolchains.utils:main"
+
+[tool.poetry]
+package-mode = true
+packages = [{ include = "toolchains" }]
+include = ["script/*", "xmake/*", "CONTRIBUTORS.md"]
+
+[tool.black]
+line-length = 140
+skip-string-normalization = false
+include = "(\\.pyi?)$"
+exclude = '''
+/(
+    \.git
+  | \.mypy_cache
+  | \.vscode
+  | \.VSCodeCounter
+  | \.xmake
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 140
+
+[tool.mypy]
+strict = true
+pretty = true
+files = ["script/*.py", "toolchains/*.py", "test/*.py"]
+
+[tool.pytest.ini_options]
+addopts = "-v --maxfail=3"
+testpaths = ["test"]
+python_files = "test_*.py"
+python_classes = "test*"
+python_functions = "test_*"
+
+[tool.sphinx-pyproject]
+build_dir = "docs/build"
+conf_dir = "docs/source"
+extensions = ["sphinx.ext.autodoc", "sphinx.ext.napoleon", "sphinx.ext.viewcode", "sphinx_rtd_theme", "myst_parser"]
+html_theme = "sphinx_rtd_theme"
+html_theme_options = { "collapse_navigation" = true, "sticky_navigation" = true, "navigation_depth" = 4, "titles_only" = false }
+package_root = "toolchains"
+language = "zh_CN"
+
+[tool.sphinx-pyproject.latex_elements]
+makeindex = '\usepackage[columns=1]{idxlayout}\makeindex'
+papersize = "a4paper"
+pointsize = "10pt"
+latex_engine = "xelatex"
+preamble = '''
+\usepackage[UTF8, scheme = plain]{ctex}
+\usepackage{ctex}
+
+\addto\captionsenglish{\renewcommand{\chaptername}{}}
+\parindent 2em
+\setcounter{tocdepth}{3}
+\setCJKmainfont[BoldFont=SimHei]{SimSun}
+\setmainfont[Scale=0.95]{Fira Sans}
+'''
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.14.1"
+mypy-extensions = "^1.0.0"
+poetry = "^2.0.0"
+black = "^24.10.0"
+isort = "^5.13.2"
+pytest = "^8.3.4"
+pytest-cov = "^6.0.0"
+sphinx = "^8.1.3"
+sphinx-rtd-theme = "^3.0.2"
+myst-parser = "^4.0.0"
+sphinx-pyproject = "^0.3.0"
+types-colorama = "^0.4.15.20240311"

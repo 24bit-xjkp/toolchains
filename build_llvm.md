@@ -4,9 +4,9 @@
 
 | 项目 | 版本         |
 | :--- | :----------- |
-| OS   | Ubuntu 24.04 |
+| OS   | Ubuntu 24.10 |
 | LLVM | 20.0.0       |
-| GCC  | 15.0.0       |
+| GCC  | 16.0.0       |
 
 ## 准备工作
 
@@ -208,7 +208,7 @@ def overwrite_copy(src: str, dst: str):
             os.remove(dst)
         shutil.copyfile(src, dst, follow_symlinks=False)
 
-home = os.environ["HOME"]
+home = os.path.expanduser("~")
 prefix = f"{home}/x86_64-linux-gnu-clang20/install"
 sysroot = f"{home}/sysroot"
 compiler_rt = f"{home}/x86_64-linux-gnu-clang20/lib/clang/20/lib"
