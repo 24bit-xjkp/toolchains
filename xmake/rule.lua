@@ -96,10 +96,26 @@ rule("coverage", function()
     on_load(register_coverage_rule_on_load)
 end)
 
+---注册fuzzer规则的on_load函数
+---@param target table @目标实例
+---@return void
+local function register_fuzzer_rule_on_load(target)
+    assert(import("utility.common").is_clang(), "Libfuzzer only support in clang toolchain.")
+    target:set("policy", "build.sanitizer.address", true)
+    target:set("policy", "build.sanitizer.undefined", true)
+    target:add("cxflags", "-fsanitize=fuzzer")
+    target:add("ldflags", "-fsanitize=fuzzer")
+    target:set("symbols", "debug")
+    target:set("optimize", "fast")
+end
+
+rule("fuzzer", function()
+    on_load(register_fuzzer_rule_on_load)
+end)
 
 ---受支持的规则表
 ---@type string[]
-support_rules_table = { "debug", "release", "minsizerel", "releasedbg", "coverage" }
+support_rules_table = { "debug", "release", "minsizerel", "releasedbg", "coverage", "fuzzer" }
 
 ---用于注册规则中on_load函数的函数表
 ---@type table<string, fun(target: table) : void>
@@ -109,4 +125,5 @@ register_rule_on_load_table = {
     minsizerel = register_minsizerel_rule_on_load,
     releasedbg = register_releasedbg_rule_on_load,
     coverage = register_coverage_rule_on_load,
+    fuzzer = register_fuzzer_rule_on_load,
 }
