@@ -111,6 +111,9 @@ local function register_fuzzer_rule_on_load(target)
     target:set("symbols", "debug")
     target:set("optimize", get_config("fuzzer_optimize_level"))
     target:set("strip", debug_strip)
+    if get_config("fuzzer_with_coverage") then
+        register_coverage_rule_on_load(target)
+    end
 end
 
 rule("fuzzer", function()

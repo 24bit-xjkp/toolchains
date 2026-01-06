@@ -106,3 +106,8 @@ option("fuzzer_optimize_level", function()
     set_default("faster")
     set_values("none", "fast", "faster", "fastest", "smallest")
 end)
+
+option("fuzzer_with_coverage", function()
+    set_description("Whether to build fuzzer with coverage.")
+    set_default(false)
+end)
