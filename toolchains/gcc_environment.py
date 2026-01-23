@@ -787,23 +787,20 @@ class build_gcc_environment:
         build_env.after_build_gcc()
 
     def build_pexports(self) -> None:
-        """ # 编译pexports
-        self.env.enter_build_dir("pexports")
-        self.env.configure(
-            "pexports",
-            f"--prefix={self.env.prefix} --host={self.env.host}",
-            "CFLAGS=-O3",
-            "CXXFLAGS=-O3",
-        )
-        self.env.make()
-        self.env.install()
-        # 为交叉工具链添加target前缀
-        if not self.env.toolchain_type.contain(self.native_or_canadian):
-            pexports = "pexports.exe" if self.host_os == "w64" else "pexports"
-            common.rename(self.env.bin_dir / pexports, self.env.bin_dir / f"{self.env.target}-{pexports}") """
+        """编译pexports"""
 
-        # TODO: 添加meson支持
-        common.toolchains_warning("Pexports is now using meson build system. It's not supported yet.")
+        self.env.enter_build_dir("pexports")
+        with common.chdir_guard(self.env.lib_dir_list["pexports"]) as build_dir:
+            cross_file = self.env.script_dir / "pexports-x86_64-w64-mingw32.txt"
+            if self.target_os == "w64":
+                common.run_command(f"meson setup --cross-file {cross_file} {build_dir}")
+            else:
+                common.run_command(f"meson setup {build_dir}")
+            common.run_command(f"meson compile -C {build_dir}")
+            src_pexports_name = "pexports.exe" if self.host_os == "w64" else "pexports"
+            native_or_canadian = self.env.toolchain_type.contain(self.native_or_canadian)
+            dst_pexports_name = src_pexports_name if native_or_canadian else f"{self.env.target}-{src_pexports_name}"
+            common.copy(build_dir / src_pexports_name, self.env.bin_dir / dst_pexports_name)
 
     @staticmethod
     def full_build_mingw(build_env: "build_gcc_environment") -> None:

@@ -242,6 +242,7 @@ class all_lib_list:
         "wget",
         "swig",
         "rsync",
+        "meson",
         "libncurses5-dev",  # ncurses5-compat-libs for ArchLinux
     ]
     git_lib_list_github: typing.Final[dict[str, git_url]] = {

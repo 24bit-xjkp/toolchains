@@ -825,7 +825,7 @@ def set_environ_list(key: str, value: list[str]) -> None:
 
 
 @contextmanager
-def chdir_guard(path: Path, dry_run: bool | None = None) -> Generator[None, None, None]:
+def chdir_guard(path: Path, dry_run: bool | None = None) -> Generator[Path, None, None]:
     """临时进入指定的工作目录
 
     Args:
@@ -833,7 +833,7 @@ def chdir_guard(path: Path, dry_run: bool | None = None) -> Generator[None, None
         dry_run (bool | None, optional): 是否只回显而不运行命令. 默认为None.
     """
     cwd = chdir(path, dry_run) or Path()
-    yield
+    yield cwd
     chdir(cwd, dry_run)
 
 
