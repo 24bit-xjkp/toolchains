@@ -9,7 +9,7 @@ from . import common
 
 
 class extra_lib_version(enum.StrEnum):
-    python = "3.13.5"
+    python = "3.13.11"
     iconv = "1.18"
     loongnix_linux = "4.19.190.8.22"
     loongnix_glibc = "2.28"
@@ -250,11 +250,11 @@ class all_lib_list:
         "mingw": git_url("github.com", "mirror/mingw-w64.git"),
         "expat": git_url("github.com", "libexpat/libexpat.git"),
         "linux": git_url("github.com", "torvalds/linux.git"),
-        "glibc": git_url("github.com", "bminor/glibc.git"),
+        "glibc": git_url("sourceware.org", "git/glibc.git"),
         "pexports": git_url("github.com", "bocke/pexports.git"),
         "zlib": git_url("github.com", "madler/zlib.git"),
         "libxml2": git_url("github.com", "GNOME/libxml2.git"),
-        "newlib": git_url("github.com", "bminor/newlib.git"),
+        "newlib": git_url("sourceware.org", "git/newlib-cygwin.git"),
         "llvm": git_url("github.com", "llvm/llvm-project.git"),
         "zstd": git_url("github.com", "facebook/zstd.git"),
     }
@@ -266,7 +266,6 @@ class all_lib_list:
         "glibc": git_url("sourceware.org", "git/glibc.git"),
         "pexports": git_url("git.osdn.net", "gitroot/mingw/pexports.git", "git"),
         "libxml2": git_url("gitlab.gnome.org", "GNOME/libxml2.git"),
-        "newlib": git_url("sourceware.org", "git/newlib-cygwin.git"),
     }
     git_lib_list_nju: typing.Final[dict[str, git_url]] = {
         **git_lib_list_github,
