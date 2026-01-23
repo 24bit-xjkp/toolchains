@@ -179,9 +179,18 @@ class gcc_configure(common.basic_build_configure):
     gdbserver: bool
     newlib: bool
     nls: bool
+    use_system_python: bool
     toolchain_type: str = "GCC"
 
-    def __init__(self, gdb: bool = True, gdbserver: bool = True, newlib: bool = True, nls: bool = True, **kwargs: typing.Any) -> None:
+    def __init__(
+        self,
+        gdb: bool = True,
+        gdbserver: bool = True,
+        newlib: bool = True,
+        nls: bool = True,
+        use_system_python: bool = True,
+        **kwargs: typing.Any,
+    ) -> None:
         """设置gcc构建配置
 
         Args:
@@ -189,6 +198,7 @@ class gcc_configure(common.basic_build_configure):
             gdbserver (bool, optional): 是否构建gdbserver. 默认为构建.
             newlib (bool, optional): 是否为独立工具链构建newlib. 默认为构建.
             nls (bool, optional): 是否启用nls. 默认为启用.
+            use_system_python (bool, optional): 是否使用系统python而不是当前的python解释器构建gdb. 默认为使用.
         """
 
         super().__init__(**kwargs)
@@ -196,6 +206,7 @@ class gcc_configure(common.basic_build_configure):
         self.gdbserver = gdbserver
         self.newlib = newlib
         self.nls = nls
+        self.use_system_python = use_system_python
 
 
 def check_triplet(host: str, target: str) -> None:

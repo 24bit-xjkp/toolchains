@@ -96,6 +96,12 @@ def main() -> int:
         help="Whether to enable nls(nature language support) in GCC toolchain.",
         default=default_config.nls,
     )
+    build_parser.add_argument(
+        "--use-system-python",
+        action=argparse.BooleanOptionalAction,
+        help="Whether to use system python instead of current python interpreter to build gdb.",
+        default=default_config.use_system_python,
+    )
 
     common.support_argcomplete(parser)
     args = parser.parse_args()

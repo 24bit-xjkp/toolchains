@@ -526,6 +526,7 @@ class build_gcc_environment:
         compress_level: int,
         long_distance_match: int,
         build_tmp: Path,
+        use_system_python: bool,
     ) -> None:
         """gcc交叉工具链对象
 
@@ -543,6 +544,7 @@ class build_gcc_environment:
             compress_level (int): zstd压缩等级
             long_distance_match (int): 长距离匹配窗口大小
             build_tmp (Path): 构建工具链时存放临时文件的路径
+            use_system_python (bool): 是否使用系统python而不是当前的python解释器构建gdb.
         """
 
         self.env = gcc_environment(build, host, target, home, jobs, prefix_dir, compress_level, long_distance_match, build_tmp)
@@ -588,11 +590,13 @@ class build_gcc_environment:
             *gcc_host_option_list[self.host_os],
             "--enable-languages=c,c++",
             "--disable-multilib",
+            "--enable-host-pie",
+            "--enable-host-shared",
         ]
 
         w64_gdbsupport_option = 'CXXFLAGS="-O3 -D_WIN32_WINNT=0x0600"'
         gdb_option_list: dict[str, list[str]] = {
-            "linux": [f'LDFLAGS="{self.env.rpath_option}"', "--with-python=/usr/bin/python3"],
+            "linux": [f'LDFLAGS="{self.env.rpath_option}"', f"--with-python={"/usr/bin/python3" if use_system_python else "yes"}"],
             "w64": [
                 f"--with-python={self.env.python_config_path}",
                 w64_gdbsupport_option,
