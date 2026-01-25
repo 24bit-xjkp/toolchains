@@ -70,7 +70,7 @@ class gcc_environment(common.basic_environment):
     toolchain_type: "common.toolchain_type"  # 工具链类别
     cross_compiler: bool  # 是否是交叉编译器
     prefix: Path  # 工具链安装位置
-    lib_prefix: Path  # 安装后库目录的前缀]
+    lib_prefix: Path  # 安装后库目录的前缀
     share_dir: Path  # 安装后share目录
     gdbinit_path: Path  # 安装后.gdbinit文件所在路径
     lib_dir_list: dict[str, Path]  # 所有库所在目录
@@ -590,8 +590,6 @@ class build_gcc_environment:
             *gcc_host_option_list[self.host_os],
             "--enable-languages=c,c++",
             "--disable-multilib",
-            "--enable-host-pie",
-            "--enable-host-shared",
         ]
 
         w64_gdbsupport_option = 'CXXFLAGS="-O3 -D_WIN32_WINNT=0x0600"'
@@ -600,6 +598,8 @@ class build_gcc_environment:
             "w64": [
                 f"--with-python={self.env.python_config_path}",
                 w64_gdbsupport_option,
+                "--disable-source-highlight",
+                'LDFLAGS="-static-libstdc++"',
                 "--with-expat",
                 *get_mingw_gdb_lib_options(self.env),
             ],
@@ -690,7 +690,7 @@ class build_gcc_environment:
         env = build_env.env
         # 编译gcc
         env.enter_build_dir("gcc")
-        env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
+        env.configure("gcc", *build_env.basic_option, *build_env.gcc_option, "--enable-host-pie", "--enable-host-shared")
         env.make()
         env.install()
 
@@ -773,6 +773,9 @@ class build_gcc_environment:
         env.enter_build_dir("gcc")
         env.make("all-target-libgcc")
         env.install("install-target-libgcc")
+        # 创建空的libatomic_asneeded.a，避免构建glibc时链接错误
+        with (env.lib_prefix / "lib" / "libatomic_asneeded.a").open("w"):
+            pass
 
         # 编译安装glibc
         env.enter_build_dir("glibc")
@@ -782,8 +785,8 @@ class build_gcc_environment:
         env.adjust_glibc(build_env.adjust_glibc_arch)
 
         # 编译完整gcc
-        env.enter_build_dir("gcc")
-        env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
+        env.enter_build_dir("gcc", True)
+        env.configure("gcc", *build_env.basic_option, *build_env.gcc_option, "--enable-host-pie", "--enable-host-shared")
         build_gcc_environment.make_with_libbacktrace_patch(env)
         env.install()
 
@@ -796,7 +799,7 @@ class build_gcc_environment:
         self.env.enter_build_dir("pexports")
         with common.chdir_guard(self.env.lib_dir_list["pexports"]) as build_dir:
             cross_file = self.env.script_dir / "pexports-x86_64-w64-mingw32.txt"
-            if self.target_os == "w64":
+            if self.host_os == "w64":
                 common.run_command(f"meson setup --cross-file {cross_file} {build_dir}")
             else:
                 common.run_command(f"meson setup {build_dir}")
@@ -829,7 +832,7 @@ class build_gcc_environment:
 
         # 编译gcc和libgcc
         env.enter_build_dir("gcc")
-        env.configure("gcc", *build_env.basic_option, *build_env.gcc_option, "--disable-shared")
+        env.configure("gcc", *build_env.basic_option, *build_env.gcc_option, "--disable-shared", "--disable-gcov")
         build_gcc_environment.make_with_libbacktrace_patch(env, "all-gcc all-target-libgcc")
         env.install("install-strip-gcc install-target-libgcc")
 
@@ -840,7 +843,7 @@ class build_gcc_environment:
         env.install()
 
         # 编译完整的gcc
-        env.enter_build_dir("gcc")
+        env.enter_build_dir("gcc", True)
         env.configure("gcc", *build_env.basic_option, *build_env.gcc_option)
         build_gcc_environment.make_with_libbacktrace_patch(env)
         env.install()
