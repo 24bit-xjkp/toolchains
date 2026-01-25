@@ -5,11 +5,11 @@
 | 项目        | 版本         |
 | :---------- | :----------- |
 | OS          | Ubuntu 25.04 |
-| GCC         | 16.0.0       |
+| GCC         | 16.0.1       |
 | GDB         | 17.0.50      |
-| Binutils    | 2.44.50      |
+| Binutils    | 2.45.1       |
 | Python $^*$ | 3.13.5       |
-| Linux       | 6.15-rc4     |
+| Linux       | v6.18-rc6    |
 | Glibc       | 2.41         |
 | Mingw-w64   | 12.0.0       |
 | PExports    | 0.47         |
@@ -116,11 +116,14 @@ cd ~/binutils
 mkdir build
 cd build
 export ORIGIN='$$ORIGIN'
-../configure --prefix=$PREFIX --disable-werror --enable-nls --with-system-gdbinit=$PREFIX/share/.gdbinit LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64"
+../configure --prefix=$PREFIX --disable-werror --enable-nls --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=yes LDFLAGS="-Wl,-rpath='$ORIGIN'/../lib64"
 make -j 20
 make install-strip -j 20
 unset ORIGIN
 ```
+
+在conda下通过`--with-python=yes`选项编译带Python支持的gdb时，需要在`$CONDA_PREFIX/envs/<env name>/lib/python<version>/config-<version>-x86_64-linux-gnu`下建立一个
+软链接`libpython<version>.so`，链接到`$CONDA_PREFIX/envs/<env name>/lib/libpython<version>.so.1.0`。
 
 `--with-system-gdbinit=$PREFIX/share/.gdbinit`选项是用于设置默认的.gdbinit，而我们可以在默认的.gdbinit中配置好pretty-printer模块，
 这样就可以实现开箱即用的pretty-printer。参见[GDB系统设置](https://sourceware.org/gdb/current/onlinedocs/gdb.html/System_002dwide-configuration.html#System_002dwide-configuration)。
@@ -547,12 +550,15 @@ python3 "$current_dir/python_config.py" $@
       |     __gthread_once_t
 ```
 
+由于gdb依赖std::call_once，但是该函数在动态链接libstdc++时会导致链接错误，因此需要静态链接libstdc++，即添加`LDFLAGS="-static-libstdc++"`。
+同时由于source-highlight功能不能与静态链接libstdc++同时使用，因此也需要禁用source-highlight。
+
 交叉编译带python支持的gdb的所有要求都已经满足了，下面开始编译binutils和gdb：
 
 ```shell
 cd ~/binutils/build
 rm -rf *
-../configure --host=$HOST --target=$TARGET --prefix=$PREFIX --disable-werror --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/script/python_config.sh CXXFLAGS=-D_WIN32_WINNT=0x0600
+../configure --host=$HOST --target=$TARGET --prefix=$PREFIX --disable-werror --with-gmp=$GMP --with-mpfr=$MPFR --with-expat --with-libexpat-prefix=$EXPAT --with-libiconv-prefix=$ICONV --with-system-gdbinit=$PREFIX/share/.gdbinit --with-python=$HOME/toolchains/script/python_config.sh CXXFLAGS=-D_WIN32_WINNT=0x0600 LDFLAGS=-"static-libstdc++" --disable-source-highlight
 make -j 20
 make install-strip -j 20
 ```
