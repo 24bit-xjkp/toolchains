@@ -106,7 +106,7 @@ class gcc_environment(common.basic_environment):
         self.cross_compiler = self.toolchain_type.contain(common.toolchain_type.cross | common.toolchain_type.canadian_cross)
 
         name_without_version = (f"{self.host}-host-{self.target}-target" if self.cross_compiler else f"{self.host}-native") + "-gcc"
-        super().__init__(build, "16.0.0", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match, build_tmp)
+        super().__init__(build, "16.0.1", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match, build_tmp)
 
         self.prefix = self.prefix_dir / self.name
         self.lib_prefix = self.prefix / self.target if not self.toolchain_type.contain(common.toolchain_type.canadian) else self.prefix
