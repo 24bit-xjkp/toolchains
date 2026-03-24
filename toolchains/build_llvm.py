@@ -24,7 +24,6 @@ def sysroot(env: llvm_environment) -> None:
     common.mkdir(libgcc_prefix)
     for target in [*llvm_support_platform_list.target_list, *llvm_support_platform_list.sysroot_only_list]:
         target_dir = sysroot_dir / target
-        common.mkdir(target_dir)
         match (target):
             case "armv7m-none-eabi" | "armv7m-fpv4-none-eabi":
                 # 将armv7m转化为arm以便和gcc保持一致
@@ -32,6 +31,10 @@ def sysroot(env: llvm_environment) -> None:
                 triplet_filed.arch = "arm"
                 target = str(triplet_filed) if triplet_filed.vendor != "unknown" else triplet_filed.drop_vendor()
                 gcc = get_specific_environment(env, env.build, target)
+                if not gcc.lib_prefix.exists():
+                    common.toolchains_print(common.toolchains_warning(f"GCC toolchain for {target} does not exist."))
+                    continue
+                common.mkdir(target_dir)
                 # 复制include和lib
                 for dir in ("include", "lib"):
                     common.copy(gcc.lib_prefix / dir, target_dir / dir)
@@ -48,6 +51,10 @@ def sysroot(env: llvm_environment) -> None:
                         common.copy(file, cpp_dir / dir / file.name)
             case _:
                 gcc = get_specific_environment(env, env.build, target)
+                if not gcc.lib_prefix.exists():
+                    common.toolchains_print(common.toolchains_warning(f"GCC toolchain for {target} does not exist."))
+                    continue
+                common.mkdir(target_dir)
                 if gcc.toolchain_type.contain(common.toolchain_type.native):
                     # 复制include和lib64
                     for dir in ("include", "lib64"):
