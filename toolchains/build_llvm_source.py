@@ -84,10 +84,9 @@ class llvm_support_platform_list:
     arch_list: typing.Final[list[str]] = ["X86", "AArch64", "RISCV", "ARM", "LoongArch", "Mips"]
     project_list: typing.Final[list[str]] = ["clang", "clang-tools-extra", "lld", "lldb", "bolt", "mlir"]
     runtime_list: typing.Final[list[str]] = ["libcxx", "libcxxabi", "libunwind", "compiler-rt", "openmp"]
-    sysroot_only_list: typing.Final[list[str]] = ["mips64el-linux-gnuabi64"]
+    sysroot_only_list: typing.Final[list[str]] = ["mips64el-linux-gnuabi64", "loongarch64-loongnix-linux-gnu"]
     target_list: typing.Final[list[str]] = [
         *generate_hosted_list_from_gcc(),
-        "loongarch64-loongnix-linux-gnu",
         "armv7m-none-eabi",
         "armv7m-fpv4-none-eabi",
     ]
