@@ -117,6 +117,8 @@ class llvm_environment(common.basic_environment):
     }
     # 如果符号过多则Windows下需要改用该选项
     # dylib_option_list_windows: dict[str, str] = {"BUILD_SHARED_LIBS": "ON"}
+    freestanding_runtimes: typing.Final[str] = "libcxx;libcxxabi;libunwind;compiler-rt"  # 独立环境下要构建的运行时项目
+    host_runtimes: typing.Final[str] = f"{freestanding_runtimes};openmp"  # 宿主环境下要构建的运行时项目
     llvm_option_list: typing.Final[dict[str, str]] = {  # 第1阶段编译选项，同时构建工具链和运行库
         "CMAKE_BUILD_TYPE": "Release",  # 设置构建类型
         "LLVM_BUILD_DOCS": "OFF",  # 禁用llvm文档构建
@@ -124,9 +126,9 @@ class llvm_environment(common.basic_environment):
         "LLVM_INCLUDE_BENCHMARKS": "OFF",  # 禁用llvm基准测试构建
         "LLVM_INCLUDE_EXAMPLES": "OFF",  # llvm不包含示例
         "LLVM_INCLUDE_TESTS": "OFF",  # llvm不包含单元测试
-        "LLVM_TARGETS_TO_BUILD": '"X86;AArch64;RISCV;ARM;LoongArch;Mips"',  # 设置需要构建的目标
-        "LLVM_ENABLE_PROJECTS": '"clang;clang-tools-extra;lld;lldb;bolt"',  # 设置一同构建的子项目
-        "LLVM_ENABLE_RUNTIMES": '"libcxx;libcxxabi;libunwind;compiler-rt;openmp"',  # 设置一同构建的运行时项目
+        "LLVM_TARGETS_TO_BUILD": '"X86;AArch64;RISCV;ARM;LoongArch;Mips;SPIRV;AMDGPU;NVPTX"',  # 设置需要构建的目标
+        "LLVM_ENABLE_PROJECTS": '"clang;clang-tools-extra;lld;lldb;bolt;polly"',  # 设置一同构建的子项目
+        "LLVM_ENABLE_RUNTIMES": f'"{host_runtimes}"',  # 设置一同构建的运行时项目
         "LLVM_ENABLE_WARNINGS": "OFF",  # 禁用警告
         "LLVM_ENABLE_LTO": "Thin",  # 启用lto
         "LLVM_INCLUDE_TESTS": "OFF",  # llvm不包含单元测试
@@ -146,6 +148,8 @@ class llvm_environment(common.basic_environment):
         "LIBCXXABI_INCLUDE_TESTS": "OFF",  # 禁用libcxxabi测试
         "LLDB_INCLUDE_TESTS": "OFF",  # 禁用lldb测试
         "LIBOMP_OMPD_GDB_SUPPORT": "OFF",  # 禁用openmpd的gdb支持，该支持需要python，而交叉编译时无法提供
+        "COMPILER_RT_USE_BUILTINS_LIBRARY": "ON", # 使用compiler-rt的builtins库
+        "COMPILER_RT_USE_ATOMIC_LIBRARY": "ON", # 使用compiler-rt的atomic库
     }
     lib_option: typing.Final[dict[str, dict[str, str]]] = {  # llvm依赖库编译选项
         "libxml2": {
@@ -195,7 +199,7 @@ class llvm_environment(common.basic_environment):
         "LIBCXXABI_ENABLE_SHARED": "OFF",
         "LIBCXXABI_ENABLE_EXCEPTIONS": "OFF",
         "LIBCXXABI_BAREMETAL": "ON",
-        "LLVM_ENABLE_RUNTIMES": '"libcxx;libcxxabi;libunwind;compiler-rt"',
+        "LLVM_ENABLE_RUNTIMES": f'"{freestanding_runtimes}"',
         "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
         "BUILD_SHARED_LIBS": "OFF",
         "LIBCXX_ENABLE_SHARED": "OFF",
@@ -296,6 +300,8 @@ class llvm_environment(common.basic_environment):
             self.prefix[f"{target}-runtimes"] = self.build_tmp / f"{target}-runtimes-install"
             self.sysroot_dir[target] = self.prefix_dir / "sysroot"
             self.generator_list[target] = default_generator
+        # libclc与cpu平台无关，只随llvm构建一次
+        self.llvm_build_options.cmake_option["LLVM_ENABLE_RUNTIMES"] = f'"{self.host_runtimes};libclc"'
         for lib in lib_list:
             self.prefix[lib] = (
                 self.build_tmp / f"{self.host}-{lib}-install" if lib != "zstd" else self.build_tmp / f"{self.host}-clang-{lib}-install"
@@ -442,9 +448,9 @@ class llvm_environment(common.basic_environment):
                     for item in src_dir.iterdir():
                         # 复制compiler-rt
                         if item.name == self.runtime_build_options[target].system_name.lower():
-                            if target == self.build:
-                                continue
                             rt_dir = self.compiler_rt_dir / gnu_to_llvm(target)
+                            if target == self.build:
+                                common.remove(rt_dir)
                             common.mkdir(rt_dir, False)
                             for file in item.iterdir():
                                 name = file.name
@@ -515,7 +521,7 @@ class llvm_environment(common.basic_environment):
         dst_prefix = self.prefix["llvm"] / ("bin" if common.triplet_field(self.host).os == "w64" else "lib")
         native_dir = self.prefix_dir / f"{self.build}-clang{self.major_version}"
         native_bin_dir = native_dir / "bin"
-        native_compiler_rt_dir = native_dir / "lib" / "clang" / self.major_version / "lib"
+        native_compiler_rt_dir = native_dir / "lib" / "clang" / self.major_version
         # 复制libc++和libunwind运行库
         if self.family == runtime_family.llvm:
             for file in filter(
@@ -539,10 +545,10 @@ class llvm_environment(common.basic_environment):
             common.copy(item, dst_prefix / item.name)
 
         if self.build != self.host:
-            # 从build下的本地工具链复制compiler-rt
+            # 从build下的本地工具链复制compiler-rt和libclc
             # 其他库在sysroot中，无需复制
             src_prefix = native_compiler_rt_dir
-            dst_prefix = self.compiler_rt_dir
+            dst_prefix = self.compiler_rt_dir.parent
             common.copy(src_prefix, dst_prefix)
 
             # 复制依赖库运行时
