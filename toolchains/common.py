@@ -1757,13 +1757,13 @@ class basic_compress_configure(basic_prefix_configure):
     long_distance_match: int
 
     def __init__(
-        self, jobs: int = (os.cpu_count() or 1) + 2, compress_level: int = 17, long_distance_match: int = 27, **kwargs: typing.Any
+        self, jobs: int = (os.cpu_count() or 1) + 2, compress_level: int = 19, long_distance_match: int = 27, **kwargs: typing.Any
     ) -> None:
         """初始化工具链构建配置
 
         Args:
             jobs (int, optional): 构建时的并发数. 默认为当前平台cpu核心数的1.5倍.
-            compress_level (int, optional): zstd压缩等级(1~22). 默认为17级.
+            compress_level (int, optional): zstd压缩等级(1~22). 默认为19级.
             long_distance_match (int): 长距离匹配窗口大小. 默认为27.
         """
 
@@ -2127,7 +2127,7 @@ def toolchains_main(main: Callable[[], None], need_timer: bool = False) -> int:
         if need_timer:
             toolchains_print(timer.stop())
         status_counter.show_status()
-        return errno
+    return errno
 
 
 class binfmt:
