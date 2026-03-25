@@ -4,8 +4,8 @@
 
 | 项目 | 版本         |
 | :--- | :----------- |
-| OS   | Ubuntu 24.10 |
-| LLVM | 20.0.0       |
+| OS   | Ubuntu 25.10 |
+| LLVM | 23.0.0       |
 | GCC  | 16.0.0       |
 
 ## 准备工作
@@ -97,16 +97,16 @@ sysroot
 首先编译llvm：
 
 ```shell
-export llvm_prefix=~/x86_64-linux-gnu-clang20
+export llvm_prefix=~/x86_64-linux-gnu-clang23
 export runtimes_prefix=$llvm_prefix/install
-export compiler_rt_prefix=$llvm_prefix/lib/clang/20/lib
+export compiler_rt_prefix=$llvm_prefix/lib/clang/23/lib
 # 启用动态链接以减小项目体积
 export dylib_option_list="-DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_BUILD_LLVM_DYLIB=ON -DCLANG_LINK_CLANG_DYLIB=ON"
 # 设置构建模式为Release
 # 关闭llvm文档、示例、基准测试和单元测试的构建
-# 构建目标：X86;AArch64;RISCV;ARM;LoongArch
+# 构建目标：X86;AArch64;RISCV;ARM;LoongArch;SPIRV;AMDGPU;NVPTX
 # 在编译llvm时编译子项目：clang;lld
-# 在编译llvm时编译运行时：libcxx;libcxxabi;libunwind;compiler-rt
+# 在编译llvm时编译运行时：libcxx;libcxxabi;libunwind;compiler-rt;libclc
 # 禁用警告以减少回显噪音
 # 关闭clang单元测试的构建
 # 禁止基准测试安装文档
@@ -119,7 +119,7 @@ export dylib_option_list="-DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_BUILD_LLVM_DYLIB=ON -
 # compiler-rt只需构建默认目标即可，禁止自动构建multilib
 # 使用libcxx构建compiler-rt中的asan等项目
 # 值得注意的是，libunwind的构建早于compiler-rt，故而此处不能选择使用compiler-rt编译libunwind
-export llvm_option_list1='-DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_DOCS=OFF -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_TARGETS_TO_BUILD="X86;AArch64;RISCV;ARM;LoongArch" -DLLVM_ENABLE_PROJECTS="clang;lld" -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind;compiler-rt" -DLLVM_ENABLE_WARNINGS=OFF -DCLANG_INCLUDE_TESTS=OFF -DCLANG_DEFAULT_LINKER=lld -DLLVM_ENABLE_LLD=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DLIBCXX_INCLUDE_BENCHMARKS=OFF -DLIBCXX_USE_COMPILER_RT=ON -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=ON -DLIBCXXABI_USE_COMPILER_RT=ON -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON -DCOMPILER_RT_USE_LIBCXX=ON'
+export llvm_option_list1='-DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_DOCS=OFF -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_TARGETS_TO_BUILD="X86;AArch64;RISCV;ARM;LoongArch;SPIRV;AMDGPU;NVPTX" -DLLVM_ENABLE_PROJECTS="clang;lld" -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind;compiler-rt;libclc" -DLLVM_ENABLE_WARNINGS=OFF -DCLANG_INCLUDE_TESTS=OFF -DCLANG_DEFAULT_LINKER=lld -DLLVM_ENABLE_LLD=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DLIBCXX_INCLUDE_BENCHMARKS=OFF -DLIBCXX_USE_COMPILER_RT=ON -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=ON -DLIBCXXABI_USE_COMPILER_RT=ON -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON -DCOMPILER_RT_USE_LIBCXX=ON'
 # 设置编译器为clang
 # 编译器目标平台：x86_64-linux-gnu
 # 禁用unused-command-line-argument警告并设置gcc查找路径以使用最新的gcc
@@ -145,6 +145,7 @@ ninja -C build install/strip -j 20
 `-DLIBCXXABI_ENABLE_SHARED=OFF`和`-DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON`选项。参见[GitHub Issue](https://github.com/llvm/llvm-project/issues/62798)。
 而编译runtimes需要较新的Linux header和Glibc，故而不能为`loongarch64-loongnix-linux-gnu`等老旧目标编译runtimes。
 同时在为arm平台编译runtimes时需要armv6+的配置才能完成编译，故而需要为`$flags`增加`-march=armv6`选项。
+对于`libclc`，这是与cpu平台无关的库，故只需要编译一次即可。
 
 ```shell
 # 静态构建libcxxabi
@@ -209,9 +210,9 @@ def overwrite_copy(src: str, dst: str):
         shutil.copyfile(src, dst, follow_symlinks=False)
 
 home = os.path.expanduser("~")
-prefix = f"{home}/x86_64-linux-gnu-clang20/install"
+prefix = f"{home}/x86_64-linux-gnu-clang23/install"
 sysroot = f"{home}/sysroot"
-compiler_rt = f"{home}/x86_64-linux-gnu-clang20/lib/clang/20/lib"
+compiler_rt = f"{home}/x86_64-linux-gnu-clang23/lib/clang/23/lib"
 for dir in os.listdir(prefix):
     src_dir = os.path.join(prefix, dir)
     match dir:
@@ -259,10 +260,10 @@ overwrite_copy(src_dir, dst_dir)
 
 ```shell
 # 重复部分参考llvm_option_list1
-# 增加子项目：clang-tools-extra
+# 增加子项目：clang-tools-extra;lldb;bolt;polly
 # 开启LTO以提升性能
 # 设置clang默认运行库为libcxx、libunwind和compiler-rt
-export llvm_option_list2='-DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_DOCS=OFF -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_TARGETS_TO_BUILD="X86;AArch64;RISCV;ARM;LoongArch" -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DLLVM_ENABLE_WARNINGS=OFF -DCLANG_INCLUDE_TESTS=OFF -DBENCHMARK_INSTALL_DOCS=OFF -DCLANG_DEFAULT_LINKER=lld -DLLVM_ENABLE_LLD=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DLIBCXX_INCLUDE_BENCHMARKS=OFF -DLIBCXX_USE_COMPILER_RT=ON -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=ON -DLIBCXXABI_USE_COMPILER_RT=ON -DLIBUNWIND_USE_COMPILER_RT=ON -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON -DCOMPILER_RT_USE_LIBCXX=ON -DLLVM_ENABLE_LTO=Thin -DCLANG_DEFAULT_CXX_STDLIB=libc++ -DCLANG_DEFAULT_RTLIB=compiler-rt -DCLANG_DEFAULT_UNWINDLIB=libunwind'
+export llvm_option_list2='-DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_DOCS=OFF -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_TARGETS_TO_BUILD="X86;AArch64;RISCV;ARM;LoongArch" -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld;lldb;bolt;polly" -DLLVM_ENABLE_WARNINGS=OFF -DCLANG_INCLUDE_TESTS=OFF -DBENCHMARK_INSTALL_DOCS=OFF -DCLANG_DEFAULT_LINKER=lld -DLLVM_ENABLE_LLD=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DLIBCXX_INCLUDE_BENCHMARKS=OFF -DLIBCXX_USE_COMPILER_RT=ON -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=ON -DLIBCXXABI_USE_COMPILER_RT=ON -DLIBUNWIND_USE_COMPILER_RT=ON -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON -DCOMPILER_RT_USE_LIBCXX=ON -DLLVM_ENABLE_LTO=Thin -DCLANG_DEFAULT_CXX_STDLIB=libc++ -DCLANG_DEFAULT_RTLIB=compiler-rt -DCLANG_DEFAULT_UNWINDLIB=libunwind'
 # 切换运行库为llvm相关库
 export lib_flags="-stdlib=libc++ -unwindlib=libunwind -rtlib=compiler-rt"
 # 设置编译器为clang并且使用llvm相关库
@@ -293,10 +294,10 @@ ninja -C build install/strip -j 20
 
 ```shell
 cd ~
-tar -cf x86_64-linux-gnu-clang20.tar x86_64-linux-gnu-clang20
+tar -cf x86_64-linux-gnu-clang23.tar x86_64-linux-gnu-clang23
 tar -cf sysroot.tar sysroot
-xz -ev9 -T 0 --memlimit=14GiB x86_64-linux-gnu-clang20.tar
-xz -ev9 -T 0 --memlimit=14GiB sysroot.tar
+zstd -19 --long -T 18 x86_64-linux-gnu-clang23.tar
+zstd -19 --long -T 18 sysroot.tar
 ```
 
 ### 编译x86_64-w64-mingw32-llvm工具链
@@ -308,7 +309,7 @@ xz -ev9 -T 0 --memlimit=14GiB sysroot.tar
 此处需要编译的依赖库为`zlib`和`libxml2`。
 
 ```shell
-export native_prefix=~/x86_64-linux-gnu-clang20
+export native_prefix=~/x86_64-linux-gnu-clang23
 export zlib_prefix=~/zlib/install
 export libxml2_prefix=~/libxml2/install
 # 切换运行库为llvm相关库，编译libxml2需要ws2_32和bcrypt，为简化流程而在此处添加
@@ -341,7 +342,7 @@ export llvm_cross_option="-DLIBXML2_INCLUDE_DIR=\"$libxml2_prefix/include/libxml
 #### (2)编译llvm
 
 ```shell
-export prefix=~/$host-clang20
+export prefix=~/$host-clang23
 # 如果符号过多则需要改用-DBUILD_SHARED_LIBS=ON
 export dylib_option_list="-DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_BUILD_LLVM_DYLIB=ON -DCLANG_LINK_CLANG_DYLIB=ON"
 export llvm_option_list1='-DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_DOCS=OFF -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_TARGETS_TO_BUILD="X86;AArch64;RISCV;ARM;LoongArch" -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind;compiler-rt" -DLLVM_ENABLE_WARNINGS=OFF -DCLANG_INCLUDE_TESTS=OFF -DBENCHMARK_INSTALL_DOCS=OFF -DCLANG_DEFAULT_LINKER=lld -DLLVM_ENABLE_LLD=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DLIBCXX_INCLUDE_BENCHMARKS=OFF -DLIBCXX_USE_COMPILER_RT=ON -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=ON -DLIBCXXABI_USE_COMPILER_RT=ON -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON -DCOMPILER_RT_USE_LIBCXX=ON'
@@ -362,8 +363,8 @@ ninja -C build install/strip -j 20
 
 ```shell
 # 复制compiler-rt
-export src_dir=$native_prefix/lib/clang/20/lib
-export dst_dir=$prefix/lib/clang/20/lib
+export src_dir=$native_prefix/lib/clang/23/lib
+export dst_dir=$prefix/lib/clang/23/lib
 cp -rf $src_dir $dst_dir
 # 复制libxml2.dll
 cp $libxml2_prefix/bin/libxml2.dll $prefix/bin
@@ -377,6 +378,6 @@ cp -r $native_prefix/include/c++ $prefix/include
 cp $native_prefix/include/*unwind* $prefix/include
 # 打包工具链
 cd ~
-tar -cf $host-clang20.tar $host-clang20
-xz -ev9 -T 0 --memlimit=14GiB $host-clang20.tar
+tar -cf $host-clang23.tar $host-clang23
+zstd -19 --long -T 18 $host-clang23.tar
 ```
