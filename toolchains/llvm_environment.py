@@ -249,7 +249,7 @@ class llvm_environment(common.basic_environment):
         self.host = host or self.build
         self.family = family
         name_without_version = f"{self.host}-clang"
-        super().__init__(build, "22.0.0", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match, build_tmp)
+        super().__init__(build, "23.0.0", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match, build_tmp)
         # 设置prefix
         self.prefix["llvm"] = self.prefix_dir / self.name
         self.compiler_rt_dir = self.prefix["llvm"] / "lib" / "clang" / self.major_version / "lib"
