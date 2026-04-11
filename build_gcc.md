@@ -32,7 +32,7 @@ sudo apt install bison flex texinfo make automake autoconf libtool git gcc g++ g
 
 ```shell
 git clone https://github.com/gcc-mirror/gcc.git --depth=1 gcc
-git clone https://github.com/bminor/binutils-gdb.git --depth=1 binutils
+git clone https://sourceware.org/git/binutils-gdb.git --depth=1 binutils
 git clone https://github.com/mirror/mingw-w64.git --depth=1 mingw
 git clone https://github.com/libexpat/libexpat.git --depth=1 expat
 cd  ~/expat/expat
@@ -40,7 +40,7 @@ cd  ~/expat/expat
 cd ~
 git clone https://github.com/torvalds/linux.git --depth=1 linux
 # glibc版本要与目标系统使用的版本对应
-git clone https://github.com/bminor/glibc.git -b release/2.39/master --depth=1 glibc
+git clone https://sourceware.org/git/glibc.git -b release/2.39/master --depth=1 glibc
 git clone https://github.com/bocke/pexports.git --depth=1 pexports
 cd ~/pexports
 autoreconf -if
