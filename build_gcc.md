@@ -5,12 +5,12 @@
 | 项目        | 版本         |
 | :---------- | :----------- |
 | OS          | Ubuntu 25.04 |
-| GCC         | 16.0.1       |
-| GDB         | 17.0.50      |
-| Binutils    | 2.45.1       |
+| GCC         | 17.0.0       |
+| GDB         | 18.0.50      |
+| Binutils    | 2.47.50      |
 | Python $^*$ | 3.13.5       |
-| Linux       | v6.18-rc6    |
-| Glibc       | 2.41         |
+| Linux       | v7.2-rc4     |
+| Glibc       | 2.43         |
 | Mingw-w64   | 12.0.0       |
 | PExports    | 0.47         |
 | Iconv       | 1.18         |
@@ -40,7 +40,7 @@ cd  ~/expat/expat
 cd ~
 git clone https://github.com/torvalds/linux.git --depth=1 linux
 # glibc版本要与目标系统使用的版本对应
-git clone https://sourceware.org/git/glibc.git -b release/2.39/master --depth=1 glibc
+git clone https://sourceware.org/git/glibc.git -b release/2.43/master --depth=1 glibc
 git clone https://github.com/bocke/pexports.git --depth=1 pexports
 cd ~/pexports
 autoreconf -if

@@ -248,7 +248,7 @@ class all_lib_list:
     git_lib_list_github: typing.Final[dict[str, git_url]] = {
         "gcc": git_url("github.com", "gcc-mirror/gcc.git"),
         "binutils": git_url("github.com", "bminor/binutils-gdb.git"),
-        "mingw": git_url("github.com", "mirror/mingw-w64.git"),
+        "mingw": git_url("git.code.sf.net", "p/mingw-w64/mingw-w64.git"),
         "expat": git_url("github.com", "libexpat/libexpat.git"),
         "linux": git_url("github.com", "torvalds/linux.git"),
         "glibc": git_url("sourceware.org", "git/glibc.git"),
@@ -263,8 +263,6 @@ class all_lib_list:
         **git_lib_list_github,
         "gcc": git_url("gcc.gnu.org", "git/gcc.git", "git"),
         "binutils": git_url("sourceware.org", "git/binutils-gdb.git"),
-        "mingw": git_url("git.code.sf.net", "p/mingw-w64/mingw-w64 mingw-w64-mingw-w64.git", "git"),
-        "glibc": git_url("sourceware.org", "git/glibc.git"),
         "pexports": git_url("git.osdn.net", "gitroot/mingw/pexports.git", "git"),
         "libxml2": git_url("gitlab.gnome.org", "GNOME/libxml2.git"),
     }
