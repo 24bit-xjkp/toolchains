@@ -11,7 +11,7 @@ from .build_llvm_source import *
 from .gcc_environment import get_specific_environment
 
 
-def sysroot(env: llvm_environment) -> None:
+def sysroot(env: llvm_environment, target_list: list[str]) -> None:
     """从已安装的gcc中复制库并创建sysroot
 
     Args:
@@ -22,7 +22,7 @@ def sysroot(env: llvm_environment) -> None:
     common.mkdir(sysroot_dir, True)
     libgcc_prefix = sysroot_dir / "lib" / "gcc"
     common.mkdir(libgcc_prefix)
-    for target in [*llvm_support_platform_list.target_list, *llvm_support_platform_list.sysroot_only_list]:
+    for target in target_list:
         target_dir = sysroot_dir / target
         match (target):
             case "armv7m-none-eabi" | "armv7m-fpv4-none-eabi":
@@ -114,6 +114,11 @@ def main() -> int:
     args = parser.parse_args()
 
     def do_main() -> None:
+        assert isinstance(args.build, str)
+        # 处理build平台带有vendor的情况
+        build_triplet = common.triplet_field(args.build)
+        target_list = llvm_support_platform_list.target_list.copy()
+        target_list = [args.build if build_triplet.weak_eq(common.triplet_field(target)) else target for target in target_list]
         match (args.command):
             case "sysroot":
                 sysroot_config_v: dict[str, typing.Any] = sysroot_config.parse_args(args).get_public_fields()
@@ -125,14 +130,18 @@ def main() -> int:
                 sysroot_config_v["family"] = runtime_family.gnu
                 sysroot_config_v["runtime_target_list"] = [sysroot_config_v["build"]]
                 sysroot_config_v["build_tmp"] = Path.home() / "build_tmp"
-                sysroot(llvm_environment(**sysroot_config_v))
+                sysroot(llvm_environment(**sysroot_config_v), [*target_list, *llvm_support_platform_list.sysroot_only_list])
             case "build":
                 build_config = llvm_configure.parse_args(args)
-                assert args.host in llvm_support_platform_list.host_list, common.toolchains_error(f"Host {args.host} is not supported.")
+                host_triplet = common.triplet_field(args.host)
+                assert any(
+                    host_triplet.weak_eq(common.triplet_field(support_host)) for support_host in llvm_support_platform_list.host_list
+                ), common.toolchains_error(f"Host {args.host} is not supported.")
+
                 env = llvm_environment(
                     host=args.host,
                     family=args.family,
-                    runtime_target_list=llvm_support_platform_list.target_list,
+                    runtime_target_list=target_list,
                     **build_config.get_public_fields(),
                 )
                 build_specific_llvm(env)

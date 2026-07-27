@@ -148,8 +148,8 @@ class llvm_environment(common.basic_environment):
         "LIBCXXABI_INCLUDE_TESTS": "OFF",  # 禁用libcxxabi测试
         "LLDB_INCLUDE_TESTS": "OFF",  # 禁用lldb测试
         "LIBOMP_OMPD_GDB_SUPPORT": "OFF",  # 禁用openmpd的gdb支持，该支持需要python，而交叉编译时无法提供
-        "COMPILER_RT_USE_BUILTINS_LIBRARY": "ON", # 使用compiler-rt的builtins库
-        "COMPILER_RT_USE_ATOMIC_LIBRARY": "ON", # 使用compiler-rt的atomic库
+        "COMPILER_RT_USE_BUILTINS_LIBRARY": "ON",  # 使用compiler-rt的builtins库
+        "COMPILER_RT_USE_ATOMIC_LIBRARY": "ON",  # 使用compiler-rt的atomic库
     }
     lib_option: typing.Final[dict[str, dict[str, str]]] = {  # llvm依赖库编译选项
         "libxml2": {
@@ -249,7 +249,7 @@ class llvm_environment(common.basic_environment):
         self.host = host or self.build
         self.family = family
         name_without_version = f"{self.host}-clang"
-        super().__init__(build, "23.0.0", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match, build_tmp)
+        super().__init__(build, "24.0.0", name_without_version, home, jobs, prefix_dir, compress_level, long_distance_match, build_tmp)
         # 设置prefix
         self.prefix["llvm"] = self.prefix_dir / self.name
         self.compiler_rt_dir = self.prefix["llvm"] / "lib" / "clang" / self.major_version / "lib"
@@ -264,6 +264,10 @@ class llvm_environment(common.basic_environment):
             {**self.llvm_option_list, **self.dylib_option_list, "LLVM_PARALLEL_LINK_JOBS": str(self.jobs // 6)},
             "Linux" if common.triplet_field(self.host).os == "linux" else "Windows",
         )
+        if family == runtime_family.gnu:
+            self.llvm_build_options.cmake_option["COMPILER_RT_CXX_LIBRARY"] = "default"
+            self.llvm_build_options.cmake_option["COMPILER_RT_USE_BUILTINS_LIBRARY"] = "OFF"
+            self.llvm_build_options.cmake_option["COMPILER_RT_USE_ATOMIC_LIBRARY"] = "OFF"
         self.llvm_build_options.cmake_option["LLDB_ENABLE_PYTHON"] = "ON" if "linux" in self.host else "OFF"
         if self.family == runtime_family.llvm:
             self.llvm_build_options.cmake_option["LIBUNWIND_USE_COMPILER_RT"] = "ON"
@@ -296,12 +300,13 @@ class llvm_environment(common.basic_environment):
                 options.cmake_option.update(self.win32_options)
                 options.cmake_option["CMAKE_ASM_MASM_COMPILER"] = "llvm-ml64" if target.startswith("x86_64") else "llvm-ml"
                 options.cmake_option["CMAKE_RC_FLAGS"] = "--target=pe-x86-64" if target.startswith("x86_64") else "--target=pe-i386"
+                if target.startswith("i686"):
+                    # i686-w64-mingw32的openmp支持链接失败，可能是llvm24的一个bug
+                    options.cmake_option["LLVM_ENABLE_RUNTIMES"] = f'"{self.freestanding_runtimes}"'
             self.build_dir[f"{target}-runtimes"] = self.build_tmp / f"{target}-runtimes"
             self.prefix[f"{target}-runtimes"] = self.build_tmp / f"{target}-runtimes-install"
             self.sysroot_dir[target] = self.prefix_dir / "sysroot"
             self.generator_list[target] = default_generator
-        # libclc与cpu平台无关，只随llvm构建一次
-        self.llvm_build_options.cmake_option["LLVM_ENABLE_RUNTIMES"] = f'"{self.host_runtimes};libclc"'
         for lib in lib_list:
             self.prefix[lib] = (
                 self.build_tmp / f"{self.host}-{lib}-install" if lib != "zstd" else self.build_tmp / f"{self.host}-clang-{lib}-install"
@@ -334,8 +339,10 @@ class llvm_environment(common.basic_environment):
                     "LLVM_NATIVE_TOOL_DIR": f'"{self.prefix["llvm"] / f'{self.build}-clang{self.major_version}' / "bin"}"',
                 }
             )
-        # 将自身注册到环境变量中
-        self.register_in_env()
+        if self.family == runtime_family.gnu:
+            # 在gnu系下将自身注册到环境变量中
+            # 在llvm系下，依赖已经编译好的libc++等库，因此需要使用已有的工具链
+            self.register_in_env()
         self.after_build_sysroot = {}
 
     def get_compiler(self, target: str, command_list_in: list[str], lang: list[str]) -> list[str]:
@@ -545,7 +552,7 @@ class llvm_environment(common.basic_environment):
             common.copy(item, dst_prefix / item.name)
 
         if self.build != self.host:
-            # 从build下的本地工具链复制compiler-rt和libclc
+            # 从build下的本地工具链复制compiler-rt
             # 其他库在sysroot中，无需复制
             src_prefix = native_compiler_rt_dir
             dst_prefix = self.compiler_rt_dir.parent
