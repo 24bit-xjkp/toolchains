@@ -1,4 +1,4 @@
----@alias modifier_t fun(toolchain: unknown, opt: table<string, unknown>): void
+---@alias modifier_t fun(toolchain: unknown, opt: opt_t): void
 ---@alias modifier_table_t table<string, modifier_t>
 ---@class sysroot_t
 ---@field public ldflags string
@@ -75,6 +75,8 @@ local arm32_arch_list = { "armv4", "armv4t", "armv5t", "armv5te", "armv5tej", "a
 ---@param opt opt_t
 ---@return void
 function armv7m_modifier(_, opt)
+    ---@type opt_t
+    local _opt = opt
     _reset_march("armv7-m", arm32_arch_list, opt)
     _reset_sysroot("armv7m-none-eabi", opt)
 end

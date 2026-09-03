@@ -1,9 +1,9 @@
 import("common")
 
----根据arch和plat推导target和modifier
----@param target string @目标平台
+--- 根据arch和plat推导target和modifier
+---@param target    string @目标平台
 ---@param toolchain string @工具链名称
----@return string @目标平台
+---@return string     @目标平台
 ---@return modifier_t @调整函数
 function get_target_modifier(target, toolchain)
     ---@type modifier_table_t
@@ -17,6 +17,7 @@ function get_target_modifier(target, toolchain)
     local modifier
     ---@type string?, modifier_t?
     target, modifier = table.unpack(cache_info["target"] or {})
+    ---@diagnostic disable-next-line
     if target and modifier then -- 已经探测过，直接返回target和modifier
         return target, modifier
     end
@@ -29,7 +30,7 @@ function get_target_modifier(target, toolchain)
     local target_os = get_config("target_os") or "none"
     local message = [[Unsupported %s "%s". Please select a specific toolchain.]]
 
-    ---将xmake风格arch映射为triplet风格
+    --- 将xmake风格arch映射为triplet风格
     ---@type map_t
     local arch_table = {
         x86 = "i686",
@@ -67,12 +68,7 @@ function get_target_modifier(target, toolchain)
     assert(plat, format(message, "plat", origin_plat))
 
     ---@type map_t
-    local x86_abi_table = {
-        windows = "msvc",
-        w64 = "mingw32",
-        linux = "gnu",
-        none = "elf"
-    }
+    local x86_abi_table = { windows = "msvc", w64 = "mingw32", linux = "gnu", none = "elf" }
     ---@type map_t
     local linux_abi_table = { linux = "gnu" }
     ---@type table<string, map_t>
@@ -104,6 +100,7 @@ function get_target_modifier(target, toolchain)
     ---@type modifier_t?
     modifier = target_list[target]
     cprint("detecting for target .. " .. (modifier and "${color.success}" or "${color.failure}") .. target)
+    ---@diagnostic disable-next-line
     assert(modifier, format(message, "target", target))
 
     cache_info["target"] = { target, modifier }
@@ -112,22 +109,22 @@ function get_target_modifier(target, toolchain)
     return target, modifier
 end
 
----根据选项或探测结果获取sysroot选项列表
+--- 根据选项或探测结果获取sysroot选项列表
 ---@return table<string, string>? @选项列表
 function get_sysroot_option()
     ---@type table<string, any>
     local cache_info = common.get_cache()
-    ---sysroot缓存
+    --- sysroot缓存
     ---@type string?
     local sysroot = cache_info["sysroot"]
-    ---根据sysroot获取选项列表
+    --- 根据sysroot获取选项列表
     ---@return table<string, string> --选项列表
     local function get_option_list()
         local sysroot_option = "--sysroot=" .. sysroot
         return { cxflags = sysroot_option, ldflags = sysroot_option, shflags = sysroot_option }
     end
     if sysroot == "" then
-        return nil               -- 已经探测过，无sysroot可用
+        return nil -- 已经探测过，无sysroot可用
     elseif sysroot then
         return get_option_list() -- 已经探测过，使用缓存的sysroot
     end
@@ -142,7 +139,7 @@ function get_sysroot_option()
     ---@type boolean
     detect = detect and common.is_clang()
     cache_info["sysroot_set_by_user"] = sysroot and true or false
-    if sysroot then    -- 有指定sysroot则检查合法性
+    if sysroot then -- 有指定sysroot则检查合法性
         assert(os.isdir(sysroot), string.format([[The sysroot "%s" is not a directory.]], sysroot))
     elseif detect then -- 尝试探测
         ---@type string?
@@ -150,7 +147,7 @@ function get_sysroot_option()
         if get_config("bin") then
             prefix = path.join(string.trim(get_config("bin")), "..")
         else
-            prefix = try { function() return os.iorunv("llvm-config", { "--prefix" }) end }
+            prefix = try { function () return os.iorunv("llvm-config", { "--prefix" }) end }
             prefix = prefix and string.trim(prefix)
         end
         if prefix then
@@ -180,8 +177,8 @@ function get_sysroot_option()
     end
 end
 
----获取march选项
----@param target string? @目标平台
+--- 获取march选项
+---@param target    string? @目标平台
 ---@param toolchain string? @工具链类型
 ---@note 在target和toolchain存在时才检查选项合法性
 ---@return string? @march选项
@@ -195,12 +192,12 @@ function get_march_option(target, toolchain)
     ---@type string?
     local option = cache_info[march_key]
     if option == "" then
-        return nil    -- 已经探测过，-march不受支持
+        return nil -- 已经探测过，-march不受支持
     elseif option then
         return option -- 已经探测过，支持-march选项
     end
 
-    ---探测march是否受支持
+    --- 探测march是否受支持
     ---@type string
     local arch = get_config(march_key)
     if arch ~= "none" then
@@ -236,14 +233,14 @@ function get_march_option(target, toolchain)
     return option
 end
 
----获取rtlib选项
+--- 获取rtlib选项
 ---@return string? @rtlib选项
 function get_rtlib_option()
     local config = get_config("rtlib")
     return (common.is_clang() and config ~= "default") and "-rtlib=" .. config or nil
 end
 
----获取unwindlib选项
+--- 获取unwindlib选项
 ---@return string? @unwindlib选项
 function get_unwindlib_option()
     local config = get_config("unwindlib")
@@ -253,7 +250,7 @@ function get_unwindlib_option()
     return (common.is_clang() and (force or get_config("rtlib") == "compiler-rt")) and option or nil
 end
 
----将mode映射为cmake风格
+--- 将mode映射为cmake风格
 ---@param mode string @xmake风格编译模式
 ---@return string? @cmake风格编译模式
 function get_cmake_mode(mode)
@@ -263,17 +260,18 @@ function get_cmake_mode(mode)
 end
 
 ---@class check_target_for_coverage_opt_t
----@field option_name string? @选项名称，默认为target
+---@field option_name string?  @选项名称，默认为target
 ---@field allow_kinds string[] @允许的目标类型，默认为{"binary", "shared"}
----@field is_array boolean? @是否为数组，默认为false
+---@field is_array    boolean? @是否为数组，默认为false
 
----检查目标是否支持覆盖率分析
+--- 检查目标是否支持覆盖率分析
 ---@param opt check_target_for_coverage_opt_t? @选项名称，默认为target
 ---@return table | table[] @目标实例
 function check_target_for_coverage(opt)
     import("core.base.option")
     import("core.project.project")
 
+    ---@diagnostic disable-next-line
     ---@type check_target_for_coverage_opt_t
     opt = opt or {}
     local option_name = opt.option_name or "target"
@@ -282,7 +280,7 @@ function check_target_for_coverage(opt)
     local len = #allow_kinds
     local message = table.concat(allow_kinds, ", ", 1, len - 1) .. ", or " .. allow_kinds[len]
 
-    ---检查目标是否支持覆盖率分析
+    --- 检查目标是否支持覆盖率分析
     ---@param target_name string? @目标名称
     ---@return table | table[] @目标实例
     local function do_check(target_name)
@@ -303,6 +301,7 @@ function check_target_for_coverage(opt)
         target_names = table.unique(target_names)
         ---@type table[]
         local targets = {}
+        ---@diagnostic disable-next-line
         for _, target_name in ipairs(target_names) do
             table.insert(targets, do_check(target_name))
         end
@@ -314,9 +313,9 @@ function check_target_for_coverage(opt)
     end
 end
 
----覆盖率分析任务执行成功后的回显函数
+--- 覆盖率分析任务执行成功后的回显函数
 ---@param output_path string @输出目录
----@param start_time number @任务开始时间
+---@param start_time  number @任务开始时间
 function coverage_task_echo_on_success(output_path, start_time)
     local seconds = (os.mclock() - start_time) / 1000
     cprint("${color.success}[100%%]: Output has been written to %s, spent %.3f s", output_path, seconds)
