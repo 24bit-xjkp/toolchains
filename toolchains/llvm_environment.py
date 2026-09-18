@@ -596,6 +596,9 @@ class build_llvm_environment:
             with common.cached_lib_builder(env.prefix[runtimes_name], env.host) as is_built:
                 if is_built:
                     continue
+                for opt in option.basic_option:
+                    if opt.startswith(("-stdlib", "-unwindlib", "-rtlib")):
+                        del opt
                 env.config(runtimes_name, target, option.basic_option, option.cmake_option)
                 env.make(runtimes_name, target)
                 env.install(runtimes_name, target)
